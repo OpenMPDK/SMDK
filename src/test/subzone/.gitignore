@@ -1,0 +1,6 @@
+# Object files:
+*.o
+
+# Built binaries:
+test_multithread_malloc
+test_random_malloc

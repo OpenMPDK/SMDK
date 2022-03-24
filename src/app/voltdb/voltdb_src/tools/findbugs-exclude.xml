@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+Exclusion file for findbugs ant task in build.xml
+-->
+<FindBugsFilter>
+  <Match>
+    <Package name="~org\.\w+_voltpatches.*" />
+  </Match>
+  <Match>
+    <Package name="~com\.\w+_voltpatches.*" />
+  </Match>
+  <Match>
+    <Package name="~org\.apache\..*" />
+  </Match>
+  <Match>
+    <Package name="~jsr166y" />
+  </Match>
+  <Match>
+    <Package name="vanilla.java.affinity.impl" />
+  </Match>
+  <Match>
+      <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE, NP_NULL_PARAM_DEREF, NP_NULL_ON_SOME_PATH"/>
+  </Match>
+  <Match>
+    <Class name="org.voltdb.HsqlBackend" />
+  </Match>
+  <Match>
+    <Class name="org.voltdb.PostgreSQLBackend" />
+  </Match>
+</FindBugsFilter>
+
+

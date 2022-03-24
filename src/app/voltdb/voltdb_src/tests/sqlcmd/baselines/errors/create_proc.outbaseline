@@ -1,0 +1,548 @@
+Hack! Table t was found to be sometimes(?) lingering from unrelated prior tests.
+    Drop it conditionally to keep it from polluting show procedure output.
+
+drop table t if exists;
+Command succeeded.
+Expect a blank line output after this one.
+
+Things will not go well if this test is not starting with an empty class list.
+
+--- Empty Class List -----------------------------------------
+
+
+
+create procedure from class sqlcmdtest.Trivial;
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+exec Trivial;
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+create procedure from class sqlcmdtest.Trivial;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ------------------------------------------
+Trivial                   
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.UsesUDF                    
+
+--- Active Procedure Classes ---------------------------------
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Trivial;
+
+create procedure from class sqlcmdtest.BadSwap;
+
+remove classes sqlcmdtest.*;
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.UsesUDF                    
+
+--- Active Procedure Classes ---------------------------------
+ sqlcmdtest.Trivial                    
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Trivial;
+
+drop procedure Trivial;
+Command succeeded.
+
+remove classes sqlcmdtest.*;
+Command succeeded.
+
+create procedure from class sqlcmdtest.Trivial;
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+create procedure from class sqlcmdtest.Breakable0;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ------------------------------------------
+Breakable0                
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
+
+--- Active Procedure Classes ---------------------------------
+ sqlcmdtest.Breakable0                 
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Breakable0;
+
+create procedure from class sqlcmdtest.Trivial;
+Command succeeded.
+
+exec Trivial;
+
+drop procedure Trivial;
+Command succeeded.
+
+drop procedure Breakable0;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+remove classes sqlcmdtest.*;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes sqlcmdtest-killed-procs.jar;
+
+--- Empty Class List -----------------------------------------
+
+
+
+load classes sqlcmdtest-sabotaged-procs.jar;
+Command succeeded.
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable0                 
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+create procedure from class sqlcmdtest.Breakable0;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+--- User Procedures ------------------------------------------
+Breakable0                
+
+
+--- Potential Procedure Classes ------------------------------
+ sqlcmdtest.BadSwap                    
+ sqlcmdtest.BoxedInsertEmployee        
+ sqlcmdtest.Breakable1                 
+ sqlcmdtest.Breakable2                 
+ sqlcmdtest.InsertEmployee             
+ sqlcmdtest.Trivial                    
+ sqlcmdtest.UsesUDF                    
+
+--- Active Procedure Classes ---------------------------------
+ sqlcmdtest.Breakable0                 
+
+--- Non-Procedure Classes ------------------------------------
+ sqlcmdtest.Breakable1$NestedGetsKilled
+
+
+exec Breakable0;
+
+create procedure from class sqlcmdtest.Trivial;
+Command succeeded.
+
+exec Trivial;
+
+drop procedure Trivial;
+Command succeeded.
+
+drop procedure Breakable0;
+Command succeeded.
+
+--- System Procedures ----------------------------------------
+@ElasticRemoveNT          	tinyint, varchar, varchar, bigint
+@Explain                  	varchar
+@ExplainProc              	varchar
+@ExplainView              	varchar
+@GC                       
+@GetPartitionKeys         	varchar
+@JStack                   	int
+@Note                     	varchar
+@Pause                    
+@Ping                     
+@Promote                  
+@QueryStats               	varchar
+@Quiesce                  
+@ResetDR                  	tinyint, tinyint, tinyint
+@Resume                   
+@Shutdown                 
+@SnapshotDelete           	varchar, varchar
+@SnapshotRestore          	varchar, varchar
+@SnapshotRestore          	varchar
+@SnapshotSave             
+@SnapshotSave             	varchar
+@SnapshotSave             	varchar, varchar, bit
+@SnapshotScan             	varchar
+@Statistics               	statisticscomponent, bit
+@StopNode                 	int
+@SwapTables               	varchar, varchar
+@SystemCatalog            	metadataselector
+@SystemInformation        	sysinfoselector
+@Trace                    
+@Trace                    	varchar
+@Trace                    	varchar, varchar
+@UpdateApplicationCatalog 	varchar, varchar
+@UpdateClasses            	varchar, varchar
+@UpdateLicense            	varchar
+@UpdateLogging            	varchar
+@ValidatePartitioning     	int, varbinary
+
+
+remove classes sqlcmdtest.*;
+Command succeeded.
+
+--- Empty Class List -----------------------------------------
+
+
+
+create table swap1 (
+  id integer
+);
+Command succeeded.
+
+create table swap2 (
+  id integer
+);
+Command succeeded.
+
+create procedure badswap as @SwapTables swap2 swap1;
+
+drop table swap1 if exists;
+Command succeeded.
+
+drop table swap2 if exists;
+Command succeeded.
+
+drop table badswap if exists;
+Command succeeded.

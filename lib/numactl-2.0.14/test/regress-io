@@ -1,0 +1,47 @@
+#!/bin/bash
+# test IO affinity parsing
+# tests may fail depending on machine setup
+
+testdir=`dirname "$0"`
+: ${srcdir:=${testdir}/..}
+: ${builddir:=${srcdir}}
+export PATH=${builddir}:$PATH
+
+E=0
+
+check() {
+	echo testing $@
+	if "$@" ; then
+		true
+	else
+		echo failed
+		E=1
+	fi
+
+}
+
+fail() {
+	echo testing failure of $@
+	if "$@" ; then
+		echo failed
+		E=1
+	else
+		true
+	fi
+}
+
+check "${builddir}/test/node-parse" file:.
+check "${builddir}/test/node-parse" ip:8.8.8.8
+fail "${builddir}/test/node-parse" ip:127.0.0.1
+
+IF=$(ip link ls | grep eth | cut -d: -f2 | head -1)
+check "${builddir}/test/node-parse" "netdev:$IF"
+fail "${builddir}/test/node-parse" netdev:lo
+DEV=$(df | awk '/\/$/ { print $1 }')
+check "${builddir}/test/node-parse" file:$DEV
+check "${builddir}/test/node-parse" block:$(basename $DEV)
+check "${builddir}/test/node-parse" pci:0:0.0
+
+if [ "$E" = 0 ] ; then echo SUCCESS ; else echo FAILURE ; fi
+
+exit $E

@@ -1,0 +1,37 @@
+#create
+CREATE TABLE voters (
+    name varchar(50),
+    zipcode varchar(5),
+    registration smallint
+);
+
+#delete
+Drop view registrations_by_zipcode;
+DROP TABLE voters;
+
+#deleteOnly
+DROP TABLE voters;
+
+#name
+voters
+
+#index
+CREATE INDEX voters_index ON voters ( zipcode )
+
+#view
+CREATE VIEW registrations_by_zipcode (
+    zipcode, registered_voters
+) AS
+SELECT zipcode, count(*) from voters where registration=1 GROUP BY zipcode;
+
+#createStoredProcedure
+CREATE PROCEDURE procedureVotersA AS SELECT * FROM voters;
+
+#executeStoredProcedure
+exec procedureVotersA;
+
+#dropStoredProcedure
+DROP PROCEDURE procedureVotersA;
+
+#procedureName
+procedureVotersA

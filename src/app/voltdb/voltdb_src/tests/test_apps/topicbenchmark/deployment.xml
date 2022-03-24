@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!-- IMPORTANT: This file is an auto-generated default deployment configuration.
+                Changes to this file will be overwritten. Copy it elsewhere if you
+                want to use it as a starting point for a custom configuration. -->
+<deployment>
+   <cluster hostcount="1" />
+   <systemsettings>
+      <flushinterval minimum="10">
+          <export interval="10" />
+          <dr interval="500" />
+      </flushinterval>
+   </systemsettings>
+   <topics enabled="true">
+     <broker>
+       <property name="port">9095</property>
+     </broker>
+     <topic name="ALL_VALUES1" procedure="InsertTopic1" retention="1 hr" />
+   </topics>
+</deployment>

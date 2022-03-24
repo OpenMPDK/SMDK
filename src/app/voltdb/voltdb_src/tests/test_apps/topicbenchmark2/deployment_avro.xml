@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<deployment>
+   <!--  multi-node config  -->
+   <!--  cluster hostcount="3" sitesperhost="24" kfactor="1" / -->
+   <cluster hostcount="1"  sitesperhost="24" />
+   <!--
+       NOTE: avo registry URL must match the value of the 'schemaregistry' parameter
+   -->
+   <avro registry="http://localhost:8081" namespace="" />
+   <systemsettings>
+      <flushinterval minimum="10">
+          <export interval="100" />
+      </flushinterval>
+   </systemsettings>
+    <threadpools>
+      <!-- make this 2 * number of cores (32 cores on volt16)
+      as some subscribers can block on I/O while others are transcoding poll results -->
+      <pool name="topicbenchmark" size="64" />
+    </threadpools>
+    <topics enabled="true" threadpool="topicbenchmark">
+     <broker>
+       <property name="port">9095</property>
+       <!--  should be 3/4 number of cores (32 cores on volt16)  -->
+       <property name="network.thread.count">24</property>
+     </broker>
+     <!-- Note: do not specify a format for the topic in order to let the key format be determined as LONG -->
+     <topic name="TEST_TOPIC" procedure="test_topic" retention="1 dy">
+       <property name="producer.parameters.includeKey">true</property>
+       <property name="producer.format.value">avro</property>
+       <property name="consumer.format.value">avro</property>
+       <!-- option to test inline encoding
+       <property name="topic.store.encoded">true</property>
+       -->
+     </topic>
+     <!-- Note: do not specify a format for the topic in order to let the key format be determined as LONG -->
+     <topic name="TEST_TOPIC01" procedure="test_topic01" retention="1 dy">
+       <property name="producer.parameters.includeKey">true</property>
+       <property name="producer.format.value">avro</property>
+       <property name="consumer.format.value">avro</property>
+       <!-- option to test inline encoding
+       <property name="topic.store.encoded">true</property>
+       -->
+     </topic>
+   </topics>
+</deployment>

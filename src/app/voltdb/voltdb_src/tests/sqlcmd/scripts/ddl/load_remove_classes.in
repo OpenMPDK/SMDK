@@ -1,0 +1,105 @@
+-- In case these tables get left behind by previous tests:
+drop function intrun if exists;
+drop procedure UsesUDF if exists;
+drop table r if exists;
+drop table s if exists;
+drop table t if exists;
+drop table t2 if exists;
+drop table addable if exists;
+drop table dropable if exists;
+drop table my_table_1 if exists;
+drop table my_table_2 if exists;
+drop table my_table_3 if exists;
+drop table prefixes if exists;
+drop table raw if exists;
+
+show classes;
+load classes sqlcmdtest-procs.jar;
+show classes;
+load classes sqlcmdtest-funcs.jar;
+show classes;
+
+drop table EMPLOYEE if exists;
+create table EMPLOYEE (
+  ID integer not null,
+  FIRST_NAME varchar,
+  LAST_NAME varchar not null,
+  DEPARTMENT varchar,
+primary key (ID));
+
+show procedures;
+create procedure from class sqlcmdtest.InsertEmployee;
+show procedures;
+show classes;
+
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec InsertEmployee John Smith Engineering;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec InsertEmployee Jane Jones Sales;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+
+drop procedure InsertEmployee;
+show procedures;
+show classes;
+
+show procedures;
+create procedure from class sqlcmdtest.BoxedInsertEmployee;
+show procedures;
+show classes;
+
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec BoxedInsertEmployee 3 John Smith Engineering;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+exec BoxedInsertEmployee 4 Jane Jones Sales;
+select * from EMPLOYEE;
+select MAX(ID) from EMPLOYEE;
+
+drop procedure BoxedInsertEmployee;
+show procedures;
+show classes;
+
+show functions;
+
+--
+-- Test dropping UDFs and procedure creation.
+--
+echoerror Expect the following to fail with intrun not defined.
+create procedure from class sqlcmdtest.UsesUDF;
+
+echo Expect this function creation to succeed.
+create function intrun from method sqlcmdtest.IntFunction.run;
+
+echo Expect this procedure creation to succeed.
+create procedure from class sqlcmdtest.UsesUDF;
+
+echoerror Expect this drop function to fail, since the procedure UsesUDF can't be planned.
+drop function intrun;
+
+show functions;
+
+echo expect this to succeed, since the drop function failed.
+exec UsesUDF;
+
+show functions;
+
+echo expect this to succeed as well.
+select intrun(0) from EMPLOYEE;
+
+drop procedure UsesUDF;
+drop function intrun;
+
+show functions;
+show classes;
+
+remove classes sqlcmdtest.InsertEmployee;
+show classes;
+
+remove classes sqlcmdtest.*;
+show classes;
+
+drop table EMPLOYEE;

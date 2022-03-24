@@ -1,0 +1,7 @@
+Latitude out of bounds: 100.0
+Longitude out of bounds: 360.0
+Longitude out of bounds: 270.0
+Latitude out of bounds: -100.0
+Longitude out of bounds: -360.0
+Longitude out of bounds: -270.0
+Cannot construct GeographyPointValue value from "point(0.0, 0.0)"

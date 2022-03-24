@@ -1,0 +1,7 @@
+*.o
+*.so
+*.d
+*.swp
+*.files
+*.out
+lib
