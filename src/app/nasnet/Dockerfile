@@ -1,10 +1,8 @@
 FROM ubuntu:latest
 
-ENV PYTHON_VER  Python-3.7.12
 ENV SMDK_BIN    /usr/src/SMDK_bin
 
 COPY libcxlmalloc.so   /usr/lib/
-COPY $PYTHON_VER       /usr/src/$PYTHON_VER/
 
 COPY run_nasnet.sh    /usr/src/test/
 COPY nasnet_src/      /usr/src/nasnet/
@@ -27,14 +25,7 @@ RUN set -eux; \
 		libffi-dev \
 		cgdb \
 		vim \
-		numactl \
-    ; \
-	cd /usr/src/$PYTHON_VER; \
-    ./configure --prefix=$SMDK_BIN && make -j "$(nproc)" && make install; \
-	cp -r $SMDK_BIN/* /usr/local; \
-	cd / && rm -rf $SMDK_BIN /usr/src/$PYTHON_VER; \
-	python3 -m pip install --upgrade pip; \
-	python3 -V && pip3 -V
+		numactl
 
 ##################################################
 # Install packages

@@ -1,26 +1,25 @@
 #include <mutex>
 #include <new>
 
-#define CXLMALLOC_CPP_CPP_
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "internal/comp_api.h"
-#include "opt_api/include/internal/opt_api.h"
+#include "core/include/internal/alloc.h"
+#include "internal/cxlmalloc.h"
 
 #ifdef __cplusplus
 }
 #endif
 
-void	*operator new(std::size_t size);
-void	*operator new[](std::size_t size);
-void	*operator new(std::size_t size, const std::nothrow_t &) noexcept;
-void	*operator new[](std::size_t size, const std::nothrow_t &) noexcept;
-void	operator delete(void *ptr) noexcept;
-void	operator delete[](void *ptr) noexcept;
-void	operator delete(void *ptr, const std::nothrow_t &) noexcept;
-void	operator delete[](void *ptr, const std::nothrow_t &) noexcept;
+void *operator new(std::size_t size);
+void *operator new[](std::size_t size);
+void *operator new(std::size_t size, const std::nothrow_t &) noexcept;
+void *operator new[](std::size_t size, const std::nothrow_t &) noexcept;
+void operator delete(void *ptr) noexcept;
+void operator delete[](void *ptr) noexcept;
+void operator delete(void *ptr, const std::nothrow_t &) noexcept;
+void operator delete[](void *ptr, const std::nothrow_t &) noexcept;
 
 /* NOTE: C++14's sized-delete operators is not supported for now. */
 
@@ -46,8 +45,8 @@ handleOOM(std::size_t size, bool nothrow) {
         } catch (const std::bad_alloc &) {
             break;
         }
-	    mem_zone_t type = get_cur_prioritized_memtype();
-		ptr = s_malloc_internal(type, size, false);
+        mem_zone_t type = get_cur_prioritized_memtype();
+        ptr = s_malloc_internal(type, size, false);
     }
 
     if (ptr == nullptr && !nothrow)
@@ -61,31 +60,30 @@ void *
 newImpl(std::size_t size) noexcept(IsNoExcept) {
     mem_zone_t type = get_cur_prioritized_memtype();
     void *ret = s_malloc_internal(type, size, false);
-	if (likely(ret)) {
-		return ret;
-	}
-
-	return handleOOM(size, IsNoExcept);
+    if (likely(ret)) {
+        return ret;
+    }
+    return handleOOM(size, IsNoExcept);
 }
 
 void *
 operator new(std::size_t size) {
-	return newImpl<false>(size);
+    return newImpl<false>(size);
 }
 
 void *
 operator new[](std::size_t size) {
-	return newImpl<false>(size);
+    return newImpl<false>(size);
 }
 
 void *
 operator new(std::size_t size, const std::nothrow_t &) noexcept {
-	return newImpl<true>(size);
+    return newImpl<true>(size);
 }
 
 void *
 operator new[](std::size_t size, const std::nothrow_t &) noexcept {
-	return newImpl<true>(size);
+    return newImpl<true>(size);
 }
 
 void

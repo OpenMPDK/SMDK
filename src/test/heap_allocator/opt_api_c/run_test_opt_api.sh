@@ -7,7 +7,6 @@ function run_app(){
 	export LD_LIBRARY_PATH=$BASEDIR/lib/smdk_allocator/lib/
 ## common
 	SMALLOC_CONF=use_auto_arena_scaling:true
-#	SMALLOC_CONF="log:smdk.core|core"
 #	echo $SMALLOC_CONF
 	export SMALLOC_CONF
 

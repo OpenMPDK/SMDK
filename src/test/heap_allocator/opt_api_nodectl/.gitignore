@@ -1,0 +1,6 @@
+# Object files:
+*.o
+
+# Built binaries:
+test_alloc_onnode
+test_policy_ctl

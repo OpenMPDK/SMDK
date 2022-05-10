@@ -9,6 +9,7 @@
 #include "jemalloc/internal/rtree.h"
 #include "jemalloc/internal/mutex.h"
 #include "jemalloc/internal/mutex_pool.h"
+#include <numa.h>
 
 /******************************************************************************/
 /* Data. */
@@ -93,6 +94,7 @@ const extent_hooks_t	extent_hooks_default = {
 static atomic_zu_t curpages;
 static atomic_zu_t highpages;
 
+cpu_node_config_t cpu_node_config;
 /******************************************************************************/
 /*
  * Function prototypes for static functions that are referenced prior to
@@ -1199,6 +1201,25 @@ extent_recycle(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 	return extent;
 }
 
+void
+set_interleave_policy(int flag){
+        int mmap_exmem = flag & MAP_EXMEM;
+        if(cpu_node_config.nodemask != numa_no_nodes_ptr){
+                if(mmap_exmem){
+                        if(tsd_is_mem_policy_enabled(false)==false){
+                                numa_set_interleave_mask(cpu_node_config.nodemask);
+                                tsd_set_mem_policy_info(true);
+                        }
+                } else {
+                        if(tsd_is_mem_policy_enabled(false)==true){
+                                numa_set_interleave_mask(numa_no_nodes_ptr);
+                                tsd_set_mem_policy_info(false);
+                        }
+                }
+        }
+}
+
+
 /*
  * If the caller specifies (!*zero), it is still possible to receive zeroed
  * memory, in which case *zero is toggled to true.  arena_extent_alloc() takes
@@ -1210,9 +1231,11 @@ extent_alloc_core(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
     size_t alignment, bool *zero, bool *commit, dss_prec_t dss_prec) {
 	void *ret;
 
+	int mmap_flag = arena_get_mmap_flag(arena);
+	set_interleave_policy(mmap_flag);
+
 	assert(size != 0);
 	assert(alignment != 0);
-
 	/* "primary" dss. */
 	if (have_dss && dss_prec == dss_prec_primary && (ret =
 	    extent_alloc_dss(tsdn, arena, new_addr, size, alignment, zero,
@@ -1221,7 +1244,7 @@ extent_alloc_core(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
 	}
 	/* mmap. */
 	//fprintf(stderr,"%s MMAP: arena->ind=%d\n",__FUNCTION__,arena_ind_get(arena));
-	ret = extent_alloc_mmap_flag(new_addr, size, alignment, zero, commit, arena_get_mmap_flag(arena));
+	ret = extent_alloc_mmap_flag(new_addr, size, alignment, zero, commit, mmap_flag);
 	if(ret != NULL){
 		return ret;
 	}

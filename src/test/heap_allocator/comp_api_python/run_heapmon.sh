@@ -11,12 +11,12 @@ function run_app(){
 	CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
 	export LD_PRELOAD=$CXLMALLOC
 	if [ "$PRIORITY" == 'exmem' ]; then
-		CXLMALLOC_CONF+=,priority:exmem,:
+		CXLMALLOC_CONF+=,priority:exmem
 		export CXLMALLOC_CONF
 		echo $CXLMALLOC_CONF
 		$PYTHON -O ./heapmon.py
 	elif [ "$PRIORITY" == 'normal' ]; then
-		CXLMALLOC_CONF+=,priority:normal,:
+		CXLMALLOC_CONF+=,priority:normal
 		export CXLMALLOC_CONF
 		echo $CXLMALLOC_CONF
 		$PYTHON -O ./heapmon.py
@@ -34,12 +34,12 @@ function run_pytest(){
 	CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
 	export LD_PRELOAD=$CXLMALLOC
 	if [ "$PRIORITY" == 'exmem' ]; then
-		CXLMALLOC_CONF+=,priority:exmem,:
+		CXLMALLOC_CONF+=,priority:exmem
 		export CXLMALLOC_CONF
 		echo $CXLMALLOC_CONF
 		$PYTHON -C -m test --pgo || true
 	elif [ "$PRIORITY" == 'normal' ]; then
-		CXLMALLOC_CONF+=,priority:normal,:
+		CXLMALLOC_CONF+=,priority:normal
 		export CXLMALLOC_CONF
 		echo $CXLMALLOC_CONF
 		$PYTHON -m test --pgo || true

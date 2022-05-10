@@ -1,5 +1,8 @@
 #include <assert.h>
+#include <string.h>
 #include "smdk_opt_api.h"
+
+using std::string;
 
 class SmdkAllocator
 {
@@ -45,9 +48,29 @@ public:
     {
         return s_get_memsize_available(type);
     }
-    void stats_print(void)
+    void stats_print(char unit)
     {
-        s_stats_print();
+        s_stats_print(unit);
+    }
+    void stats_node_print(char unit)
+    {
+        s_stats_node_print(unit);
+    }
+    void enable_node_interleave(string nodes)
+    {
+        s_enable_node_interleave((char *)nodes.c_str());
+    }
+    void disable_node_interleave(void)
+    {
+        s_disable_node_interleave();
+    }
+    void *malloc_node(smdk_memtype_t type, size_t size, string nodes)
+    {
+        return s_malloc_node(type, size, (char *)nodes.c_str());
+    }
+    void free_node(smdk_memtype_t type, void *mem, size_t size)
+    {
+        return s_free_node(type, mem, size);
     }
 private:
     SmdkAllocator() = default;

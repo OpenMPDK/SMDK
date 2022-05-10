@@ -123,4 +123,15 @@ typedef int malloc_cpuid_t;
 #define MEM_ZONE_EXMEM (1)
 #define MEM_ZONE_NORMAL (0)
 
+typedef enum {
+    policy_zone,
+    policy_node,
+    policy_noop,
+} group_policy_t;
+
+typedef struct {
+    group_policy_t group_policy;
+    struct bitmask *nodemask;
+}cpu_node_config_t;
+
 #endif /* JEMALLOC_INTERNAL_TYPES_H */

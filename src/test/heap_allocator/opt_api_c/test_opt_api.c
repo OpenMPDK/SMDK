@@ -309,6 +309,7 @@ char* arr_desc_test_option[] = {
 	"vsizes: variable memory allocation request sizes; 8B, 64B, 512B, 4KB and 2MB",
 	"perthreadcpu: set different cpu affinities for each thread (applied only when nthreads > 1)",
 	"exmem: set memtype to 'ExMem'(otherwise it is set to 'Normal')",
+	"repeat: number of times the test is repeated (default:1)",
 };
 
 void print_test_desc(int num_tests) {
@@ -338,6 +339,7 @@ int main(int argc, char* argv[]){
 	int test_idx = -1;
 	int max_num_tests = sizeof(arr_test)/sizeof(test_t);
 	long num_cores = 0;
+	unsigned int repeat = 1;
 	bool per_thread_cpu = false;
 	unsigned int nthreads = NTHREADS_DEFAULT;
 	void* status;
@@ -376,6 +378,8 @@ int main(int argc, char* argv[]){
 					test_param.type = SMDK_MEM_EXMEM;
 				} else if (!strcmp(argv[i], "test")) {
 					test_idx = atoi(argv[++i]) - 1;
+				} else if (!strcmp(argv[i], "repeat")) {
+					repeat = (unsigned int)atoi(argv[++i]);
 				} else {
 					printf("[PARAM ERROR] argv[%d]: %s, Please check user input\n", i, argv[i]);
 					goto param_err;
@@ -386,6 +390,9 @@ int main(int argc, char* argv[]){
 	if (test_idx < 0) {
 		printf("[PARAM ERROR] Test id is missing\n");
 		goto param_err;
+	} else if (test_idx+1 > (int)(sizeof(arr_test)/sizeof(test_t))) {
+		printf("[PARAM ERROR] Invalid test id\n");
+		goto param_err;
 	}
 	printf("[Test Parameters] size=");
 	for (unsigned int i = 0 ; i < test_param.nsizes; i ++) {
@@ -394,24 +401,26 @@ int main(int argc, char* argv[]){
 	printf(",iter=%u, nthreads=%u, mem type=%d\n", test_param.iter, nthreads, test_param.type);
 
 	/* run tests */
-	GET_TIME_START(&test_param);
-	for(unsigned int j = 0; j < nthreads; j++) {
-		memcpy(&test_params[j], &test_param, sizeof(test_param_t));
-		if (per_thread_cpu) {
-			assign_to_this_core(j % num_cores);
+	for(unsigned int i = 0; i < repeat; i++) {
+		GET_TIME_START(&test_param);
+		for(unsigned int j = 0; j < nthreads; j++) {
+			memcpy(&test_params[j], &test_param, sizeof(test_param_t));
+			if (per_thread_cpu) {
+				assign_to_this_core(j % num_cores);
+			}
+			pthread_create(&test_threads[j], NULL, arr_test[test_idx].f_test, (void*)&(test_params[j]));
+			//printf("create thread id: %ld\n", test_threads[j]);
+			PRINT_TEST(test_idx+1, j, COLOR_RED, "Start");
 		}
-		pthread_create(&test_threads[j], NULL, arr_test[test_idx].f_test, (void*)&(test_params[j]));
-		//printf("create thread id: %ld\n", test_threads[j]);
-		PRINT_TEST(test_idx+1, j, COLOR_RED, "Start");
+		for(unsigned int j = 0; j < nthreads; j++) {
+			int ret = pthread_join(test_threads[j], (void**)&status);
+			//printf("join thread id: %ld\n", test_threads[j]);
+			assert_d_eq(ret, 0, "pthread_join failure");
+			PRINT_TEST(test_idx+1, j, COLOR_GREEN, "End");
+		}
+		GET_TIME_END(&test_param);
+		PRINT_ELAPSED_TIME(&test_param);
 	}
-	for(unsigned int j = 0; j < nthreads; j++) {
-		int ret = pthread_join(test_threads[j], (void**)&status);
-		//printf("join thread id: %ld\n", test_threads[j]);
-		assert_d_eq(ret, 0, "pthread_join failure");
-		PRINT_TEST(test_idx+1, j, COLOR_GREEN, "End");
-	}
-	GET_TIME_END(&test_param);
-	PRINT_ELAPSED_TIME(&test_param);
 	goto ret;
 
 param_err:

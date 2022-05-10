@@ -1,4 +1,4 @@
-SUBDIRS=comp_api_c comp_api_cpp heap metadata_api opt_api_c opt_api_cpp
+SUBDIRS=comp_api_c comp_api_cpp metadata_api opt_api_c opt_api_cpp opt_api_nodectl
 
 .PHONY:subdirs $(SUBDIRS)
 

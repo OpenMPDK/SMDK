@@ -1867,7 +1867,7 @@ if test "x${force_tls}" = "x1" ; then
 elif test "x${force_tls}" = "x0" ; then
   enable_tls="0"
 else
-  enable_tls="1"
+  enable_tls="0"
 fi
 if test "x${enable_tls}" = "x1" ; then
 AC_MSG_CHECKING([for TLS])

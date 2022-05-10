@@ -7,16 +7,11 @@
 #include <complex>
 #include <vector>
 #include <algorithm>
-#include "javaJNITest.h"
-
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string.h>
-
-/* Note: MAP_EXMEM must be identical with MAP_EXMEM at linux-5.17-rc5-smdk/include/uapi/asm-generic/mman-common.h */
-#ifndef MAP_EXMEM
-#define MAP_EXMEM 0x200000
-#endif
+#include "javaJNITest.h"
+#include "common.h"
 
 /*
  * =================IMPLEMENTATION===============
@@ -112,7 +107,7 @@ JNIEXPORT jstring JNICALL Java_javaJNITest_stringManipulator
 	int i;
 	while(count < 10) {
 		p[count] = (char *)malloc(size);
-		printf("mallloc(%d): pid=%u %p\n",count, getpid(), p[count]);
+		printf("malloc(%d): pid=%u %p\n",count, getpid(), p[count]);
 		if(p[count]) {
 			memset(p[count], '0', size);
 		}

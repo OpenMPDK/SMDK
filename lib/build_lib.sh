@@ -8,20 +8,22 @@ set -e
 
 source "$BASEDIR/script/common.sh"
 SMDKMALLOC=smdk_allocator
+SMDK_PY=smdk_allocator/opt_api/py_smdk_pkg
+SMDK_PYPACKAGE=_py_smdk.so
 JEMALLOC=jemalloc-5.2.1
 REDIS=redis-6.2.1
 MEMCACHED=memcached-1.6.9
 MEMTIER=memtier_benchmark-1.3.0
 STREAM=stream
 NUMACTL=numactl-2.0.14
-CXL_KERNEL=linux-5.17-rc5-smdk
-CXL_KERNEL_CONFIG=config-linux-5.17-rc5-smdk
+CXL_KERNEL=linux-5.18-rc3-smdk
+CXL_KERNEL_CONFIG=config-linux-5.18-rc3-smdk
 QEMU=qemu_cxl2.0v4
 MLC=mlc
 VOLTDB=$BASEDIR/src/app/voltdb
 
 SMDK_BIN=$BASEDIR/lib/SMDK_bin
-SMDK_VERSION=v1.0
+SMDK_VERSION=v1.1
 
 function build_voltdb() {
 	app=$VOLTDB
@@ -214,6 +216,27 @@ function build_smdkmalloc(){
 	fi
 }
 
+function build_py_smdk(){
+	smdklib=$SMDKMALLOC/lib
+	app=$SMDK_PY
+	log_normal "[build py_smdk]"
+
+	if [ ! -e "$smdklib/libsmalloc.so" ]; then
+		log_error "[build py_smdk] build SMDK library first(smdkmalloc)..error"
+		return
+	fi
+
+	cd $app/py_smdk && python build.py && cd -
+	mv $app/py_smdk/_py_smdk*so $app/$SMDK_PYPACKAGE
+	ret=$?
+
+	if [ $ret = 0 ]; then
+		log_normal "[build py_smdk]..success"
+	else
+		log_error "[build py_smdk]..error"
+	fi
+}
+
 function build_all(){
 	build_smdkmalloc
 	build_redis
@@ -224,6 +247,7 @@ function build_all(){
 	#build_voltdb
 	#build_qemu
 	#build_smdk_kernel
+	build_py_smdk
 }
 
 function clean_smdkmalloc(){
@@ -235,6 +259,14 @@ function clean_smdkmalloc(){
 		cd -
 	fi
 	log_normal "[clean smdkmalloc]..done"
+}
+
+function clean_py_smdk(){
+	app=$SMDK_PY
+	log_normal "[clean py_smdk]"
+	rm -rf $SMDK_PY/py_smdk/*_py*
+	rm -rf $SMDK_PY/$SMDK_PYPACKAGE
+	log_normal "[clean py_smdk]..done"
 }
 
 function clean_redis(){
@@ -385,6 +417,10 @@ case "$1" in
 		build_numactl
 		;;
 
+	py_smdk)
+		build_py_smdk
+		;;
+
 	all)
 		build_all
 		;;
@@ -425,6 +461,10 @@ case "$1" in
 		clean_numactl
 		;;
 
+	clean_py_smdk)
+		clean_py_smdk
+		;;
+
 	clean_all)
 		clean_smdkmalloc
 		clean_redis
@@ -435,10 +475,11 @@ case "$1" in
 #		clean_qemu
 		clean_numactl
 #		clean_voltdb
+		clean_py_smdk
 		;;
 	*)
-		echo "Usage: build_lib.sh {all|kernel|smdkmalloc|redis|memcached|memtier||qemu|numactl|voltdb|bm}"
-		echo "Usage: build_lib.sh {clean_all|clean_kernel|clean_smdkmalloc|clean_redis|clean_memcached|clean_memtier|clean_qemu|clean_numactl|clean_voltdb|clean_bm}"
+		echo "Usage: build_lib.sh {all|kernel|smdkmalloc|redis|memcached|memtier|qemu|numactl|voltdb|bm|py_smdk}"
+		echo "Usage: build_lib.sh {clean_all|clean_kernel|clean_smdkmalloc|clean_redis|clean_memcached|clean_memtier|clean_qemu|clean_numactl|clean_voltdb|clean_bm|py_smdk}"
 		exit 1
 		;;
 esac

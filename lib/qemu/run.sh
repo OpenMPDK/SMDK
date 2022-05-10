@@ -1,7 +1,7 @@
 #!/bin/bash
 
 source "../../script/common.sh"
-SMDK_KERNEL_PATH=../linux-5.17-rc5-smdk
+SMDK_KERNEL_PATH=../linux-5.18-rc3-smdk
 QEMU_BUILD_PATH=./qemu_cxl2.0v4/build
 ROOTFS_PATH=.
 MONITOR_PORT=45454

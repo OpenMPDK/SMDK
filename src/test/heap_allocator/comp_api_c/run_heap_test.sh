@@ -9,7 +9,7 @@ APP=test_heap_alloc
 function test_cxlmalloc_exmem(){
 	log_normal "cxlmalloc - $APP"
 	export LD_PRELOAD=$CXLMALLOCDIR/libcxlmalloc.so
-	export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,priority:exmem,exmem_zone_size:1000,normal_zone_size:1000,maxmemory_policy:interleave
+	export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,priority:exmem,exmem_zone_size:1000,normal_zone_size:1000,maxmemory_policy:interleave,exmem_partition_range:2,3
 	echo $CXLMALLOC_CONF
 	$APP
 }

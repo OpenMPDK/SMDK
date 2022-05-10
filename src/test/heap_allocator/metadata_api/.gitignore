@@ -1,0 +1,6 @@
+# Object files:
+*.o
+
+# Built binaries:
+test_metadata_api
+test_metadata_api_node

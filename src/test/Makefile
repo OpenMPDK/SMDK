@@ -1,4 +1,4 @@
-SUBDIRS=heap_allocator lazy_alloc mmap numactl subzone Syscall
+SUBDIRS=group_policy heap_allocator lazy_alloc mmap numactl subzone syscall
 
 .PHONY:subdirs $SUBDIRS)
 

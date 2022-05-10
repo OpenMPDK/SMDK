@@ -1,10 +1,15 @@
 #!/bin/bash
-#prerequisite : create dmdk-YYYY_MMDD_HHMM.v0.1.tgz by running build_lib.sh release
-QEMU_ROOTFS=/var/www/html/qemu-image.img
-DMDK_BIN=/root/DMDK/lib/dmdk.cxlmalloc-2021_0507_1622.v0.1.tgz
+
+# Script for updating SMDK files in qemu rootfs.
+# Prerequisite: SMDK archive (or files you want to update to qemu rootfs)
+#   Or you can use scp, etc., to move the files directly to qemu virtual
+#   machine while it is running.
+
+QEMU_ROOTFS=/path/to/qemu-image.img
+SMDK_ARCHIVE=/path/to/SMDK.tgz
 
 sudo mkdir -p tmp
 sudo mount -o loop $QEMU_ROOTFS tmp
-sudo tar -xvf $DMDK_BIN -C tmp
+sudo tar -xvf $SMDK_ARCHIVE -C tmp
 sync
 sudo umount tmp

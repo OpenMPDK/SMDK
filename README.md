@@ -22,7 +22,7 @@ The CXL standard promises to help address the increasing demand for memory and b
 
 The SMDK is developed for Samsung CXL(Compute Express Link) Memory Expander to enable full-stack Software-Defined Memory system.
 
-The SMDK is a collection of software tools and APIs that sit between applications and the hardware, as shown in the figure below. It supports a diverse range of mixed-use memory scenarios in which the main memory and the Memory Expander can be easily adjusted for priority, usage, bandwidth, and security, or simply used as is without modification to applications on the things they do well by giving them an easy-to-use, portable and scalable ML stack.
+The SMDK is a collection of software tools and APIs that sit between applications and the hardware, as shown in the link(https://github.com/OpenMPDK/SMDK/wiki/2.-SMDK-Architecture). It supports a diverse range of mixed-use memory scenarios in which the main memory and the Memory Expander can be easily adjusted for priority, usage, bandwidth, and security, or simply used as is without modification to applications on the things they do well by giving them an easy-to-use, portable and scalable ML stack.
 
 The toolkit thus reduces the burden of introducing new memory and allows users to quickly reap the benefits of heterogeneous memory. The SMDK accomplishes this with a four-level approach:
 

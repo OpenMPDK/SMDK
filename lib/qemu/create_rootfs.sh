@@ -26,24 +26,14 @@ sudo chroot .
 # 1) Change root password
 # $ passwd
 
-# 2) Add proxy configuration
-# Open /etc/profile, and add below lines
-# export HTTP_PROXY="http://12.26.204.100:8080/"
-# export HTTPS_PROXY="http://12.26.204.100:8080/"
+# 2) (Optional) Add proxy configuration
+# Open /etc/profile, and add proxy configuration
+# export HTTP_PROXY="http://<PROXY_IP>:<PROXY_PORT>/"
+# export HTTPS_PROXY="http://<PROXY_IP>:<PROXY_PORT>/"
 # $ sh /etc/profile
 
-# 3) Modify sources.list
-# Open /etc/apt/sources.list, and add below lines
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic main restricted
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-updates main restricted
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic universe
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-updates universe
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic multiverse
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-updates multiverse
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-backports main restricted universe multiverse
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-security main restricted
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-security universe
-# deb http://ubuntu.mirror.samsungds.net/ubuntu bionic-security multiverse
+# 3) (Optional) Add local Ubuntu repository mirrors
+# Open /etc/apt/sources.list, and add repository mirrors
 
 # 4) Package update
 # $ apt update

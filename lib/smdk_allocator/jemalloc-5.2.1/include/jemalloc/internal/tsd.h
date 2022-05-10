@@ -101,13 +101,13 @@ typedef void (*test_callback_t)(int *);
     MALLOC_TEST_TSD_INITIALIZER
 
 #define TSD_INITIALIZER {                       \
-    _TSD_INITIALIZER,                   \
-    MEM_ZONE_NORMAL /* mem_zone_normal */				\
+    _TSD_INITIALIZER,				\
+    MEM_ZONE_NORMAL /* mem_zone_normal */	\
 }
 
-#define TSD_EXMEM_INITIALIZER {                       \
-    _TSD_INITIALIZER,                   \
-    MEM_ZONE_EXMEM /* mem_zone_exmem */				\
+#define TSD_EXMEM_INITIALIZER {			\
+    _TSD_INITIALIZER,				\
+    MEM_ZONE_EXMEM /* mem_zone_exmem */		\
 }
 
 void *malloc_tsd_malloc(size_t size);

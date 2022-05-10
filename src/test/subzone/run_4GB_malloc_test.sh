@@ -42,7 +42,7 @@ get_time() {
 
 print_elapsed_time() {
 	elapsed=$((($(date +%s%N) - $start_time)/1000000))
-	echo "elasepd time: $elapsed milliseconds"
+	echo "elapsed time: $elapsed milliseconds"
 }
 
 run_test() {

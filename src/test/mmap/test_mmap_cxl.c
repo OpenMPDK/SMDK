@@ -5,11 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-
-/* Note: MAP_EXMEM must be identical with MAP_EXMEM at linux-5.17-rc5-smdk/include/uapi/asm-generic/mman-common.h */
-#ifndef MAP_EXMEM
-#define MAP_EXMEM 0x200000
-#endif
+#include "common.h"
 
 int main(int argc, char* argv[]) {
 	unsigned long size = 4*1024*1024;

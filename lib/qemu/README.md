@@ -26,10 +26,7 @@ Setup VM network
 ------------------
 
 For communication between VMs, a TUN/TAP virtual interface must be added to br0.
-In advance, you must enable br0:
-
- * QEMU network enabling: https://wiki.itplatform.samsungds.net:8090/x/bBuuB
-
+In advance, you should enable br0.
 You can use the following scripts to automatically add the TUN / TAP interface to use by the VMs.
 
     $ ./setup_bridge -c <number of VMs>
@@ -39,4 +36,3 @@ You can use the following scripts to automatically add the TUN / TAP interface t
                                                             tap0
                                                             tap1
                                                             tap2
-

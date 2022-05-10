@@ -11,7 +11,8 @@ opt_api : jemalloc
 	mkdir -p lib
 	cd $(OPT_DIR) && make
 
-comp_api : opt_api
+comp_api : jemalloc
+	mkdir -p lib
 	cd $(COMP_DIR) && make
 
 SMDK_api : comp_api opt_api

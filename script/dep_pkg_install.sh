@@ -30,6 +30,7 @@ apt-get install -y openjdk-8-jdk openjdk-11-jdk
 # SMDK
 apt-get install -y dialog
 apt-get install -y flex bison
+apt-get install -y libelf-dev
 
 # memcached
 apt-get install -y libevent-dev
@@ -47,8 +48,12 @@ apt-get install -y libx11-dev libxext-dev libxrender-dev libxrandr-dev libxtst-d
 apt-get install -y libcups2-dev libfontconfig1-dev libasound2-dev
 apt-get install -y cmake junit4
 
-#voltdb
+# voltdb
 apt-get install -y ant ant-optional
+
+# opt_api python binding
+pip install cffi
+
 # docker repository
 #apt-get install -y apt-get install ca-certificates curl gnupg lsb-release software-properties-common
 

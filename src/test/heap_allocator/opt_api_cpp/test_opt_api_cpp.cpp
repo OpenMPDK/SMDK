@@ -62,6 +62,8 @@ public:
 		assert_d_eq(ret, 0, "s_posix_memalign allocation failure");
 		allocator.free(posix_memalign_buf);
 
+		allocator.stats_print('K');
+
 		print_end();
 	}
 };
@@ -83,6 +85,8 @@ public:
 			memset(buf, 0, size);
 			allocator.free(type, buf);
 		}
+
+		allocator.stats_print('M');
 
 		print_end();
 	}
@@ -115,8 +119,69 @@ public:
 		print_mem_stats("After Free");
 
 		delete buf;
+
+		allocator.stats_print('G');
+
 		print_end();
 	}
+};
+
+class Test4: public CPPTest
+{
+public:
+	Test4(size_t size, int iter, smdk_memtype_t type, string name, string nodes)
+		: CPPTest(size, iter, type, name)
+	{
+		this->nodes = nodes;
+	}
+	void run(void)
+	{
+		print_start();
+		SmdkAllocator& allocator = SmdkAllocator::get_instance();
+
+		void* buf;
+		for(int i = 0; i < iter; i++){
+			buf = allocator.malloc_node(type, size, nodes);
+			assert_ptr_not_null(buf, "s_malloc allocation failure");
+			memset(buf, 0, size);
+			allocator.free_node(type, buf, size);
+		}
+
+		allocator.stats_print('M');
+
+		print_end();
+	}
+	string nodes;
+};
+
+class Test5: public CPPTest
+{
+public:
+	Test5(size_t size, int iter, smdk_memtype_t type, string name, string nodes)
+		: CPPTest(size, iter, type, name)
+	{
+		this->nodes = nodes;
+	}
+	void run(void)
+	{
+		print_start();
+		SmdkAllocator& allocator = SmdkAllocator::get_instance();
+
+		void* buf;
+		allocator.enable_node_interleave(nodes);
+		for(int i = 0; i < iter; i++){
+			buf = allocator.malloc(type, size);
+			assert_ptr_not_null(buf, "s_malloc allocation failure");
+			memset(buf, 0, size);
+			allocator.free(buf);
+		}
+		allocator.disable_node_interleave();
+
+		allocator.stats_print('M');
+
+		print_end();
+	}
+	string nodes;
 };
 
 int main(void){
@@ -132,6 +197,12 @@ int main(void){
 
 	Test3 tc3(size, iter, type, "malloc-memstat-free test");
 	tc3.run();
+
+	Test4 tc4(size, iter, type, "alloc_on_nodes test", "0-1");
+	tc4.run();
+
+	Test5 tc5(size, iter, type, "enable_node_interleave test", "1");
+	tc5.run();
 
 	return 0;
 }

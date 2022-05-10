@@ -92,8 +92,7 @@ int main(void){
 	smdk_memtype_t type = SMDK_MEM_NORMAL;
 	size_t size_gb = 1<<30;
 
-	s_stats_print();
-	s_stats_node_print();
+	s_stats_print('g');  //k/K, m/M, g/G
 
 	/* Notice: request size should be same with sc_size in jemalloc */
 	/* case 1: tcache_small(<=14KiB) */
@@ -101,12 +100,10 @@ int main(void){
 
 	/* case 2: tcache_large(<=32KiB) */
 	test(16*KiB, 4*size_gb, type);
-	s_stats_node_print();
 
 	/* case 3: huge(>32KiB) */
 	test(64*KiB, 8*size_gb, type);
 
-	s_stats_print();
-	s_stats_node_print();
+	s_stats_print('G');
 	return 0;
 }

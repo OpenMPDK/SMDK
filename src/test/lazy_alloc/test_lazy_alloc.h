@@ -18,6 +18,8 @@
 
 #include <pthread.h>
 
+#include <common.h>
+
 #define NAME_NORMAL_ZONE "Normal"
 #define NAME_EX_ZONE "ExMem"
 
@@ -36,10 +38,6 @@
 #define TC_PASS (0)
 #define TC_FAIL (1)
 #define TC_ERROR (-1)
-
-#ifndef MAP_EXMEM
-#define MAP_EXMEM 0x200000
-#endif
 
 #define PG_JUMP (256)
 #define G_JUMP (32)

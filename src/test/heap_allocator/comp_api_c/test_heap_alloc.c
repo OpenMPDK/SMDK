@@ -11,7 +11,7 @@ void malloc_test(){
 	size_t size=0x400000;
 	buffer = malloc(size);
 	memset(buffer,'0',size);
-	printf("mallloc: %p\n", buffer);
+	printf("malloc: %p\n", buffer);
 	if (buffer != NULL) {
 		printf("free: %p\n", buffer);
 		free(buffer);
@@ -25,7 +25,7 @@ void calloc_test(){
 	void* buffer;
 	size_t size=0x400000;
 	buffer = calloc(1,size);
-	printf("callloc: %p\n", buffer);
+	printf("calloc: %p\n", buffer);
 	if (buffer != NULL) {
         printf("free: %p\n", buffer);
         free(buffer);
@@ -40,7 +40,7 @@ void realloc_test(){
 	size_t size=0x400000;
 	buffer = malloc(size);
 	memset(buffer,'0',size);
-	printf("mallloc: %p\n", buffer);
+	printf("malloc: %p\n", buffer);
 	if (buffer == NULL) {
 		printf("malloc(realloc) error\n");
 		return;
@@ -48,7 +48,7 @@ void realloc_test(){
 
 	size_t newsize=0x800000;
 	buffer = realloc(buffer, newsize);
-	printf("reallloc: %p\n", buffer);
+	printf("realloc: %p\n", buffer);
 	if (buffer != NULL) {
 	    printf("free: %p\n", buffer);
 	    free(buffer);

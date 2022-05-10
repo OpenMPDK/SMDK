@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # Prerequisite: Add br0 config in /etc/network/interfaces and reboot.
-# (https://wiki.itplatform.samsungds.net:8090/x/bBuuB)
 # 
 # $ sudo vi /etc/network/interfaces
 # auto lo

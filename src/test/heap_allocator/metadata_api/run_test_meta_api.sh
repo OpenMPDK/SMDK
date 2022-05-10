@@ -10,6 +10,7 @@ function run_app(){
     export SMALLOC_CONF
 
     ./test_metadata_api $ARGS
+    ./test_metadata_api_node $ARGS
 }
 
 ARGS=$@

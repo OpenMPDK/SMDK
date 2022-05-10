@@ -8,7 +8,7 @@ function run_app(){
 	export LD_PRELOAD=/lib/libcxlmalloc.so
     CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
     if [ "$PRIORITY" == 'exmem' ]; then
-        CXLMALLOC_CONF+=,priority:exmem,:
+        CXLMALLOC_CONF+=,priority:exmem
 		export CXLMALLOC_CONF
 		echo $CXLMALLOC_CONF
 		python3 -C -O /usr/src/nasnet/eval_image_classifier.py \
@@ -20,7 +20,7 @@ function run_app(){
 			--model_name=nasnet_large \
 			--eval_image_size=331
     elif [ "$PRIORITY" == 'normal' ]; then
-        CXLMALLOC_CONF+=,priority:normal,:
+        CXLMALLOC_CONF+=,priority:normal
 		export CXLMALLOC_CONF
 		echo $CXLMALLOC_CONF
 		python3 -O /usr/src/nasnet/eval_image_classifier.py \

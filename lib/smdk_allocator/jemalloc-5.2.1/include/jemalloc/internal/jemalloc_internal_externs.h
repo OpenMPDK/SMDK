@@ -54,4 +54,5 @@ void jemalloc_postfork_child(void);
 bool malloc_initialized(void);
 void je_sdallocx_noflags(void *ptr, size_t size);
 
+extern cpu_node_config_t cpu_node_config;
 #endif /* JEMALLOC_INTERNAL_EXTERNS_H */

@@ -1,0 +1,6 @@
+# Object files:
+*.o
+
+# Built binaries:
+test_heap_alloc
+test_multi_thread

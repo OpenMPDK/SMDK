@@ -24,9 +24,9 @@ function run_app(){
 	export LD_PRELOAD=$CXLMALLOCDIR/libcxlmalloc.so
 	CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
 	if [ "$PRIORITY" == 'exmem' ]; then
-		CXLMALLOC_CONF+=,priority:exmem,:
+		CXLMALLOC_CONF+=,priority:exmem
 	elif [ "$PRIORITY" == 'normal' ]; then
-		CXLMALLOC_CONF+=,priority:normal,:
+		CXLMALLOC_CONF+=,priority:normal
 	fi
 	echo $CXLMALLOC_CONF
 	export CXLMALLOC_CONF

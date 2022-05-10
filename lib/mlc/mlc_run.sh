@@ -20,7 +20,7 @@ function run_app(){
     fi
     echo $CXLMALLOC_CONF
     export CXLMALLOC_CONF
-    $NUMACTL $MLC
+    $NUMACTL $MLC --peak_injection_bandwidth
 }
 
 

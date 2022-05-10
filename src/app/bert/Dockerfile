@@ -1,10 +1,8 @@
 FROM ubuntu:latest
 
-ENV PYTHON_VER  Python-3.7.12
 ENV SMDK_BIN    /usr/src/SMDK_bin
 
 COPY libcxlmalloc.so   /usr/lib/
-COPY $PYTHON_VER       /usr/src/$PYTHON_VER/
 
 COPY run_bert.sh      /usr/src/
 COPY bert_src/        /usr/src/bert/
@@ -27,12 +25,7 @@ RUN set -eux; \
 		libffi-dev \
 		cgdb \
 		vim \
-		numactl \
-    ; \
-	cd /usr/src/$PYTHON_VER; \
-    ./configure --prefix=$SMDK_BIN && make -j "$(nproc)" && make install; \
-	cp $SMDK_BIN/bin/* /usr/local/bin; \
-	python3 -V && pip3 -V
+		numactl
 
 ##################################################
 # Install packages
