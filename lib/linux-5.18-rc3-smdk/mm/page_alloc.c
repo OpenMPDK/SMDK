@@ -291,6 +291,9 @@ int sysctl_lowmem_reserve_ratio[MAX_NR_ZONES] = {
 #ifdef CONFIG_ZONE_DMA32
 	[ZONE_DMA32] = 256,
 #endif
+#ifdef CONFIG_EXMEM
+	[ZONE_EXMEM] = 32,
+#endif
 	[ZONE_NORMAL] = 32,
 #ifdef CONFIG_HIGHMEM
 	[ZONE_HIGHMEM] = 0,
@@ -305,14 +308,14 @@ static char * const zone_names[MAX_NR_ZONES] = {
 #ifdef CONFIG_ZONE_DMA32
 	 "DMA32",
 #endif
+#ifdef CONFIG_EXMEM
+	 "ExMem",
+#endif
 	 "Normal",
 #ifdef CONFIG_HIGHMEM
 	 "HighMem",
 #endif
 	 "Movable",
-#ifdef CONFIG_EXMEM
-	 "ExMem",
-#endif
 #ifdef CONFIG_ZONE_DEVICE
 	 "Device",
 #endif
@@ -955,6 +958,17 @@ compaction_capture(struct capture_control *capc, struct page *page,
 #endif /* CONFIG_COMPACTION */
 
 #ifdef CONFIG_EXMEM
+#define ZONELIST_ORDER_NONE		0
+#define ZONELIST_ORDER_NORMAL	1
+#define ZONELIST_ORDER_EXMEM	2
+
+static char zonelist_order_name[3][NUMA_ZONELIST_ORDER_LEN] = {
+	"None",
+	"Normal",
+	"ExMem"
+};
+static int user_zonelist_order = ZONELIST_ORDER_NONE;
+
 /**
  * for_each_subzone - helper macro to iterate over subzones in a given zone
  */
@@ -4436,10 +4450,17 @@ alloc_flags_nofragment(struct zone *zone, gfp_t gfp_mask)
 	 */
 	alloc_flags = (__force int) (gfp_mask & __GFP_KSWAPD_RECLAIM);
 
-#ifdef CONFIG_ZONE_DMA32
+#if defined(CONFIG_ZONE_DMA32) || defined(CONFIG_EXMEM)
 	if (!zone)
 		return alloc_flags;
 
+#if defined(CONFIG_ZONE_DMA32) && defined(CONFIG_EXMEM)
+	if (zone_idx(zone) != ZONE_NORMAL && zone_idx(zone) != ZONE_EXMEM)
+		return alloc_flags;
+
+	BUILD_BUG_ON(ZONE_NORMAL - ZONE_EXMEM != 1);
+	BUILD_BUG_ON(ZONE_EXMEM - ZONE_DMA32 != 1);
+#elif defined(CONFIG_ZONE_DMA32)
 	if (zone_idx(zone) != ZONE_NORMAL)
 		return alloc_flags;
 
@@ -4449,11 +4470,18 @@ alloc_flags_nofragment(struct zone *zone, gfp_t gfp_mask)
 	 * on UMA that if Normal is populated then so is DMA32.
 	 */
 	BUILD_BUG_ON(ZONE_NORMAL - ZONE_DMA32 != 1);
+#elif defined(CONFIG_EXMEM)
+	if (zone_idx(zone) != ZONE_NORMAL)
+		return alloc_flags;
+
+	BUILD_BUG_ON(ZONE_NORMAL - ZONE_EXMEM != 1);
+#endif
+
 	if (nr_online_nodes > 1 && !populated_zone(--zone))
 		return alloc_flags;
 
 	alloc_flags |= ALLOC_NOFRAGMENT;
-#endif /* CONFIG_ZONE_DMA32 */
+#endif
 	return alloc_flags;
 }
 
@@ -4466,6 +4494,33 @@ static inline unsigned int gfp_to_alloc_flags_cma(gfp_t gfp_mask,
 		alloc_flags |= ALLOC_CMA;
 #endif
 	return alloc_flags;
+}
+
+static inline bool __is_zone_allowed(struct zone *z, gfp_t gfp_mask)
+{
+	if (user_zonelist_order == ZONELIST_ORDER_NONE &&
+			!(gfp_mask & __GFP_EXMEM) &&
+			zone_is_zone_exmem(z))
+		return false;
+
+	/*
+	 * If the ZONE_EXMEM page is requested, ignore other zones.
+	 * If the page of the zones except ZONE_EXMEM is requested,
+	 * ignore ZONE_EXMEM.
+	 */
+	if (unlikely((gfp_mask & __GFP_EXMEM) &&
+				!(gfp_mask & __GFP_NOEXMEM) &&
+				!zone_is_zone_exmem(z)))
+		return false;
+	else if (unlikely((gfp_mask & __GFP_NOEXMEM) &&
+				!(gfp_mask & __GFP_EXMEM) &&
+				zone_is_zone_exmem(z)))
+		return false;
+	else if (unlikely((gfp_mask & __GFP_EXMEM) &&
+				(gfp_mask & __GFP_NOEXMEM)))
+		return false;
+
+	return true;
 }
 
 /*
@@ -4494,9 +4549,7 @@ retry:
 		unsigned long mark;
 
 #ifdef CONFIG_EXMEM
-		/* If ExMem page is requested, other zone is ignored */
-		if (unlikely((gfp_mask & __GFP_EXMEM) &&
-					zonelist_zone_idx(z) != ZONE_EXMEM))
+		if (!__is_zone_allowed(zone, gfp_mask))
 			continue;
 #endif
 
@@ -5236,9 +5289,16 @@ should_reclaim_retry(gfp_t gfp_mask, unsigned order,
 		bool wmark;
 
 #ifdef CONFIG_EXMEM
-		/* If ExMem page is requested, other zone is ignored */
+		/*
+		 * If the ZONE_EXMEM page is requested, ignore other zones.
+		 * If the page of the zones except ZONE_EXMEM is requested,
+		 * ignore ZONE_EXMEM.
+		 */
 		if (unlikely((gfp_mask & __GFP_EXMEM) &&
 					zonelist_zone_idx(z) != ZONE_EXMEM))
+			continue;
+		else if (unlikely((gfp_mask & __GFP_NOEXMEM) &&
+					zonelist_zone_idx(z) == ZONE_EXMEM))
 			continue;
 #endif
 
@@ -5725,6 +5785,11 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	/* Find an allowed local zone that meets the low watermark. */
 	for_each_zone_zonelist_nodemask(zone, z, ac.zonelist, ac.highest_zoneidx, ac.nodemask) {
 		unsigned long mark;
+
+#if CONFIG_EXMEM
+		if (!__is_zone_allowed(zone, gfp))
+			continue;
+#endif
 
 		if (cpusets_enabled() && (alloc_flags & ALLOC_CPUSET) &&
 		    !__cpuset_zone_allowed(zone, gfp)) {
@@ -6584,6 +6649,23 @@ static int build_zonerefs_node(pg_data_t *pgdat, struct zoneref *zonerefs)
 
 	do {
 		zone_type--;
+#ifdef CONFIG_EXMEM
+		/* If numa_zonelist_order is set to "ExMem", put ZONE_EXMEM before
+		 * ZONE_NORMAL. */
+		BUILD_BUG_ON(ZONE_NORMAL - ZONE_EXMEM != 1);
+		if (user_zonelist_order == ZONELIST_ORDER_EXMEM) {
+			if (zone_type == ZONE_NORMAL) {
+				zone = pgdat->node_zones + zone_type - 1; /* ZONE_EXMEM */
+				if (populated_zone(zone)) {
+					zoneref_set_zone(zone, &zonerefs[nr_zones++]);
+					check_highest_zone(zone_type);
+				}
+			} else if (zone_type == ZONE_EXMEM) {
+				/* It is already processed. */
+				continue;
+			}
+		}
+#endif
 		zone = pgdat->node_zones + zone_type;
 		if (populated_zone(zone)) {
 			zoneref_set_zone(zone, &zonerefs[nr_zones++]);
@@ -6598,6 +6680,21 @@ static int build_zonerefs_node(pg_data_t *pgdat, struct zoneref *zonerefs)
 
 static int __parse_numa_zonelist_order(char *s)
 {
+#ifdef CONFIG_EXMEM
+	if (!strncasecmp(s, zonelist_order_name[ZONELIST_ORDER_NONE],
+				strlen(zonelist_order_name[ZONELIST_ORDER_NONE]))) {
+		user_zonelist_order = ZONELIST_ORDER_NONE;
+	} else if (!strncasecmp(s, zonelist_order_name[ZONELIST_ORDER_NORMAL],
+				strlen(zonelist_order_name[ZONELIST_ORDER_NORMAL]))) {
+		user_zonelist_order = ZONELIST_ORDER_NORMAL;
+	} else if (!strncasecmp(s, zonelist_order_name[ZONELIST_ORDER_EXMEM],
+				strlen(zonelist_order_name[ZONELIST_ORDER_EXMEM]))) {
+		user_zonelist_order = ZONELIST_ORDER_EXMEM;
+	} else {
+		pr_warn("Ignoring unsupported numa_zonelist_order value:  %s\n", s);
+		return -EINVAL;
+	}
+#else
 	/*
 	 * We used to support different zonelists modes but they turned
 	 * out to be just not useful. Let's keep the warning in place
@@ -6608,11 +6705,47 @@ static int __parse_numa_zonelist_order(char *s)
 		pr_warn("Ignoring unsupported numa_zonelist_order value:  %s\n", s);
 		return -EINVAL;
 	}
+#endif
 	return 0;
 }
 
-char numa_zonelist_order[] = "Node";
+char numa_zonelist_order[] = "None";
 
+#ifdef CONFIG_EXMEM
+/*
+ * sysctl handler for numa_zonelist_order
+ */
+int numa_zonelist_order_handler(struct ctl_table *table, int write,
+		void *buffer, size_t *length, loff_t *ppos)
+{
+	int ret;
+	static DEFINE_MUTEX(zl_order_mutex);
+
+	mutex_lock(&zl_order_mutex);
+	if (write) {
+		int oldval = user_zonelist_order;
+
+		ret = __parse_numa_zonelist_order(buffer);
+		if (ret) {
+			user_zonelist_order = oldval;
+
+			/* Don't update value */
+			goto out;
+		} else if (oldval != user_zonelist_order) {
+			build_all_zonelists(NULL);
+			ret = proc_dostring(table, write, buffer, length, ppos);
+
+			/* Update sysctl numa_zonelist_order right value */
+			snprintf((char *)table->data, NUMA_ZONELIST_ORDER_LEN, "%s",
+					zonelist_order_name[user_zonelist_order]);
+		}
+	} else
+		ret = proc_dostring(table, write, buffer, length, ppos);
+out:
+	mutex_unlock(&zl_order_mutex);
+	return ret;
+}
+#else
 /*
  * sysctl handler for numa_zonelist_order
  */
@@ -6623,7 +6756,7 @@ int numa_zonelist_order_handler(struct ctl_table *table, int write,
 		return __parse_numa_zonelist_order(buffer);
 	return proc_dostring(table, write, buffer, length, ppos);
 }
-
+#endif
 
 #define MAX_NODE_LOAD (nr_online_nodes)
 static int node_load[MAX_NUMNODES];
@@ -6963,6 +7096,10 @@ void __ref build_all_zonelists(pg_data_t *pgdat)
 		nr_online_nodes,
 		page_group_by_mobility_disabled ? "off" : "on",
 		vm_total_pages);
+#ifdef CONFIG_EXMEM
+	pr_info("Numa zonelist order: %s\n",
+		zonelist_order_name[user_zonelist_order]);
+#endif
 #ifdef CONFIG_NUMA
 	pr_info("Policy zone: %s\n", zone_names[policy_zone]);
 #endif

@@ -15,8 +15,10 @@
 
 #ifdef CONFIG_EXMEM
 # define IF_HAVE_GFP_EXMEM(flag, name) ,{(unsigned long)flag, name}
+# define IF_HAVE_GFP_NOEXMEM(flag, name) ,{(unsigned long)flag, name}
 #else
 # define IF_HAVE_GFP_EXMEM(flag, name)
+# define IF_HAVE_GFP_NOEXMEM(flag, name)
 #endif
 
 #define __def_gfpflag_names						\
@@ -57,6 +59,7 @@
 	{(unsigned long)__GFP_KSWAPD_RECLAIM,	"__GFP_KSWAPD_RECLAIM"},\
 	{(unsigned long)__GFP_ZEROTAGS,		"__GFP_ZEROTAGS"}	\
 IF_HAVE_GFP_EXMEM(__GFP_EXMEM,			"__GFP_EXMEM")	\
+IF_HAVE_GFP_EXMEM(__GFP_NOEXMEM,		"__GFP_NOEXMEM")	\
 
 #ifdef CONFIG_KASAN_HW_TAGS
 #define __def_gfpflag_names_kasan ,					       \
@@ -169,8 +172,10 @@ IF_HAVE_PG_SKIP_KASAN_POISON(PG_skip_kasan_poison, "skip_kasan_poison")
 
 #ifdef CONFIG_EXMEM
 #define IF_HAVE_VM_EXMEM(flag,name) ,{flag, name }
+#define IF_HAVE_VM_NOEXMEM(flag,name) ,{flag, name }
 #else
 #define IF_HAVE_VM_EXMEM(flag,name)
+#define IF_HAVE_VM_NOEXMEM(flag,name)
 #endif
 
 #define __def_vmaflag_names						\
@@ -207,6 +212,7 @@ IF_HAVE_VM_SOFTDIRTY(VM_SOFTDIRTY,	"softdirty"	)		\
 	{VM_NOHUGEPAGE,			"nohugepage"	},		\
 	{VM_MERGEABLE,			"mergeable"	}		\
 IF_HAVE_VM_EXMEM(VM_EXMEM,	"exmem" )				\
+IF_HAVE_VM_NOEXMEM(VM_NOEXMEM,	"noexmem" )				\
 
 #define show_vma_flags(flags)						\
 	(flags) ? __print_flags(flags, "|",				\

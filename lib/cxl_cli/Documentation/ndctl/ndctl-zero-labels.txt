@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-2.0
+
+ndctl-zero-labels(1)
+====================
+
+NAME
+----
+ndctl-zero-labels - zero out the label area on a dimm or set of dimms
+
+SYNOPSIS
+--------
+[verse]
+'ndctl zero-labels' <nmem0> [<nmem1>..<nmemN>] [<options>]
+
+include::labels-description.txt[]
+This command resets the device to its default state by
+deleting all labels.
+
+OPTIONS
+-------
+include::labels-options.txt[]
+
+include::../copyright.txt[]
+
+SEE ALSO
+--------
+http://www.uefi.org/sites/default/files/resources/UEFI_Spec_2_7.pdf[UEFI NVDIMM Label Protocol]

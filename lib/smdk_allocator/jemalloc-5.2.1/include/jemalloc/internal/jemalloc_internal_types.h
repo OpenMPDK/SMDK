@@ -111,26 +111,21 @@ typedef int malloc_cpuid_t;
 #  define VARIABLE_ARRAY(type, name, count) type name[(count)]
 #endif
 
-/* mmap flag, Note: aligned to sys_mmap_flag (MAP_EXMEM) */
-#define MAP_NORMAL_MEM 0
+/* mmap flag */
+#ifndef MAP_NORMAL
+#define MAP_NORMAL 0x400000
+#endif
 #ifndef MAP_EXMEM
 #define MAP_EXMEM 0x200000
 #endif
 #ifndef MAP_JEMALLOC_INTERNAL_MMAP
-#define MAP_JEMALLOC_INTERNAL_MMAP 0x400000
+#define MAP_JEMALLOC_INTERNAL_MMAP 0x800000
 #endif
 
 #define MEM_ZONE_EXMEM (1)
 #define MEM_ZONE_NORMAL (0)
 
-typedef enum {
-    policy_zone,
-    policy_node,
-    policy_noop,
-} group_policy_t;
-
 typedef struct {
-    group_policy_t group_policy;
     struct bitmask *nodemask;
 }cpu_node_config_t;
 

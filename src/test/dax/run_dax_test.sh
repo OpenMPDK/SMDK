@@ -24,7 +24,7 @@ if [ ! -d $FIO_PATH ]; then
 fi
 
 if [ `whoami` != 'root' ]; then
-	echo "You must be root!"
+	echo "This test requires root privileges"
 	exit
 fi
 
@@ -37,7 +37,9 @@ done
 
 print_result
 
-echo 0 > /sys/kernel/cxl/cxl_mem_mode
+for cxldev in /sys/kernel/cxl/devices/cxl*; do
+	echo -1 > $cxldev/node_id
+done
 
 for ((i=0 ; i < $NUM_DEVICE ; i ++)) do
 	if [ ! -d "/sys/devices/platform/hmem.$i/dax$i.0/mapping0/" ]; then
@@ -55,6 +57,8 @@ for ((i=0 ; i < $NUM_DEVICE ; i ++)) do
 	echo dax$i.0 > /sys/bus/dax/drivers/device_dax/unbind
 done
 
-echo 2 > /sys/kernel/cxl/cxl_mem_mode
+for cxldev in /sys/kernel/cxl/devices/cxl*; do
+	echo 0 > $cxldev/node_id
+done
 
 print_result

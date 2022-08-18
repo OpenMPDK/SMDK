@@ -45,37 +45,32 @@ void set_exmem_partition_range_mask(void){
     struct bitmask *bmp = numa_allocate_nodemask();
 
     if(strcmp(opt_smdk.exmem_partition_range, "")) {
-        if (je_cpu_node_config.group_policy != policy_zone){
-            if (!strcmp(opt_smdk.exmem_partition_range, "all")) {
-                /* all */
-                set_all_exmem_node_mask(bmp);
-            } else {
-                /* node list */
-                bmp = numa_parse_nodestring(opt_smdk.exmem_partition_range);
-                if (bmp == numa_no_nodes_ptr || bmp == 0) {
-                    fprintf(stderr, "[Warning] Invalid value for \"exmem_partition_range\"=%s."
-                            " This option will be ignored.\n", opt_smdk.exmem_partition_range);
-                    goto EXMEM_CONTROL_OFF;
-                }
-                /* filtering out the DDR nodes */
-                struct bitmask *all_exmem_node_bmp = numa_allocate_nodemask();
-                int num_nodes = numa_num_configured_nodes();
-                set_all_exmem_node_mask(all_exmem_node_bmp);
-                for (int i = 0 ; i < num_nodes; i++) {
-                    if (numa_bitmask_isbitset(bmp, i)) {
-                        if (numa_bitmask_isbitset(all_exmem_node_bmp,i) == 0) {
-                            fprintf(stderr, "[Warning] node %d is not ExMem node\n", i);
-                            numa_bitmask_clearbit(bmp, i);
-                        }
+        if (!strcmp(opt_smdk.exmem_partition_range, "all")) {
+            /* all */
+            set_all_exmem_node_mask(bmp);
+        } else {
+            /* node list */
+            bmp = numa_parse_nodestring(opt_smdk.exmem_partition_range);
+            if (bmp == numa_no_nodes_ptr || bmp == 0) {
+                fprintf(stderr, "[Warning] Invalid value for \"exmem_partition_range\"=%s."
+                        " This option will be ignored.\n", opt_smdk.exmem_partition_range);
+                goto EXMEM_CONTROL_OFF;
+            }
+            /* filtering out the DDR nodes */
+            struct bitmask *all_exmem_node_bmp = numa_allocate_nodemask();
+            int num_nodes = numa_num_configured_nodes();
+            set_all_exmem_node_mask(all_exmem_node_bmp);
+            for (int i = 0 ; i < num_nodes; i++) {
+                if (numa_bitmask_isbitset(bmp, i)) {
+                    if (numa_bitmask_isbitset(all_exmem_node_bmp,i) == 0) {
+                        fprintf(stderr, "[Warning] node %d is not ExMem node\n", i);
+                        numa_bitmask_clearbit(bmp, i);
                     }
                 }
             }
-            je_cpu_node_config.nodemask = bmp;
-            return;
-        } else {
-            fprintf(stderr, "[Warning] \"cxl_group_policy\" should be 'noop' or 'node' "
-            "to enable \"exmem_partition_range\"\n");
         }
+        je_cpu_node_config.nodemask = bmp;
+        return;
     }
 
 EXMEM_CONTROL_OFF:

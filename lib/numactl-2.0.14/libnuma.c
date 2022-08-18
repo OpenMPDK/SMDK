@@ -1827,7 +1827,7 @@ void numa_set_strict(int flag)
 #ifdef SUPPORT_SMDK_KERNEL
 int numa_set_zone(unsigned int flag)
 {
-	if (flag != MPOL_F_ZONE_EXMEM)
+	if (flag != MPOL_F_ZONE_EXMEM && flag != MPOL_F_ZONE_NOEXMEM)
 		return -1;
 	zone_flags |= flag;
 	return 0;

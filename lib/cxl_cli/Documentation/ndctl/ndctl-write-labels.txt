@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0
+
+ndctl-write-labels(1)
+=====================
+
+NAME
+----
+ndctl-write-labels - write data to the label area on a dimm
+
+SYNOPSIS
+--------
+[verse]
+'ndctl write-labels <nmem> [-i <filename>]'
+
+include::labels-description.txt[]
+Read data from the input filename, or stdin, and write it to the given
+<nmem> device. Note that the device must not be active in any region,
+otherwise the kernel will not allow write access to the device's label
+data area.
+
+OPTIONS
+-------
+include::labels-options.txt[]
+-i::
+--input::
+	input file
+
+SEE ALSO
+--------
+http://www.uefi.org/sites/default/files/resources/UEFI_Spec_2_7.pdf[UEFI NVDIMM Label Protocol]

@@ -158,6 +158,7 @@ calc_vm_flag_bits(unsigned long flags)
 	       _calc_vm_trans(flags, MAP_SYNC,	     VM_SYNC      ) |
 #ifdef CONFIG_EXMEM
 	       _calc_vm_trans(flags, MAP_EXMEM,      VM_EXMEM     ) |
+	       _calc_vm_trans(flags, MAP_NORMAL,     VM_NOEXMEM   ) |
 #endif
 	       arch_calc_vm_flag_bits(flags);
 }

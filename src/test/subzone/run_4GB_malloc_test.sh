@@ -9,10 +9,8 @@ source "$BASEDIR/script/common.sh"
 NUMACTL_DIR=$BASEDIR/lib/numactl-2.0.14/
 NUMACTL=$NUMACTL_DIR/numactl
 
-# cxl policy
-CXL_SYSFS_PATH="/sys/kernel/cxl/"
-POLICY_PATH=$CXL_SYSFS_PATH/cxl_group_policy
-MODE_PATH=$CXL_SYSFS_PATH/cxl_mem_mode
+# cxl-cli
+CXLCLI=$BASEDIR/lib/cxl_cli/build/cxl/cxl
 
 # tc
 TEST_APP_DIR=$BASEDIR/src/test/subzone/
@@ -27,11 +25,19 @@ run_malloc() {
 }
 
 set_pol() {
-	echo $POL > $POLICY_PATH
+	if [ "$POL" = "zone" ]; then
+		$CXLCLI group-zone
+	elif [ "$POL" = "node" ]; then
+		$CXLCLI group-node
+	elif [ "$POL" = "noop" ]; then
+		$CXLCLI group-noop
+	else
+		log_error "Bad policy: $POL"
+	fi
 }
 
 print_desc_test() {
-	echo -n "cxl_group_policy: $POL, "
+	echo -n "cxl group-$POL, "
 	echo -n "size: `numfmt --to iec --format "%f" $SIZE` bytes, "
 	echo -n "iteration: `numfmt --to iec --format "%f" $ITER` times, "
 }
@@ -97,8 +103,18 @@ test_malloc_4GB_10_threads_4M_unit(){
 }
 
 if [ `whoami` != 'root' ]; then
-	log_error "You must be root!"
+	log_error "This test requires root privileges"
 	exit
+fi
+
+if [ ! -f "${NUMACTL}" ]; then
+	log_error "numactl does not exist. Run 'build_lib.sh numactl' in /path/to/SMDK/lib/"
+	exit 1
+fi
+
+if [ ! -f "${CXLCLI}" ]; then
+	log_error "cxl does not exist. Run 'build_lib.sh cxl_cli' in /path/to/SMDK/lib/"
+	exit 1
 fi
 
 log_normal "Single Thread Testcases"

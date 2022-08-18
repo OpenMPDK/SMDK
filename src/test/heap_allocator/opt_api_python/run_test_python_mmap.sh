@@ -19,9 +19,28 @@ export LD_PRELOAD=$SMALLOCPYLIB
 ### If _py_smdk.so is not copied in the basic path of python package, PYTHONPATH should be specified as below.
 export PYTHONPATH=$SMALLOCPYLIB_DIR
 
-$PYTHON test_python_mmap.py
+MEMTYPE=normal
+
+while getopts "en" opt; do
+	case "$opt" in
+		e)
+			MEMTYPE=exmem
+			;;
+		n)
+			MEMTYPE=normal
+			;;
+		*)
+			echo "Usage: $0 -e | -n"
+			exit 1
+			;;
+	esac
+done
+
+$PYTHON test_python_mmap.py $MEMTYPE
 unset LD_PRELOAD
 
 if [ -e $FILE ];then
     rm -rf $FILE
 fi
+
+exit 0

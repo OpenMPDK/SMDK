@@ -19,7 +19,7 @@ SRAT_FILENAME=srat.dsl
 function check_srat_table(){
 	# Extract ACPI Tables
 	if [ ! -f $ACPI_FILENAME ]; then
-		sudo apt install acpica-tools > apt.log 2>&1
+		sudo apt install -y acpica-tools > apt.log 2>&1
 		sudo acpidump -o acpidump.out > acpidump.log 2>&1
 		acpixtract -a acpidump.out > acpixtract.log 2>&1
 	fi

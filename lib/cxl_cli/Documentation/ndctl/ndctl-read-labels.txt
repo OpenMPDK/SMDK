@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-2.0
+
+ndctl-read-labels(1)
+====================
+
+NAME
+----
+ndctl-read-labels - read out the label area on a dimm or set of dimms
+
+SYNOPSIS
+--------
+[verse]
+'ndctl read-labels' <nmem0> [<nmem1>..<nmemN>] [<options>]
+
+include::labels-description.txt[]
+This command dumps the raw binary data in a dimm's label area to stdout or a
+file.  In the multi-dimm case the data is concatenated.
+
+OPTIONS
+-------
+include::labels-options.txt[]
+-I::
+--index::
+	Limit the span of the label operation to just the index-block
+	area. This is useful to determine if the dimm label area is
+	initialized. Note that this option and --size/--offset are
+	mutually exclusive.
+
+-o::
+--output::
+	output file
+-j::
+--json::
+	parse the label data into json assuming the 'NVDIMM Namespace
+	Specification' format.
+
+-u::
+--human::
+	enable json output and convert number formats to human readable
+	strings, for example show the size in terms of "KB", "MB", "GB", etc
+	instead of a signed 64-bit numbers per the JSON interchange
+	format (implies --json).
+
+include::../copyright.txt[]
+
+SEE ALSO
+--------
+http://www.uefi.org/sites/default/files/resources/UEFI_Spec_2_7.pdf[UEFI NVDIMM Label Protocol]

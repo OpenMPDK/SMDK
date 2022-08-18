@@ -1,0 +1,5 @@
+build/
+rhel/ndctl.spec
+sles/ndctl.spec
+*.swp
+tags

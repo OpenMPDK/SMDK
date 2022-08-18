@@ -8,6 +8,7 @@ obj-$(CONFIG_CXL_PORT) += cxl_port.o
 
 cxl_mem-y := mem.o
 cxl_pci-y := pci.o
+cxl_pci-$(CONFIG_EXMEM) += cxlgroup.o
 cxl_acpi-y := acpi.o
 cxl_pmem-y := pmem.o
 cxl_port-y := port.o

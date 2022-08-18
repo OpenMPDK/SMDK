@@ -2,13 +2,16 @@ import mmap
 import os, sys, time
 from py_smdk import py_smalloc
 
-MAP_EXMEM = py_smalloc.MAP_EXMEM
+if sys.argv[1] == "exmem":
+    MEMTYPE_FLAG = py_smalloc.MAP_EXMEM
+else:
+    MEMTYPE_FLAG = py_smalloc.MAP_NORMAL
 
 filename = "./4M.dummy"
 fileno = -1 #for MAP_ANON
 length = 4*1024*1024 #4MB
 num = 1000
-flags = mmap.MAP_ANON | mmap.MAP_PRIVATE | MAP_EXMEM #mmap.MAP_POPULATE from 3.10
+flags = mmap.MAP_ANON | mmap.MAP_PRIVATE | MEMTYPE_FLAG #cf.mmap.MAP_POPULATE from 3.10
 prot = mmap.PROT_WRITE | mmap.PROT_READ
 
 try:

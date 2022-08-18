@@ -32,8 +32,10 @@
 #define ARENA_AUTOSCALE_FACTOR 0
 #define ARENA_SCALE_FACTOR 2
 
-/* mmap flag, Note: aligned to sys_mmap_flag (MAP_EXMEM) */
-#define MAP_NORMAL_MEM 0
+/* mmap flag */
+#ifndef MAP_NORMAL
+#define MAP_NORMAL 0x400000
+#endif
 #ifndef MAP_EXMEM
 #define MAP_EXMEM 0x200000
 #endif

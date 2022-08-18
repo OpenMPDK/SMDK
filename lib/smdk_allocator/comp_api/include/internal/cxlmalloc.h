@@ -24,7 +24,7 @@ extern int get_current_prio(void);
             return je_##n;					    \
         }							    \
     }while (0)
-#define MAP_JEMALLOC_INTERNAL_MMAP 0x400000
+#define MAP_JEMALLOC_INTERNAL_MMAP 0x800000
 #define RET_USE_EXMEM_FALSE (1)
 #define CXLMALLOC_CONSTRUCTOR_PRIORITY (SMALLOC_CONSTRUCTOR_PRIORITY-1)
 typedef void *(*mmap_ptr_t)(void *, size_t, int, int, int, off_t);

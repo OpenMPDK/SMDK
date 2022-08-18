@@ -1,4 +1,4 @@
-SUBDIRS=group_policy heap_allocator lazy_alloc mmap numactl subzone syscall
+SUBDIRS=driver heap_allocator mmap numactl subzone syscall cxl_cli
 
 .PHONY:subdirs $SUBDIRS)
 

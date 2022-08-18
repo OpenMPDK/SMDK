@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: GPL-2.0
+
+ndctl-sanitize-dimm(1)
+======================
+
+NAME
+----
+ndctl-sanitize-dimm - Perform a cryptographic destruction or overwrite of
+the contents of the given NVDIMM(s)
+
+SYNOPSIS
+--------
+[verse]
+'ndctl sanitize-dimm' <nmem0> [<nmem1>..<nmemN>] [<options>]
+
+DESCRIPTION
+-----------
+The 'sanitize-dimm' command performs a cryptographic destruction of the
+contents of the given NVDIMM. It scrambles the data, and any metadata or
+info-blocks, but it doesn't modify namespace labels. Therefore, any
+namespaces on regions associated with the given NVDIMM will be retained,
+but they will end up in the 'raw' mode.
+
+Additionally, after completion of this command, the security and passphrase
+for the given NVDIMM will be disabled, and the passphrase and any key material
+will also be removed from the keyring and the ndctl keys directory at
+{ndctl_keysdir}
+
+The command supports two different methods of performing the cryptographic
+erase. The default is 'crypto-erase', but additionally, an 'overwrite' option
+is available which overwrites not only the data area, but also the label area,
+thus losing record of any namespaces the given NVDIMM participates in.
+
+OPTIONS
+-------
+<dimm>::
+include::xable-dimm-options.txt[]
+
+-b::
+--bus=::
+include::xable-bus-options.txt[]
+
+-c::
+--crypto-erase::
+	Replace the media encryption key on the NVDIMM causing all existing
+	data to read as cipher text with the new key. This does not change
+	label data. Namespaces get reverted to raw mode.
+
+-o::
+--ovewrite::
+	Wipe the entire DIMM, including label data. This can take significant
+	time, and the command is non-blocking. With this option, the overwrite
+	request is merely submitted to the NVDIMM, and the completion is
+	asynchronous. Depending on the medium and capacity, overwrite may take
+	tens of minutes to many hours.
+
+-m::
+--master-passphrase::
+	Indicate that we are using the master passphrase to perform the erase.
+	This only is applicable to the 'crypto-erase' option.
+
+-z::
+--zero-key::
+	Passing in a key with payload that is just 0's.
+
+--verbose::
+        Emit debug messages.
+
+include::intel-nvdimm-security.txt[]
+
+include::../copyright.txt[]
+
+SEE ALSO
+--------
+linkndctl:ndctl-wait-overwrite[1], https://trustedcomputinggroup.org/wp-content/uploads/TCG_SWG_SIIS_Version_1_07_Revision_1_00.pdf

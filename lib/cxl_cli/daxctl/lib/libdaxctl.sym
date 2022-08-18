@@ -1,0 +1,101 @@
+LIBDAXCTL_1 {
+global:
+	daxctl_get_userdata;
+	daxctl_set_userdata;
+	daxctl_ref;
+	daxctl_get_log_priority;
+	daxctl_set_log_fn;
+	daxctl_unref;
+	daxctl_set_log_priority;
+	daxctl_new;
+local:
+        *;
+};
+
+LIBDAXCTL_2 {
+global:
+	daxctl_region_unref;
+	daxctl_new_region;
+	daxctl_region_ref;
+	daxctl_region_unref;
+	daxctl_region_get_uuid;
+	daxctl_region_get_id;
+	daxctl_region_get_ctx;
+	daxctl_dev_get_first;
+	daxctl_dev_get_next;
+	daxctl_dev_get_region;
+	daxctl_dev_get_id;
+	daxctl_dev_get_devname;
+	daxctl_dev_get_major;
+	daxctl_dev_get_minor;
+	daxctl_dev_get_size;
+} LIBDAXCTL_1;
+
+LIBDAXCTL_3 {
+global:
+	daxctl_region_get_available_size;
+	daxctl_region_get_devname;
+	daxctl_region_get_dev_seed;
+} LIBDAXCTL_2;
+
+LIBDAXCTL_4 {
+global:
+	daxctl_region_get_size;
+	daxctl_region_get_align;
+	daxctl_region_get_first;
+	daxctl_region_get_next;
+} LIBDAXCTL_3;
+
+LIBDAXCTL_5 {
+global:
+	daxctl_region_get_path;
+} LIBDAXCTL_4;
+
+LIBDAXCTL_6 {
+global:
+	daxctl_dev_get_ctx;
+	daxctl_dev_is_enabled;
+	daxctl_dev_disable;
+	daxctl_dev_enable_devdax;
+	daxctl_dev_enable_ram;
+	daxctl_dev_get_resource;
+	daxctl_dev_get_target_node;
+	daxctl_dev_get_memory;
+	daxctl_memory_get_dev;
+	daxctl_memory_get_node_path;
+	daxctl_memory_get_block_size;
+	daxctl_memory_online;
+	daxctl_memory_offline;
+	daxctl_memory_is_online;
+	daxctl_memory_num_sections;
+} LIBDAXCTL_5;
+
+LIBDAXCTL_7 {
+global:
+	daxctl_memory_is_movable;
+	daxctl_memory_online_no_movable;
+} LIBDAXCTL_6;
+
+LIBDAXCTL_8 {
+global:
+	daxctl_dev_set_size;
+	daxctl_region_create_dev;
+	daxctl_region_destroy_dev;
+	daxctl_dev_get_align;
+	daxctl_dev_set_align;
+	daxctl_mapping_get_first;
+	daxctl_mapping_get_next;
+	daxctl_mapping_get_start;
+	daxctl_mapping_get_end;
+	daxctl_mapping_get_offset;
+	daxctl_mapping_get_size;
+	daxctl_dev_set_mapping;
+} LIBDAXCTL_7;
+
+LIBDAXCTL_9 {
+global:
+	daxctl_dev_will_auto_online_memory;
+	daxctl_dev_has_online_memory;
+	daxctl_set_config_path;
+	daxctl_get_config_path;
+} LIBDAXCTL_8;

@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+A bus id number, or a provider string (e.g. "ACPI.NFIT"). Restrict the
+operation to the specified bus(es). The keyword 'all' can be specified
+to indicate the lack of any restriction, however this is the same as
+not supplying a --bus option at all.

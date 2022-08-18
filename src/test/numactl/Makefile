@@ -9,4 +9,4 @@ $(APP): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	rm *.o $(APP)
+	rm -rf *.o $(APP)

@@ -41,6 +41,10 @@
 	___C(GET_SCAN_MEDIA_CAPS, "Get Scan Media Capabilities"),         \
 	___C(SCAN_MEDIA, "Scan Media"),                                   \
 	___C(GET_SCAN_MEDIA, "Get Scan Media Results"),                   \
+	___C(GET_TIME, "Get timestamp"),                                  \
+	___C(SET_TIME, "Set timestamp"),                                  \
+	___C(GET_EVENT_LOG, "Get event log"),                             \
+	___C(CLEAR_EVENT, "Clear event log"),                             \
 	___C(MAX, "invalid / last command")
 
 #define ___C(a, b) CXL_MEM_COMMAND_ID_##a

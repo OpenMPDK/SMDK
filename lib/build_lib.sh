@@ -21,6 +21,7 @@ CXL_KERNEL_CONFIG=config-linux-5.18-rc3-smdk
 QEMU=qemu_cxl2.0v4
 MLC=mlc
 VOLTDB=$BASEDIR/src/app/voltdb
+CXLCLI=cxl_cli
 
 SMDK_BIN=$BASEDIR/lib/SMDK_bin
 SMDK_VERSION=v1.1
@@ -237,6 +238,21 @@ function build_py_smdk(){
 	fi
 }
 
+function build_cxl_cli(){
+	app=$CXLCLI
+	log_normal "[build $app]"
+
+	cd $app && meson setup build && cd -
+	cd $app/build && ninja && cd -
+	ret=$?
+
+	if [ $ret = 0 ]; then
+		log_normal "[build $app]..success"
+	else
+		log_error "[build $app]..error"
+	fi
+}
+
 function build_all(){
 	build_smdkmalloc
 	build_redis
@@ -248,6 +264,7 @@ function build_all(){
 	#build_qemu
 	#build_smdk_kernel
 	build_py_smdk
+	build_cxl_cli
 }
 
 function clean_smdkmalloc(){
@@ -380,6 +397,21 @@ function clean_voltdb(){
 	fi
 }
 
+function clean_cxl_cli(){
+	app=$CXLCLI
+	log_normal "[clean $app]"
+
+	cd $app && rm -rf build && cd -
+	ret=$?
+
+	if [ $ret = 0 ]; then
+		log_normal "[clean $app]..success"
+	else
+		log_error "[clean $app]..error"
+	fi
+}
+
+
 case "$1" in
 	kernel)
 		build_smdk_kernel
@@ -419,6 +451,10 @@ case "$1" in
 
 	py_smdk)
 		build_py_smdk
+		;;
+
+	cxl_cli)
+		build_cxl_cli
 		;;
 
 	all)
@@ -465,6 +501,10 @@ case "$1" in
 		clean_py_smdk
 		;;
 
+	clean_cxl_cli)
+		clean_cxl_cli
+		;;
+
 	clean_all)
 		clean_smdkmalloc
 		clean_redis
@@ -476,10 +516,11 @@ case "$1" in
 		clean_numactl
 #		clean_voltdb
 		clean_py_smdk
+		clean_cxl_cli
 		;;
 	*)
-		echo "Usage: build_lib.sh {all|kernel|smdkmalloc|redis|memcached|memtier|qemu|numactl|voltdb|bm|py_smdk}"
-		echo "Usage: build_lib.sh {clean_all|clean_kernel|clean_smdkmalloc|clean_redis|clean_memcached|clean_memtier|clean_qemu|clean_numactl|clean_voltdb|clean_bm|py_smdk}"
+		echo "Usage: build_lib.sh {all|kernel|smdkmalloc|redis|memcached|memtier|qemu|numactl|voltdb|bm|py_smdk|cxl_cli}"
+		echo "Usage: build_lib.sh {clean_all|clean_kernel|clean_smdkmalloc|clean_redis|clean_memcached|clean_memtier|clean_qemu|clean_numactl|clean_voltdb|clean_bm|clean_py_smdk|clean_cxl_cli}"
 		exit 1
 		;;
 esac

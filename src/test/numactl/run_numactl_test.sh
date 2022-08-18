@@ -25,9 +25,9 @@ function run_numactl(){
 	fi
 }
 
-usage() { echo "Usage: $0 [-e | -n] [-i nodes| -m nodes]"; exit 0; }
+usage() { echo "Usage: $0 [-e | -n] [-i nodes| -p node]"; exit 0; }
 [ $# -eq 0 ] && usage
-while getopts ":eni:m:" opt; do
+while getopts ":eni:p:" opt; do
 	case "$opt" in
 		e)
 			PRIORITY='e' # ExMem zone
@@ -39,8 +39,8 @@ while getopts ":eni:m:" opt; do
 			MEMPOLICY="interleave"
 			NODES=$OPTARG
 			;;
-		m)
-			MEMPOLICY="membind"
+		p)
+			MEMPOLICY="preferred"
 			NODES=$OPTARG
 			CPUNODES=$OPTARG
 			;;

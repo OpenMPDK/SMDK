@@ -34,6 +34,7 @@ extern long move_pages(int pid, unsigned long count,
 #ifdef SUPPORT_SMDK_KERNEL
 /* Flags for zone policy */
 #define MPOL_F_ZONE_EXMEM  (1<<12)
+#define MPOL_F_ZONE_NOEXMEM  (1<<11)
 #endif
 
 /* Flags for get_mem_policy */

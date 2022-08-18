@@ -4,6 +4,7 @@ from _py_smdk import lib, ffi
 SMDK_MEM_NORMAL = lib.SMDK_MEM_NORMAL
 SMDK_MEM_EXMEM = lib.SMDK_MEM_EXMEM
 MAP_EXMEM = 0x200000
+MAP_NORMAL = 0x400000
 
 class mem_obj:
     def __init__(self, mem_type, data=None, size=None):

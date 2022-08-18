@@ -73,6 +73,8 @@ void *mmap(void *start, size_t len, int prot, int flags, int fd, off_t off) {
             /* mmap called by user */
             if (is_cur_prio_exmem(&prio)) {
                 flags |= MAP_EXMEM;
+            } else {
+                flags |= MAP_NORMAL;
             }
         }
         set_interleave_policy(flags);

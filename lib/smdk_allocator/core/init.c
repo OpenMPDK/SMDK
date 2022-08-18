@@ -155,7 +155,7 @@ static int init_arena_pool(){
             arena_t* arena = arena_get(TSDN_NULL,g_arena_pool[i].arena_id[j],false);
             assert(arena != NULL);
             if(opt_smdk.prio[i] == mem_zone_normal){ //prio[0] == normal, prio[1] == exmem by default
-                arena_set_mmap_flag(arena, MAP_NORMAL_MEM);
+                arena_set_mmap_flag(arena, MAP_NORMAL);
             }else{
                 arena_set_mmap_flag(arena, MAP_EXMEM);
             }
@@ -169,33 +169,8 @@ static int init_arena_pool(){
     return 0;
 }
 
-group_policy_t get_exmem_policy(){
-    group_policy_t policy = policy_zone;
-    FILE* fs;
-    fs = fopen("/sys/kernel/cxl/cxl_group_policy", "r");
-    if (!fs) {
-        fprintf(stderr, "[Warning] Get cxl_group_policy fail. Check Kernel.\n");
-        return policy;
-    }
-    char str[10];
-
-    while(1){
-        if(fgets(str,MAX_CHAR_LEN,fs) == NULL)
-            break;
-        if(!strncmp(str,"zone",4)){
-            policy=policy_zone;
-        } else if(!strncmp(str, "node",4)){
-            policy=policy_node;
-        } else
-            policy=policy_noop;
-    }
-    fclose(fs);
-    return policy;
-}
-
 void init_cpu_node_config(){
     extern cpu_node_config_t je_cpu_node_config;
-    je_cpu_node_config.group_policy = get_exmem_policy();
     je_cpu_node_config.nodemask = numa_no_nodes_ptr;
 }
 

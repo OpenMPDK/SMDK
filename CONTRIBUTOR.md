@@ -1,5 +1,6 @@
 Appreciate all the people who participate and help SMDK development.
 
+### v1.2
 SW development
 * Kyungsan Kim
 * Wonjae Lee
@@ -17,5 +18,6 @@ Product planning
 * Chonyong Lee
 * Youngjoo Choi
 * Hyeyoung Ryu
+* Kyungchang Ryoo
 * Jonathan Prout
 

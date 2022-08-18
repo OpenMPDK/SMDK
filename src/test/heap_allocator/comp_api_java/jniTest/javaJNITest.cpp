@@ -135,12 +135,6 @@ JNIEXPORT void JNICALL Java_javaJNITest_mmapHooking
         (JNIEnv *env, jobject obj, jlong size, jstring prio) {
 	int flag = MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE|MAP_POPULATE;
 	
-	const char *sprio = env->GetStringUTFChars(prio, NULL);
-	if(!strncasecmp(sprio, "cxl", 3)){
-		flag |= MAP_EXMEM;
-		std::cout<<"MAP_EXMEM"<<std::endl;
-	}
-	
 	for(int i = 0; i < 100; i++) {
 		char *addr = static_cast<char*>(mmap(NULL, size, PROT_READ|PROT_WRITE, flag, -1, 0));
 		if(addr == MAP_FAILED) {

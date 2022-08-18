@@ -67,11 +67,13 @@ struct vm_area_struct;
 #define ___GFP_NOLOCKDEP	0x8000000u
 #ifdef CONFIG_EXMEM
 #define ___GFP_EXMEM		0x10000000u
+#define ___GFP_NOEXMEM		0x20000000u
 #endif
 #else
 #define ___GFP_NOLOCKDEP	0
 #ifdef CONFIG_EXMEM
 #define ___GFP_EXMEM		0x8000000u
+#define ___GFP_NOEXMEM		0x10000000u
 #endif
 #endif
 /* If the above are modified, __GFP_BITS_SHIFT may need updating */
@@ -90,6 +92,7 @@ struct vm_area_struct;
 #define GFP_ZONEMASK	(__GFP_DMA|__GFP_HIGHMEM|__GFP_DMA32|__GFP_MOVABLE)
 #ifdef CONFIG_EXMEM
 #define __GFP_EXMEM	((__force gfp_t)___GFP_EXMEM)
+#define __GFP_NOEXMEM	((__force gfp_t)___GFP_NOEXMEM)
 #endif
 
 /**
@@ -274,7 +277,7 @@ struct vm_area_struct;
 
 /* Room for N __GFP_FOO bits */
 #ifdef CONFIG_EXMEM
-#define __GFP_BITS_SHIFT (28 + IS_ENABLED(CONFIG_LOCKDEP))
+#define __GFP_BITS_SHIFT (29 + IS_ENABLED(CONFIG_LOCKDEP))
 #else
 #define __GFP_BITS_SHIFT (27 + IS_ENABLED(CONFIG_LOCKDEP))
 #endif
@@ -365,9 +368,6 @@ struct vm_area_struct;
 #define GFP_TRANSHUGE_LIGHT	((GFP_HIGHUSER_MOVABLE | __GFP_COMP | \
 			 __GFP_NOMEMALLOC | __GFP_NOWARN) & ~__GFP_RECLAIM)
 #define GFP_TRANSHUGE	(GFP_TRANSHUGE_LIGHT | __GFP_DIRECT_RECLAIM)
-#ifdef CONFIG_EXMEM
-#define GFP_EXMEM		(GFP_HIGHUSER | __GFP_EXMEM)
-#endif
 
 /* Convert GFP flags to their corresponding migrate type */
 #define GFP_MOVABLE_MASK (__GFP_RECLAIMABLE|__GFP_MOVABLE)
@@ -470,8 +470,6 @@ static inline bool gfpflags_normal_context(const gfp_t gfp_flags)
 #if defined(CONFIG_ZONE_DEVICE) && (MAX_NR_ZONES-1) <= 4
 /* ZONE_DEVICE is not a valid GFP zone specifier */
 #define GFP_ZONES_SHIFT 2
-#elif defined(CONFIG_EXMEM)
-#define GFP_ZONES_SHIFT 2
 #else
 #define GFP_ZONES_SHIFT ZONES_SHIFT
 #endif
@@ -481,14 +479,14 @@ static inline bool gfpflags_normal_context(const gfp_t gfp_flags)
 #endif
 
 #define GFP_ZONE_TABLE ( \
-	(ZONE_NORMAL << 0 * GFP_ZONES_SHIFT)				       \
-	| (OPT_ZONE_DMA << ___GFP_DMA * GFP_ZONES_SHIFT)		       \
-	| (OPT_ZONE_HIGHMEM << ___GFP_HIGHMEM * GFP_ZONES_SHIFT)	       \
-	| (OPT_ZONE_DMA32 << ___GFP_DMA32 * GFP_ZONES_SHIFT)		       \
-	| (ZONE_NORMAL << ___GFP_MOVABLE * GFP_ZONES_SHIFT)		       \
-	| (OPT_ZONE_DMA << (___GFP_MOVABLE | ___GFP_DMA) * GFP_ZONES_SHIFT)    \
-	| (ZONE_MOVABLE << (___GFP_MOVABLE | ___GFP_HIGHMEM) * GFP_ZONES_SHIFT)\
-	| (OPT_ZONE_DMA32 << (___GFP_MOVABLE | ___GFP_DMA32) * GFP_ZONES_SHIFT)\
+	(((uint64_t)ZONE_NORMAL) << 0 * GFP_ZONES_SHIFT)				       \
+	| (((uint64_t)OPT_ZONE_DMA) << ___GFP_DMA * GFP_ZONES_SHIFT)		       \
+	| (((uint64_t)OPT_ZONE_HIGHMEM) << ___GFP_HIGHMEM * GFP_ZONES_SHIFT)	       \
+	| (((uint64_t)OPT_ZONE_DMA32) << ___GFP_DMA32 * GFP_ZONES_SHIFT)		       \
+	| (((uint64_t)ZONE_NORMAL) << ___GFP_MOVABLE * GFP_ZONES_SHIFT)		       \
+	| (((uint64_t)OPT_ZONE_DMA) << (___GFP_MOVABLE | ___GFP_DMA) * GFP_ZONES_SHIFT)    \
+	| (((uint64_t)ZONE_MOVABLE) << (___GFP_MOVABLE | ___GFP_HIGHMEM) * GFP_ZONES_SHIFT)\
+	| (((uint64_t)OPT_ZONE_DMA32) << (___GFP_MOVABLE | ___GFP_DMA32) * GFP_ZONES_SHIFT)\
 )
 
 /*
@@ -512,11 +510,6 @@ static inline enum zone_type gfp_zone(gfp_t flags)
 {
 	enum zone_type z;
 	int bit = (__force int) (flags & GFP_ZONEMASK);
-
-#ifdef CONFIG_EXMEM
-	if (flags & __GFP_EXMEM)
-		return ZONE_EXMEM;
-#endif
 
 	z = (GFP_ZONE_TABLE >> (bit * GFP_ZONES_SHIFT)) &
 					 ((1 << GFP_ZONES_SHIFT) - 1);

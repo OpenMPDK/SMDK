@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0
+
+ndctl-disable-dimm(1)
+=====================
+
+NAME
+----
+ndctl-disable-dimm - disable one or more idle dimms
+
+SYNOPSIS
+--------
+[verse]
+'ndctl disable-dimm' <dimm> [<options>]
+
+include::dimm-description.txt[]
+
+OPTIONS
+-------
+<dimm>::
+include::xable-dimm-options.txt[]
+
+-b::
+--bus=::
+include::xable-bus-options.txt[]
+
+include::../copyright.txt[]
+
+SEE ALSO
+--------
+linkndctl:ndctl-enable-dimm[1]

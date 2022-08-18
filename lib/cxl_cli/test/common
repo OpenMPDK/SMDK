@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (C) 2018, FUJITSU LIMITED. All rights reserved.
+
+# Global variables
+
+# NDCTL
+if [ -z $NDCTL ]; then
+	if [ -f "../ndctl/ndctl" ] && [ -x "../ndctl/ndctl" ]; then
+		export NDCTL=../ndctl/ndctl
+	elif [ -f "./ndctl/ndctl" ] && [ -x "./ndctl/ndctl" ]; then
+		export NDCTL=./ndctl/ndctl
+	else
+		echo "Couldn't find an ndctl binary"
+		exit 1
+	fi
+fi
+
+# DAXCTL
+if [ -z $DAXCTL ]; then
+	if [ -f "../daxctl/daxctl" ] && [ -x "../daxctl/daxctl" ]; then
+		export DAXCTL=../daxctl/daxctl
+	elif [ -f "./daxctl/daxctl" ] && [ -x "./daxctl/daxctl" ]; then
+		export DAXCTL=./daxctl/daxctl
+	else
+		echo "Couldn't find an daxctl binary"
+		exit 1
+	fi
+fi
+
+if [ -z $TEST_PATH ]; then
+	export TEST_PATH=.
+fi
+
+# NFIT_TEST_BUS[01]
+#
+NFIT_TEST_BUS0="nfit_test.0"
+NFIT_TEST_BUS1="nfit_test.1"
+ACPI_BUS="ACPI.NFIT"
+E820_BUS="e820"
+
+# Functions
+
+# err
+# $1: line number which error detected
+# $2: cleanup function (optional)
+#
+err()
+{
+	echo test/$(basename $0): failed at line $1
+	[ -n "$2" ] && "$2"
+	exit $rc
+}
+
+reset()
+{
+	$NDCTL disable-region -b $NFIT_TEST_BUS0 all
+	$NDCTL init-labels -f -b $NFIT_TEST_BUS0 all
+	$NDCTL enable-region -b $NFIT_TEST_BUS0 all
+}
+
+resetV()
+{
+	$NDCTL disable-region -b $NFIT_TEST_BUS0 all
+	$NDCTL init-labels -f -V 1.2 -b $NFIT_TEST_BUS0 all
+	$NDCTL enable-region -b $NFIT_TEST_BUS0 all
+}
+
+reset1()
+{
+	$NDCTL disable-region -b $NFIT_TEST_BUS1 all
+	$NDCTL init-labels -f -b $NFIT_TEST_BUS1 all
+	$NDCTL enable-region -b $NFIT_TEST_BUS1 all
+}
+
+
+# check_min_kver
+# $1: Supported kernel version. format: X.Y
+#
+check_min_kver()
+{
+	local ver="$1"
+	: "${KVER:=$(uname -r)}"
+
+	[ -n "$ver" ] || return 1
+	[[ "$ver" == "$(echo -e "$ver\n$KVER" | sort -V | head -1)" ]]
+}
+
+# do_skip
+# $1: Skip message
+#
+do_skip()
+{
+	echo kernel $(uname -r): $1
+	exit 77
+}
+
+# check_prereq
+# $1: command to check
+#
+check_prereq()
+{
+	if ! command -v "$1" >/dev/null; then
+		do_skip "missing $1, skipping..."
+	fi
+}
+
+# _cleanup
+#
+_cleanup()
+{
+	$NDCTL disable-region -b $NFIT_TEST_BUS0 all
+	$NDCTL disable-region -b $NFIT_TEST_BUS1 all
+	modprobe -r nfit_test
+}
+
+# json2var
+# stdin: json
+#
+json2var()
+{
+	sed -e "s/[{}\",]//g; s/\[//g; s/\]//g; s/:/=/g"
+}

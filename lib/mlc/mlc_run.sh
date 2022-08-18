@@ -1,53 +1,26 @@
 #!/usr/bin/env bash
 
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../
+
 CXLMALLOC=$BASEDIR/lib/smdk_allocator/lib/libcxlmalloc.so
 MLC=$BASEDIR/lib/mlc/Linux/mlc
+CLI=$BASEDIR/lib/cxl_cli/build/cxl/cxl
+GROUP=group-noop # group-zone, group-node
 
-PRIORITY='normal'
-NUMACTL=""
+CONF_PATH=/proc/sys/vm/numa_zonelist_order
 
-function run_app(){
-    echo 3 > /proc/sys/vm/drop_caches
+if [ ! -e $CXL_CLI ]; then
+	echo "cxl-cli does not exist. Run './build_lib.sh cxl_cli' at /path/to/SMDK/lib/"
+	exit
+fi
 
-    unset LD_PRELOAD
-    export LD_PRELOAD=$CXLMALLOC
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:65536,normal_zone_size:65536,maxmemory_policy:remain
-    if [ "$PRIORITY" == 'exmem' ]; then
-        CXLMALLOC_CONF+=,priority:exmem,:
-    elif [ "$PRIORITY" == 'normal' ]; then
-        CXLMALLOC_CONF+=,priority:normal,:
-    fi
-    echo $CXLMALLOC_CONF
-    export CXLMALLOC_CONF
-    $NUMACTL $MLC --peak_injection_bandwidth
-}
+if [ `whoami` != 'root' ]; then
+	echo "This script requires root privileges"
+	exit
+fi
 
-
-while getopts "a:en" opt; do
-	case "$opt" in
-		a)
-			NODENUM=$OPTARG
-			if [ $NODENUM -eq 0 ]; then
-				NUMACTL="numactl -N 0"
-			elif [ $NODENUM -eq 1 ]; then
-				NUMACTL="numactl -N 1"
-			else
-				echo "Node number should be 0 or 1"
-				exit 1
-			fi
-			;;
-		e)
-			PRIORITY='exmem'
-			;;
-		n)
-			PRIORITY='normal'
-			;;
-		*)
-			echo "Usage: $0 -a <node 0 or 1> -e[exmem] -n[normal]"
-			echo "Usage: $0 -a 0 -e or $0 -a 1 -n"
-			exit 1
-			;;
-	esac
-done
-run_app
+$CLI $GROUP
+echo exmem > $CONF_PATH		# zone traversal on (exmem or normal)
+$MLC --latency_matrix
+$MLC --bandwidth_matrix
+echo none > $CONF_PATH		# zone traversal off

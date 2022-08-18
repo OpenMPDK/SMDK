@@ -87,7 +87,7 @@ void usage(void)
 		"               memory policy | --dump | -d | --dump-nodes | -D\n"
 		"\n"
 #ifdef SUPPORT_SMDK_KERNEL
-		"<zone> is 'c' or 'n'.\n"
+		"<zone> is 'e' or 'n'.\n"
 #endif
 		"memory policy is --interleave | -i, --preferred | -p, --membind | -m, --localalloc | -l\n"
 		"<nodes> is a comma delimited list of node numbers or A-B ranges or all.\n"
@@ -655,6 +655,9 @@ int main(int ac, char **av)
 			}
 			if (optarg[0] == 'e')
 				numa_set_zone(MPOL_F_ZONE_EXMEM);
+			else if (optarg[0] == 'n')
+				numa_set_zone(MPOL_F_ZONE_NOEXMEM);
+
 			break;
 #endif
 		default:

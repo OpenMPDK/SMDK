@@ -217,7 +217,7 @@ struct arena_s {
 	/* Used to determine uptime.  Read-only after initialization. */
 	nstime_t		create_time;
 
-	/* SMDK, additional mmap flag for the arena : MAP_EXMEM | MAP_NORMAL_MEM */
+	/* SMDK, additional mmap flag for the arena : MAP_EXMEM | MAP_NORMAL */
 	int arena_mmap_flag;
 };
 

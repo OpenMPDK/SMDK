@@ -433,6 +433,9 @@ enum zone_type {
 #ifdef CONFIG_ZONE_DMA32
 	ZONE_DMA32,
 #endif
+#ifdef CONFIG_EXMEM
+	ZONE_EXMEM,
+#endif
 	/*
 	 * Normal addressable memory is in ZONE_NORMAL. DMA operations can be
 	 * performed on pages in ZONE_NORMAL if the DMA devices support
@@ -500,9 +503,6 @@ enum zone_type {
 	 * there can be false negatives).
 	 */
 	ZONE_MOVABLE,
-#ifdef CONFIG_EXMEM
-	ZONE_EXMEM,
-#endif
 #ifdef CONFIG_ZONE_DEVICE
 	ZONE_DEVICE,
 #endif

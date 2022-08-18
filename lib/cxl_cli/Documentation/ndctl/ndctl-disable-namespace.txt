@@ -1,0 +1,25 @@
+// SPDX-License-Identifier: GPL-2.0
+
+ndctl-disable-namespace(1)
+=========================
+
+NAME
+----
+ndctl-disable-namespace - disable the given namespace(s)
+
+SYNOPSIS
+--------
+[verse]
+'ndctl disable-namespace' <namespace> [<options>]
+
+include::namespace-description.txt[]
+
+OPTIONS
+-------
+include::xable-namespace-options.txt[]
+
+include::../copyright.txt[]
+
+SEE ALSO
+--------
+linkndctl:ndctl-enable-namespace[1]

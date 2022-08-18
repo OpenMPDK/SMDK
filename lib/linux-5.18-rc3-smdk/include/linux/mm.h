@@ -304,7 +304,8 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_NOHUGEPAGE	0x40000000	/* MADV_NOHUGEPAGE marked this vma */
 #define VM_MERGEABLE	0x80000000	/* KSM may merge identical pages */
 #ifdef CONFIG_EXMEM
-#define VM_EXMEM		0x80000000000	/* Only uses ExMem pages from ExMem zone */
+#define VM_EXMEM		0x80000000000	/* Use only pages from ZONE_EXMEM */
+#define VM_NOEXMEM		0x100000000000	/* Use only pages of zones except ZONE_EXMEM. */
 #endif
 
 #ifdef CONFIG_ARCH_USES_HIGH_VMA_FLAGS

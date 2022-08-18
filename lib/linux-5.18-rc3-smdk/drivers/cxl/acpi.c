@@ -8,6 +8,9 @@
 #include <linux/pci.h>
 #include "cxlpci.h"
 #include "cxl.h"
+#ifdef CONFIG_EXMEM
+#include "cxlgroup.h"
+#endif
 
 /* Encode defined in CXL 2.0 8.2.5.12.7 HDM Decoder Control Register */
 #define CFMWS_INTERLEAVE_WAYS(x)	(1 << (x)->interleave_ways)
@@ -274,31 +277,6 @@ static int add_root_nvdimm_bridge(struct device *match, void *data)
 		dev_name(&cxl_nvb->dev));
 	return 1;
 }
-
-#ifdef CONFIG_EXMEM
-static int add_cxl_info_cfmws(struct device *match, void *data)
-{
-	struct cxl_decoder *cxld;
-	int rc;
-
-	if (!is_root_decoder(match))
-		return 0;
-
-	cxld = to_cxl_decoder(match);
-	if (!(cxld->flags & CXL_DECODER_F_RAM))
-		return 0;
-
-	pr_info("CXL: %s node: %d range %pr\n", dev_name(&cxld->dev),
-			phys_to_target_node(cxld->platform_res.start),
-			&cxld->platform_res);
-
-	rc = register_cxl_cfmws_ranges(cxld);
-	if (rc)
-		return rc;
-
-	return 0;
-}
-#endif
 
 static int cxl_acpi_probe(struct platform_device *pdev)
 {

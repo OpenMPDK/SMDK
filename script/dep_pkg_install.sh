@@ -40,6 +40,9 @@ apt-get install -y libpixman-1-dev cgdb
 apt-get install -y openvpn
 apt-get install -y pkg-config libglib2.0-dev
 
+# dax
+apt-get install -y libpmem-dev
+
 # ACPI Tables
 apt-get install -y acpica-tools
 
@@ -52,7 +55,12 @@ apt-get install -y cmake junit4
 apt-get install -y ant ant-optional
 
 # opt_api python binding
+apt-get install -y python-dev python3-dev
 pip install cffi
+
+# meson
+apt-get install -y libiniparser1 libiniparser-dev libkmod-dev libkeyutils-dev
+apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build meson
 
 # docker repository
 #apt-get install -y apt-get install ca-certificates curl gnupg lsb-release software-properties-common

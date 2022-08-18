@@ -2191,7 +2191,7 @@ static int try_offline_memory_block(struct memory_block *mem, void *arg)
 	page = pfn_to_online_page(section_nr_to_pfn(mem->start_section_nr));
 	if (page && zone_idx(page_zone(page)) == ZONE_MOVABLE)
 		online_type = MMOP_ONLINE_MOVABLE;
-#if CONFIG_EXMEM
+#ifdef CONFIG_EXMEM
 	else if (page && zone_idx(page_zone(page)) == ZONE_EXMEM)
 		online_type = MMOP_ONLINE_EXMEM;
 #endif

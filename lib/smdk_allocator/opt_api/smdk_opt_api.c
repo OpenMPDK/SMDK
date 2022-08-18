@@ -106,11 +106,12 @@ void* s_malloc_node(smdk_memtype_t type, size_t size, char *nodes) {
         flags |= MAP_EXMEM;
         smdk_info.node_alloc_stat_exmem[core]+=(long long)size;
     } else {
+        flags |= MAP_NORMAL;
         smdk_info.node_alloc_stat_normal[core]+=(long long)size;
     }
     numa_set_interleave_mask(nodemask_parsed);
     mem = mmap(0, size, PROT_READ|PROT_WRITE, flags, 0, 0);
-    assert(mem != (char *)-1);
+    assert(mem != MAP_FAILED);
 
     numa_set_interleave_mask(original_bitmask);
 

@@ -33,6 +33,7 @@ enum {
 
 /* Flags for zone policy */
 #define MPOL_F_ZONE_EXMEM		(1 << 12)
+#define MPOL_F_ZONE_NOEXMEM		(1 << 11)
 
 /*
  * MPOL_MODE_FLAGS is the union of all possible optional mode flags passed to
@@ -40,7 +41,7 @@ enum {
  */
 #define MPOL_MODE_FLAGS							\
 	(MPOL_F_STATIC_NODES | MPOL_F_RELATIVE_NODES | MPOL_F_NUMA_BALANCING | \
-	 MPOL_F_ZONE_EXMEM)
+	 MPOL_F_ZONE_EXMEM | MPOL_F_ZONE_NOEXMEM)
 
 /* Flags for get_mempolicy */
 #define MPOL_F_NODE	(1<<0)	/* return next IL mode instead of node mask */
