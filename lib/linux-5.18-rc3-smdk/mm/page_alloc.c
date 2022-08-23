@@ -4496,6 +4496,8 @@ static inline unsigned int gfp_to_alloc_flags_cma(gfp_t gfp_mask,
 	return alloc_flags;
 }
 
+
+#ifdef CONFIG_EXMEM
 static inline bool __is_zone_allowed(struct zone *z, gfp_t gfp_mask)
 {
 	if (user_zonelist_order == ZONELIST_ORDER_NONE &&
@@ -4522,6 +4524,7 @@ static inline bool __is_zone_allowed(struct zone *z, gfp_t gfp_mask)
 
 	return true;
 }
+#endif
 
 /*
  * get_page_from_freelist goes through the zonelist trying to allocate
@@ -5786,7 +5789,7 @@ unsigned long __alloc_pages_bulk(gfp_t gfp, int preferred_nid,
 	for_each_zone_zonelist_nodemask(zone, z, ac.zonelist, ac.highest_zoneidx, ac.nodemask) {
 		unsigned long mark;
 
-#if CONFIG_EXMEM
+#ifdef CONFIG_EXMEM
 		if (!__is_zone_allowed(zone, gfp))
 			continue;
 #endif
