@@ -14,8 +14,7 @@
 #define SYSFS_DAX_BIND "/sys/bus/dax/drivers/device_dax/bind"
 #define SYSFS_DAX_UNBIND "/sys/bus/dax/drivers/device_dax/unbind"
 
-#define SYSFS_CXL_DEVICES "/sys/bus/cxl/devices"
-#define SYSFS_CXL_NODE "/sys/bus/cxl/nodes"
+#define SYSFS_CXL_DEVICES "/sys/kernel/cxl/devices"
 #define SYSFS_PCI_DEVICES "/sys/bus/pci/devices"
 #define SYSFS_NODE_POSSIBLE "/sys/devices/system/node/possible"
 #define SYSFS_NODE_HAS_CPU "/sys/devices/system/node/has_cpu"
