@@ -70,8 +70,14 @@ SMDK_INLINE unsigned get_normal_target_arena(mem_zone_t type){
     int pool_idx = (opt_smdk.prio[0] == type)? 0:1;
     arena_pool* pool = &g_arena_pool[pool_idx];
 
-    /* the value 'idx' would be changed during update_arena_pool -> max_memory_policy of cxlmalloc */
-    return pool->arena_id[pool->arena_index%pool->nr_arena];
+    int aid = tsd_get_aid();
+    if (unlikely(aid < 0)) {
+        pthread_rwlock_wrlock(&pool->rwlock_arena_index);
+        aid = pool->arena_index++;
+        pthread_rwlock_unlock(&pool->rwlock_arena_index);
+        tsd_set_aid(aid);
+    }
+    return pool->arena_id[aid%pool->nr_arena];
 }
 
 static int scale_arena_pool(){

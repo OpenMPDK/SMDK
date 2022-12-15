@@ -442,7 +442,8 @@ struct json_object *util_cxl_decoder_to_json(struct cxl_decoder *decoder,
 	const char *devname = cxl_decoder_get_devname(decoder);
 	struct cxl_port *port = cxl_decoder_get_port(decoder);
 	struct json_object *jdecoder, *jobj;
-	u64 val;
+	struct cxl_region *region;
+	u64 val, size;
 
 	jdecoder = json_object_new_object();
 	if (!jdecoder)
@@ -452,27 +453,88 @@ struct json_object *util_cxl_decoder_to_json(struct cxl_decoder *decoder,
 	if (jobj)
 		json_object_object_add(jdecoder, "decoder", jobj);
 
+	size = cxl_decoder_get_size(decoder);
 	val = cxl_decoder_get_resource(decoder);
-	if (val < ULLONG_MAX) {
+	if (size && val < ULLONG_MAX) {
 		jobj = util_json_object_hex(val, flags);
 		if (jobj)
 			json_object_object_add(jdecoder, "resource", jobj);
 	}
 
-	val = cxl_decoder_get_size(decoder);
-	if (val < ULLONG_MAX) {
-		jobj = util_json_object_size(val, flags);
+	if (size && size < ULLONG_MAX) {
+		jobj = util_json_object_size(size, flags);
 		if (jobj)
 			json_object_object_add(jdecoder, "size", jobj);
 	}
 
-	if (val == 0) {
+	val = cxl_decoder_get_interleave_ways(decoder);
+	if (val < UINT_MAX) {
+		jobj = json_object_new_int(val);
+		if (jobj)
+			json_object_object_add(jdecoder, "interleave_ways",
+					       jobj);
+
+		/* granularity is a don't care if not interleaving */
+		if (val > 1) {
+			val = cxl_decoder_get_interleave_granularity(decoder);
+			if (val < UINT_MAX) {
+				jobj = json_object_new_int(val);
+				if (jobj)
+					json_object_object_add(
+						jdecoder,
+						"interleave_granularity", jobj);
+			}
+		}
+	}
+
+	region = cxl_decoder_get_region(decoder);
+	if (region) {
+		jobj = json_object_new_string(cxl_region_get_devname(region));
+		if (jobj)
+			json_object_object_add(jdecoder, "region", jobj);
+	}
+
+	if (size == 0) {
 		jobj = json_object_new_string("disabled");
 		if (jobj)
 			json_object_object_add(jdecoder, "state", jobj);
 	}
 
+	if (cxl_port_is_endpoint(port)) {
+		enum cxl_decoder_mode mode = cxl_decoder_get_mode(decoder);
+
+		size = cxl_decoder_get_dpa_size(decoder);
+		val = cxl_decoder_get_dpa_resource(decoder);
+		if (size && val < ULLONG_MAX) {
+			jobj = util_json_object_hex(val, flags);
+			if (jobj)
+				json_object_object_add(jdecoder, "dpa_resource",
+						       jobj);
+		}
+
+		if (size && size < ULLONG_MAX) {
+			jobj = util_json_object_size(size, flags);
+			if (jobj)
+				json_object_object_add(jdecoder, "dpa_size",
+						       jobj);
+		}
+
+		if (mode > CXL_DECODER_MODE_NONE) {
+			jobj = json_object_new_string(cxl_decoder_mode_name(mode));
+			if (jobj)
+				json_object_object_add(jdecoder, "mode", jobj);
+		}
+	}
+
 	if (cxl_port_is_root(port) && cxl_decoder_is_mem_capable(decoder)) {
+		size = cxl_decoder_get_max_available_extent(decoder);
+		if (size < ULLONG_MAX) {
+			jobj = util_json_object_size(size, flags);
+			if (jobj)
+				json_object_object_add(jdecoder,
+						       "max_available_extent",
+						       jobj);
+		}
 		if (cxl_decoder_is_pmem_capable(decoder)) {
 			jobj = json_object_new_boolean(true);
 			if (jobj)
@@ -496,6 +558,129 @@ struct json_object *util_cxl_decoder_to_json(struct cxl_decoder *decoder,
 	}
 
 	return jdecoder;
+}
+
+void util_cxl_mappings_append_json(struct json_object *jregion,
+				  struct cxl_region *region,
+				  unsigned long flags)
+{
+	struct json_object *jobj, *jmappings;
+	struct cxl_memdev_mapping *mapping;
+	unsigned int val, nr_mappings;
+	const char *devname;
+
+	nr_mappings = cxl_region_get_interleave_ways(region);
+	if (!nr_mappings || (nr_mappings == UINT_MAX))
+		return;
+
+	if (!(flags & UTIL_JSON_TARGETS))
+		return;
+
+	jmappings = json_object_new_array();
+	if (!jmappings)
+		return;
+
+	cxl_mapping_foreach(region, mapping) {
+		struct json_object *jmapping;
+		struct cxl_decoder *decoder;
+		struct cxl_memdev *memdev;
+
+		jmapping = json_object_new_object();
+		if (!jmapping)
+			continue;
+
+		val = cxl_mapping_get_position(mapping);
+		if (val < UINT_MAX) {
+			jobj = json_object_new_int(val);
+			if (jobj)
+				json_object_object_add(jmapping, "position",
+						       jobj);
+		}
+
+		decoder = cxl_mapping_get_decoder(mapping);
+		if (!decoder)
+			continue;
+
+		memdev = cxl_decoder_get_memdev(decoder);
+		if (memdev) {
+			devname = cxl_memdev_get_devname(memdev);
+			jobj = json_object_new_string(devname);
+			if (jobj)
+				json_object_object_add(jmapping, "memdev", jobj);
+		}
+
+		devname = cxl_decoder_get_devname(decoder);
+		jobj = json_object_new_string(devname);
+		if (jobj)
+			json_object_object_add(jmapping, "decoder", jobj);
+
+		json_object_array_add(jmappings, jmapping);
+	}
+
+	json_object_object_add(jregion, "mappings", jmappings);
+}
+
+struct json_object *util_cxl_region_to_json(struct cxl_region *region,
+					     unsigned long flags)
+{
+	const char *devname = cxl_region_get_devname(region);
+	struct json_object *jregion, *jobj;
+	u64 val;
+
+	jregion = json_object_new_object();
+	if (!jregion)
+		return NULL;
+
+	jobj = json_object_new_string(devname);
+	if (jobj)
+		json_object_object_add(jregion, "region", jobj);
+
+	val = cxl_region_get_resource(region);
+	if (val < ULLONG_MAX) {
+		jobj = util_json_object_hex(val, flags);
+		if (jobj)
+			json_object_object_add(jregion, "resource", jobj);
+	}
+
+	val = cxl_region_get_size(region);
+	if (val < ULLONG_MAX) {
+		jobj = util_json_object_size(val, flags);
+		if (jobj)
+			json_object_object_add(jregion, "size", jobj);
+	}
+
+	val = cxl_region_get_interleave_ways(region);
+	if (val < INT_MAX) {
+		jobj = json_object_new_int(val);
+		if (jobj)
+			json_object_object_add(jregion,
+					       "interleave_ways", jobj);
+	}
+
+	val = cxl_region_get_interleave_granularity(region);
+	if (val < INT_MAX) {
+		jobj = json_object_new_int(val);
+		if (jobj)
+			json_object_object_add(jregion,
+					       "interleave_granularity", jobj);
+	}
+
+	if (cxl_region_decode_is_committed(region))
+		jobj = json_object_new_string("commit");
+	else
+		jobj = json_object_new_string("reset");
+	if (jobj)
+		json_object_object_add(jregion, "decode_state", jobj);
+
+	if (!cxl_region_is_enabled(region)) {
+		jobj = json_object_new_string("disabled");
+		if (jobj)
+			json_object_object_add(jregion, "state", jobj);
+	}
+
+	util_cxl_mappings_append_json(jregion, region, flags);
+
+	return jregion;
 }
 
 void util_cxl_targets_append_json(struct json_object *jdecoder,
@@ -583,6 +768,10 @@ static struct json_object *__util_cxl_port_to_json(struct cxl_port *port,
 	jobj = json_object_new_string(cxl_port_get_host(port));
 	if (jobj)
 		json_object_object_add(jport, "host", jobj);
+
+	jobj = json_object_new_int(cxl_port_get_depth(port));
+	if (jobj)
+		json_object_object_add(jport, "depth", jobj);
 
 	if (!cxl_port_is_enabled(port)) {
 		jobj = json_object_new_string("disabled");

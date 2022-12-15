@@ -1,9 +1,14 @@
+#!/bin/bash
 # prerequisite:
 # 1. SMDK Kernel is running
-#!/usr/bin/env bash
 
 deviceId=0
 DEVICE_PATH=/sys/kernel/cxl/devices/cxl$deviceId
+
+readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
+source "$BASEDIR/script/common.sh"
+
+SCRIPT_PATH=$(readlink -f $(dirname $0))
 
 #Change the address of devices according to your system
 ADDRESS="1050000000-304fffffff"
@@ -28,32 +33,68 @@ function print_deviceinfo() {
 }
 
 if [ `whoami` != 'root' ]; then
-	echo "This test requires root privileges"
-	exit
+	log_error "This test requires root privileges"
+	exit 2
 fi
 
-echo [online rollback test]
+print_buddyinfo
 print_deviceinfo
-echo -1 > $DEVICE_PATH/node_id & sleep 1s; ./mmap_cxl
-print_deviceinfo
+echo
 
-echo -1 > $DEVICE_PATH/node_id
+echo [online rollback test]
+state=`cat $DEVICE_PATH/state`
+if [ $state == "online" ]; then
+    $SCRIPT_PATH/mmap_cxl & sleep 0.3s; echo -1 > $DEVICE_PATH/node_id
+    new_state=`cat $DEVICE_PATH/state`
+    print_buddyinfo
+    print_deviceinfo
+
+    if [ $new_state == "online" ]; then
+        echo "PASS"
+    else
+        echo "FAIL"
+        exit 1
+    fi
+else
+    echo "Device is not online. state: $state"
+    echo "Try again after onlining CXL device"
+    exit 2
+fi
+
+wait
 
 echo
+echo -1 > $DEVICE_PATH/node_id
+state=`cat $DEVICE_PATH/state`
+# not neseccary part
+# for very rare case that device offline is not working?
+if [ $state == "online" ]; then
+    echo "Device is not offline. state: $state"
+    echo "offline rollback test requires offlined device"
+    exit 1
+fi
+
+print_buddyinfo
+print_deviceinfo
+echo
+
 echo [offline rollback test]
 echo $ADDRESS > /sys/devices/platform/hmem.0/dax0.0/mapping
 echo dax0.0 > /sys/bus/dax/drivers/device_dax/bind
 
-print_deviceinfo
 echo 0 > $DEVICE_PATH/node_id
+state=`cat $DEVICE_PATH/state`
+print_buddyinfo
 print_deviceinfo
 
-state=`cat $DEVICE_PATH/state`
+echo dax0.0 > /sys/bus/dax/drivers/device_dax/unbind
+echo 0 > $DEVICE_PATH/node_id
+
 if [ $state == "offline" ]; then
 	echo "PASS"
 else
 	echo "FAIL"
+	exit 1
 fi
 
-echo dax0.0 > /sys/bus/dax/drivers/device_dax/unbind
-echo 0 > $DEVICE_PATH/node_id
+exit 0

@@ -29,6 +29,11 @@ int main(void) {
 		memset(addr,'0',size);
 		zero=*(addr+size/2);
 		printf("addr[%p], one='%c' zero='%c'\n", (void *)addr, one, zero);
+
+        if(one != '1' || zero != '0'){
+            perror("memset error");
+            exit(1);
+        }
 		sleep(1);
 	}
 

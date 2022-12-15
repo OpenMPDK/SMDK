@@ -1,7 +1,8 @@
+#!/usr/bin/env bash
 # prerequisite:
 # 1. SMDK Kernel is running
 # 2. $BASEDIR/lib/build_lib.sh numactl
-#!/usr/bin/env bash
+
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
 source "$BASEDIR/script/common.sh"
 
@@ -22,6 +23,12 @@ NTHREAD=1
 run_malloc() {
 	$NUMACTL --zone e --interleave all $TEST_APP --size $SIZE --iter $ITER \
 		--thread $NTHREAD
+
+	ret=$?
+	if [ $ret != 0 ]; then
+		echo "FAIL"
+		exit 1
+	fi
 }
 
 set_pol() {
@@ -33,6 +40,13 @@ set_pol() {
 		$CXLCLI group-noop
 	else
 		log_error "Bad policy: $POL"
+		exit 2
+	fi
+
+	ret=$?
+	if [ $ret != 0 ]; then
+		log_error "Faild to set policy, check out cxl_cli functionality."
+		exit 1
 	fi
 }
 
@@ -104,17 +118,17 @@ test_malloc_4GB_10_threads_4M_unit(){
 
 if [ `whoami` != 'root' ]; then
 	log_error "This test requires root privileges"
-	exit
+	exit 2
 fi
 
 if [ ! -f "${NUMACTL}" ]; then
 	log_error "numactl does not exist. Run 'build_lib.sh numactl' in /path/to/SMDK/lib/"
-	exit 1
+	exit 2
 fi
 
 if [ ! -f "${CXLCLI}" ]; then
 	log_error "cxl does not exist. Run 'build_lib.sh cxl_cli' in /path/to/SMDK/lib/"
-	exit 1
+	exit 2
 fi
 
 log_normal "Single Thread Testcases"
@@ -132,3 +146,8 @@ do
 	$i
 	log_normal "TC $i done"
 done
+
+echo
+echo "PASS"
+exit 0
+

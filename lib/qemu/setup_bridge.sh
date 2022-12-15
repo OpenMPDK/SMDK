@@ -45,20 +45,20 @@ while getopts "c:" opt; do
 		c)
 			if [ $OPTARG -lt 0 ] || [ $OPTARG -gt 10 ]; then
 				echo "Error: VM count should be 0-10"
-				exit 1
+				exit 2
 			fi
 			VMCNT=$OPTARG
 			;;
 		:)
 			print_usage
-			exit 1
+			exit 2
 			;;
 	esac
 done
 
 if [ -z ${VMCNT} ]; then
 	print_usage
-	exit 1
+	exit 2
 fi
 
 num=0

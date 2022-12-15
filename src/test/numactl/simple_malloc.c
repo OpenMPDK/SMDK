@@ -6,8 +6,8 @@
 int main(void)
 {
 	unsigned long size = 4 * 1024 * 1024;
-
-	while (1) {
+	int cnt = 0;
+	while (cnt < 10) {
 		char *addr = malloc(size);
 		char one,zero;
 
@@ -22,7 +22,13 @@ int main(void)
 		zero = *(addr + size / 2);
 		printf("addr[%p], one='%c' zero='%c'\n", (void *)addr, one, zero);
 
+        if(one != '1' || zero != '0'){
+            perror("memset error");
+            exit(1);
+        }
+
 		sleep(1);
+		cnt++;
 	}
 
 	return 0;

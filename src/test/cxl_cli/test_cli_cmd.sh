@@ -9,14 +9,14 @@ DAX_ACCESS_PGM=$BASEDIR/src/test/cxl_cli/devmem2
 
 if [ `whoami` != 'root' ]; then
 	echo "This test requires root privileges"
-	exit
+	exit 2
 fi
 
 if [ $# -eq 0 ]; then
 	echo  -e "\nPoison address needed\n"
 	echo  -e "Usage : $0 [address]"
 	echo  -e "ex) $0 10000\n"
-	exit
+	exit 2
 fi
 
 if [ $ADDRESS -lt 1000 ]; then
@@ -25,6 +25,11 @@ if [ $ADDRESS -lt 1000 ]; then
 	echo -e "Automatically setting address to 0x1000"
 	ADDRESS=1000
 fi
+
+log_normal "This test starts after applying 'Zone' grouping policy."
+log_normal "[group-zone]"
+echo "$ cxl group-zone"
+$CLI group-zone
 
 # timestamp cmds
 log_normal "[set-timestamp]"
@@ -58,7 +63,9 @@ echo "$ cxl inject-poison mem0 -a $ADDRESS"
 $CLI inject-poison mem0 -a $ADDRESS
 
 log_normal "Accessing poison injected address"
+$CLI group-dax
 $DAX_ACCESS_PGM 0x$ADDRESS
+$CLI group-zone
 
 # event-record cmds
 log_normal "[get-event-record]"
@@ -73,3 +80,4 @@ log_normal "[get-event-record]"
 echo "$ cxl get-event-record mem0 -t 3"
 $CLI get-event-record mem0 -t 3
 
+exit 0

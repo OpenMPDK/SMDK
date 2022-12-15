@@ -9,7 +9,7 @@ TEST_PASS_COUNT=0
 
 if [ `whoami` != 'root' ]; then
 	echo "This test requires root privileges"
-	exit
+	exit 2
 fi
 
 function print_sysinfo() {
@@ -75,3 +75,14 @@ $CLI group-remove --node 99
 check_result $?
 
 echo "Test Total: $TEST_TOTAL_COUNT, Test Pass: $TEST_PASS_COUNT"
+
+echo
+if [ $TEST_TOTAL_COUNT == $TEST_PASS_COUNT ]; then
+	echo "PASS"
+else
+	echo "FAIL"
+	exit 1
+fi
+
+exit 0
+

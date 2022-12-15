@@ -2,6 +2,7 @@
 #include <string>
 #include "test.h"
 #include "smdk_opt_api.hpp"
+#include <numa.h>
 
 using namespace std;
 
@@ -187,6 +188,10 @@ public:
 int main(void){
 	size_t size = 1024;
 	int iter = 10000000;
+	string node_range = "0";
+	if(numa_max_node() != 0)
+		node_range += "-" + to_string(numa_max_node());
+	string node_max = to_string(numa_max_node());
 	smdk_memtype_t type = SMDK_MEM_NORMAL;
 
 	Test1 tc1(size, iter, type, "basic functional test");
@@ -198,10 +203,10 @@ int main(void){
 	Test3 tc3(size, iter, type, "malloc-memstat-free test");
 	tc3.run();
 
-	Test4 tc4(size, iter, type, "alloc_on_nodes test", "0-1");
+	Test4 tc4(size, iter, type, "alloc_on_nodes test", node_range);
 	tc4.run();
 
-	Test5 tc5(size, iter, type, "enable_node_interleave test", "1");
+	Test5 tc5(size, iter, type, "enable_node_interleave test", node_max);
 	tc5.run();
 
 	return 0;

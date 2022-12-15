@@ -6,6 +6,11 @@ source "$BASEDIR/script/common.sh"
 NUMACTL=$BASEDIR/lib/numactl-2.0.14/numactl
 MMAP=$BASEDIR/src/test/mmap/test_mmap_cxl
 
+if [ ! -f "${NUMACTL}" ]; then
+    log_error "numactl does not exist. Run 'build_lib.sh numactl' in /path/to/SMDK/lib/"
+    exit 2
+fi
+
 # test_mmap_cxl parameters
 LOOP=500
 USEC=1000
@@ -18,7 +23,7 @@ DDR_CXL_NID=-1
 if [ "$#" -ne 3 ]; then
 	echo -e "Usage: $0 <DDR only nid> <CXL only nid> <DDR + CXL nid>\n"
 	echo -e "If there is no corresponding node, enter -1 as nid. e.g. $0 0 1 -1\n"
-	exit
+	exit 2
 fi
 
 DDR_ONLY_NID=$1
@@ -83,6 +88,10 @@ function run_testcase() {
 	$NUMACTL $zonebind_option --preferred $nid \
 		$MMAP $mmap_option loop $LOOP usleep $USEC buddyinfo \
 		> /dev/null 2>&1
+	ret=$?
+	if [ $ret != 0 ]; then
+		exit 1
+	fi
 }
 
 function get_expected_zone() {
@@ -129,3 +138,4 @@ for ((i=0; i<${tc_cnt}; i++)); do
 	done
 done
 
+exit 0

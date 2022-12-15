@@ -16,15 +16,15 @@ MEMCACHED=memcached-1.6.9
 MEMTIER=memtier_benchmark-1.3.0
 STREAM=stream
 NUMACTL=numactl-2.0.14
-CXL_KERNEL=linux-5.18-rc3-smdk
-CXL_KERNEL_CONFIG=config-linux-5.18-rc3-smdk
-QEMU=qemu_cxl2.0v4
+CXL_KERNEL=linux-6.0-rc6-smdk
+CXL_KERNEL_CONFIG=config-linux-6.0-rc6-smdk
+QEMU=qemu-7.1.0
 MLC=mlc
 VOLTDB=$BASEDIR/src/app/voltdb
 CXLCLI=cxl_cli
 
 SMDK_BIN=$BASEDIR/lib/SMDK_bin
-SMDK_VERSION=v1.1
+SMDK_VERSION=v1.3
 
 function build_voltdb() {
 	app=$VOLTDB
@@ -227,7 +227,7 @@ function build_py_smdk(){
 		return
 	fi
 
-	cd $app/py_smdk && python build.py && cd -
+	cd $app/py_smdk && python3 build.py && cd -
 	mv $app/py_smdk/_py_smdk*so $app/$SMDK_PYPACKAGE
 	ret=$?
 
@@ -342,23 +342,17 @@ function clean_kernel(){
 }
 
 function clean_qemu(){
-    app=$QEMU
-    log_normal "[clean $app]"
+	app=$QEMU
+	log_normal "[clean $app]"
 
-    if [ -f qemu/$app/build ]; then
-        cd qemu/$app/build
-        if [ -f "qemu-system-x86_64" ]; then
-            make clean && make distclean
-        fi
-        ret=$?
-        cd -
+	rm -rf qemu/$app/build
+	ret=$?
 
-        if [ $ret = 0 ]; then
-            log_normal "[clean $app]..success"
-        else
-            log_error "[clean $app]..error"
-        fi
-    fi
+	if [ $ret = 0 ]; then
+		log_normal "[clean $app]..success"
+	else
+		log_error "[clean $app]..error"
+	fi
 }
 
 function clean_numactl(){
@@ -401,8 +395,9 @@ function clean_cxl_cli(){
 	app=$CXLCLI
 	log_normal "[clean $app]"
 
-	cd $app && rm -rf build && cd -
+	cd $app && rm -rf build
 	ret=$?
+	cd -
 
 	if [ $ret = 0 ]; then
 		log_normal "[clean $app]..success"

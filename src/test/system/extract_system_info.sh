@@ -13,6 +13,8 @@
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
 source "$BASEDIR/script/common.sh"
 
+SCRIPT_PATH=$(readlink -f $(dirname $0))/
+
 ACPI_FILENAME=acpidump.out
 SRAT_FILENAME=srat.dsl
 
@@ -26,7 +28,7 @@ function check_srat_table(){
 
 	if [ ! -f srat.dat ]; then
 	   echo -e "\nError: BIOS should publish SRAT to OS.\n"
-	   return
+	   return 2
 	fi
 
 	if [ ! -f $SRAT_FILENAME ]; then
@@ -37,8 +39,19 @@ function check_srat_table(){
 	cat srat.dsl | grep -A8 -B6 "$1"
 }
 
-usage() { echo "Usage: $0 <start address. e.g. 1080000000>"; exit 0; }
+if [ `whoami` != 'root' ]; then
+    log_error "This test requires root privileges"
+    exit 2
+fi
+
+function usage(){
+    log_error "Usage: $0 <start address. e.g. 1080000000>"
+    exit 2
+}
+
 [ $# -eq 0 ] && usage
+
+cd $SCRIPT_PATH
 
 log_normal "1. SRAT table:"
 check_srat_table $1
@@ -51,3 +64,8 @@ sudo cat /proc/iomem | grep "\<$1\>"
 
 log_normal "4. /proc/buddyinfo:"
 cat /proc/buddyinfo
+
+# sudo rm *.dat *.dsl *.out *.log
+
+exit 0
+

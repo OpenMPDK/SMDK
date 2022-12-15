@@ -5,21 +5,12 @@ Building QEMU
     $ ./build_lib.sh qemu
 
 
-Building Kernel
----------------
-
-The Kernel build must be preceded to execute the QEMU VM.
-
-    $ cd ..
-    $ ./build_lib.sh kernel
-
-
 Preparing rootfs image
 ----------------------
 
-Download the Kernel image, or create it using the following command:
+Download the Ubuntu iso file, and create QEMU image using the following command:
 
-    $ ./create_rootfs.sh
+    $ ./create_gui_image.sh
 
 
 Setup VM network

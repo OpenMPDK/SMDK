@@ -78,20 +78,20 @@ inline void *s_realloc_internal(mem_zone_t type, void *ptr, size_t size) {
         return NULL;
     } else {
         if (unlikely(ptr == NULL)) {
-            int flags = MALLOCX_ARENA(get_arena_idx(type));
             set_tsd_set_cur_mem_type(type);
+            int flags = MALLOCX_ARENA(get_arena_idx(type));
             return je_mallocx(size, flags);
         } else {
             mem_zone_t old_type = get_memtype_from_arenaidx(je_arenaidx_find(ptr));
             if (unlikely(old_type == mem_zone_invalid)) { //invalid ptr
                 return NULL;
             } else if (likely(type == old_type)) {
-                int flags = MALLOCX_ARENA(get_arena_idx(type));
                 set_tsd_set_cur_mem_type(type);
+                int flags = MALLOCX_ARENA(get_arena_idx(type));
                 return je_rallocx(ptr, size, flags);
             } else { // type != old_type
-                int flags = MALLOCX_ARENA(get_arena_idx(type));
                 set_tsd_set_cur_mem_type(type);
+                int flags = MALLOCX_ARENA(get_arena_idx(type));
                 void* ret = je_mallocx(size, flags);
                 set_tsd_set_cur_mem_type(old_type);
                 if (likely(ret)) {
@@ -109,8 +109,8 @@ inline void *s_realloc_internal(mem_zone_t type, void *ptr, size_t size) {
 inline int s_posix_memalign_internal(mem_zone_t type, void **memptr, size_t alignment, size_t size) {
     if (unlikely(!is_memtype_valid(type))) return EINVAL;
 
-    set_tsd_set_cur_mem_type(type);
     *memptr = NULL;
+    set_tsd_set_cur_mem_type(type);
     int flags = MALLOCX_ARENA(get_arena_idx(type)) | MALLOCX_ALIGN(alignment);
 
     *memptr = je_mallocx(size, flags);

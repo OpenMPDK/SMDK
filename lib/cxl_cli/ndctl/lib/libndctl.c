@@ -938,10 +938,14 @@ static void *add_bus(void *parent, int id, const char *ctl_base)
 	if (!bus->wait_probe_path)
 		goto err_read;
 
-	sprintf(path, "%s/device/nfit/scrub", ctl_base);
-	bus->scrub_path = strdup(path);
-	if (!bus->scrub_path)
-		goto err_read;
+	if (ndctl_bus_has_nfit(bus)) {
+		sprintf(path, "%s/device/nfit/scrub", ctl_base);
+		bus->scrub_path = strdup(path);
+		if (!bus->scrub_path)
+			goto err_read;
+	} else {
+		bus->scrub_path = NULL;
+	}
 
 	sprintf(path, "%s/device/firmware/activate", ctl_base);
 	if (sysfs_read_attr(ctx, path, buf) < 0)
@@ -1377,6 +1381,9 @@ NDCTL_EXPORT int ndctl_bus_start_scrub(struct ndctl_bus *bus)
 	struct ndctl_ctx *ctx = ndctl_bus_get_ctx(bus);
 	int rc;
 
+	if (bus->scrub_path == NULL)
+		return -EOPNOTSUPP;
+
 	rc = sysfs_write_attr(ctx, bus->scrub_path, "1\n");
 
 	/*
@@ -1446,6 +1453,9 @@ NDCTL_EXPORT int ndctl_bus_poll_scrub_completion(struct ndctl_bus *bus,
 	struct pollfd fds;
 	char in_progress;
 	int fd = 0, rc;
+
+	if (bus->scrub_path == NULL)
+		return -EOPNOTSUPP;
 
 	fd = open(bus->scrub_path, O_RDONLY|O_CLOEXEC);
 	if (fd < 0)
@@ -4593,7 +4603,6 @@ NDCTL_EXPORT int ndctl_namespace_disable_safe(struct ndctl_namespace *ndns)
 	const char *bdev = NULL;
 	int fd, active = 0;
 	char path[50];
-	unsigned long long size = ndctl_namespace_get_size(ndns);
 
 	if (pfn && ndctl_pfn_is_enabled(pfn))
 		bdev = ndctl_pfn_get_block_device(pfn);
@@ -4630,11 +4639,7 @@ NDCTL_EXPORT int ndctl_namespace_disable_safe(struct ndctl_namespace *ndns)
 				devname);
 		return -EBUSY;
 	} else {
-		if (size == 0)
-			/* No disable necessary due to no capacity allocated */
-			return 1;
-		else
-			ndctl_namespace_disable_invalidate(ndns);
+		ndctl_namespace_disable_invalidate(ndns);
 	}
 
 	return 0;

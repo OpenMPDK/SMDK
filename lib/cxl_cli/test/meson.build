@@ -150,6 +150,10 @@ monitor = find_program('monitor.sh')
 max_extent = find_program('max_available_extent_ns.sh')
 pfn_meta_errors = find_program('pfn-meta-errors.sh')
 track_uuid = find_program('track-uuid.sh')
+cxl_topo = find_program('cxl-topology.sh')
+cxl_sysfs = find_program('cxl-region-sysfs.sh')
+cxl_labels = find_program('cxl-labels.sh')
+cxl_create_region = find_program('cxl-create-region.sh')
 
 tests = [
   [ 'libndctl',               libndctl,		  'ndctl' ],
@@ -174,6 +178,10 @@ tests = [
   [ 'max_extent_ns',          max_extent,	  'ndctl' ],
   [ 'pfn-meta-errors.sh',     pfn_meta_errors,	  'ndctl' ],
   [ 'track-uuid.sh',          track_uuid,	  'ndctl' ],
+  [ 'cxl-topology.sh',	      cxl_topo,		  'cxl'   ],
+  [ 'cxl-region-sysfs.sh',    cxl_sysfs,	  'cxl'   ],
+  [ 'cxl-labels.sh',          cxl_labels,	  'cxl'   ],
+  [ 'cxl-create-region.sh',   cxl_create_region,  'cxl'   ],
 ]
 
 if get_option('destructive').enabled()
@@ -227,7 +235,7 @@ foreach t : tests
       mmap,
     ],
     suite: t[2],
-    timeout : 0,
+    timeout : 600,
     env : [
       'NDCTL=@0@'.format(ndctl_tool.full_path()),
       'DAXCTL=@0@'.format(daxctl_tool.full_path()),

@@ -95,3 +95,17 @@ JEMALLOC_ALWAYS_INLINE void
 tsd_set_mem_policy_info(bool policy) {
     tsd_set_tls.mem_policy_enabled = policy;
 }
+
+JEMALLOC_ALWAYS_INLINE void
+tsd_set_aid(int aid) {
+    tsd_t *tsd = tsd_get(false);
+    assert(tsd);
+    tsd->aid = aid;
+}
+
+JEMALLOC_ALWAYS_INLINE int
+tsd_get_aid(void) {
+    tsd_t *tsd = tsd_get(false);
+    assert(tsd);
+    return tsd->aid;
+}

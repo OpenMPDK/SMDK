@@ -5,6 +5,9 @@
 #include <assert.h>
 #include <time.h>
 #include <pthread.h>
+#include <stdbool.h>
+#include <numa.h>
+
 #include "smdk_opt_api.h"
 
 #define MAX_NUM_THREADS (100)
@@ -12,7 +15,15 @@
 size_t size = 64*1024*1024;
 int iter = 10;
 int nthreads=1;
-char* node = "1";
+char* node = "0";
+
+bool is_node_valid(char *node) {
+    if (numa_parse_nodestring(node) == NULL) {
+        printf("Invalid node(s): %s\n", node);
+        return false;
+    }
+    return true;
+}
 
 void* thd_start(void *arg) {
     void* ptr1;
@@ -60,10 +71,12 @@ int main(int argc, char* argv[]) {
             nthreads = (int)atoi(argv[++i]);
         } else if (!strcmp(argv[i], "node")) {
             node = argv[++i];
+            if (!is_node_valid(node))
+                return 2;
         } else {
             printf("\n[TEST ERROR] argv[%d]: %s, Please check user input\n\
                     e.g) size xx iter xx node 1,3 nthreads 3 \n", i, argv[i]);
-            return -1;
+            return 2;
         }
     }
 

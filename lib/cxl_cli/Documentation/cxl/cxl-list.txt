@@ -255,19 +255,27 @@ OPTIONS
 --port=::
 	Specify CXL Port device name(s), device id(s), and or port type
 	names to filter the listing. The supported port type names are "root"
-	and "switch". Note that since a bus object is also a port, the following
-	two syntaxes are equivalent:
+	and "switch". Note that a bus object is also a port, so the
+	following two syntaxes are equivalent:
 ----
 # cxl list -B
-# cxl list -P -p root
+# cxl list -P -p root -S
 ----
-	Additionally, endpoint objects are also ports so the following commands
-	are also equivalent.
+	...where the '-S/--single' is required since descendant ports are always
+	included in a port listing and '-S/--single' stops after listing the
+	bus.  Additionally, endpoint objects are ports so the following commands
+	are equivalent, and no '-S/--single' is required as endpoint ports are
+	terminal:
 ----
 # cxl list -E
 # cxl list -P -p endpoint
 ----
-	By default, only 'switch' ports are listed.
+	By default, only 'switch' ports are listed, i.e.
+----
+# cxl list -P
+# cxl list -P -p switch
+----
+	...are equivalent.
 
 -S::
 --single::
@@ -309,8 +317,9 @@ OPTIONS
 
 -T::
 --targets::
-	Extend decoder listings with downstream port target information, and /
-	or port and bus listings with the downstream port information.
+	Extend decoder listings with downstream port target information, port
+	and bus listings with the downstream port information, and / or regions
+	with mapping information.
 ----
 # cxl list -BTu -b ACPI.CXL
 {
@@ -326,6 +335,32 @@ OPTIONS
   ]
 }
 ----
+
+-R::
+--regions::
+	Include region objects in the listing.
+
+-r::
+--region::
+	Specify CXL region device name(s), or device id(s), to filter the listing.
+
+-v::
+--verbose::
+	Increase verbosity of the output. This can be specified
+	multiple times to be even more verbose on the
+	informational and miscellaneous output, and can be used
+	to override omitted flags for showing specific
+	information. Note that cxl list --verbose --verbose is
+	equivalent to cxl list -vv.
+	- *-v*
+	  Enable --memdevs, --regions, --buses,
+	  --ports, --decoders, and --targets.
+	- *-vv*
+	  Everything *-v* provides, plus include disabled
+	  devices with --idle.
+	- *-vvv*
+	  Everything *-vv* provides, plus enable
+	  --health and --partition.
 
 --debug::
 	If the cxl tool was built with debug enabled, turn on debug

@@ -1,27 +1,31 @@
 #!/bin/bash
 
-source "../../script/common.sh"
-SMDK_KERNEL_PATH=../linux-5.18-rc3-smdk
-QEMU_BUILD_PATH=./qemu_cxl2.0v4/build
-ROOTFS_PATH=.
+readonly BASEDIR=$(readlink -f $(dirname $0))/../../
+
+source "${BASEDIR}/script/common.sh"
+
+QEMU_PATH=${BASEDIR}/lib/qemu/
+QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
+SMDK_KERNEL_PATH=${BASEDIR}/lib/linux-6.0-rc6-smdk
+ROOTFS_PATH=${QEMU_PATH}
 
 QEMU_SYSTEM_BINARY=${QEMU_BUILD_PATH}/qemu-system-x86_64
 BZIMAGE_PATH=${SMDK_KERNEL_PATH}/arch/x86_64/boot/bzImage
 IMAGE_PATH=${ROOTFS_PATH}/qemu-image-1.img
 
 if [ ! -f "${QEMU_SYSTEM_BINARY}" ]; then
-	log_error "qemu-system-x86_64 is necessary. Run build_qemu.sh first."
-	exit 1
+	log_error "qemu-system-x86_64 binary does not exist. Run 'build_lib.sh qemu' in /path/to/SMDK/lib/"
+	exit 2
 fi
 
 if [ ! -f "${BZIMAGE_PATH}" ]; then
-	log_error "SMDK kernel image is necessary. Run build_lib.sh kernel first."
-	exit 1
+	log_error "SMDK kernel image does not exist. Run 'build_lib.sh kernel' in /path/to/SMDK/lib/"
+	exit 2
 fi
 
 if [ ! -f "${IMAGE_PATH}" ]; then
-	log_error "QEMU rootfs is necessary. Run create_rootfs.sh or download it first."
-	exit 1
+	log_error "QEMU rootfs ${IMAGE_PATH} does not exist. Run 'create_rootfs.sh' in /path/to/SMDK/lib/qemu/"
+	exit 2
 fi
  
 sudo ${QEMU_SYSTEM_BINARY} \

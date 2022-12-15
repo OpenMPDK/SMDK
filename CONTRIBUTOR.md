@@ -1,21 +1,27 @@
 Appreciate all the people who participate and help SMDK development.
 
-### v1.2
+### v1.3
 SW development
 * Kyungsan Kim
 * Wonjae Lee
 * Junhyeok Im
-* Donghwa Kang
-* Daeyoung Kim
 * Jongchan Lim
+* Seungjun Ha
+* Jehoon Park
+* Hojin Nam
+* Daeyoung Kim
+* Donghwa Kang
 * Chanwoo Ryu
 * Jina Kim
 * Eunhan Jo
 * Woobin Lee
 * Changyoung Lee
+* Sangyoon Ji
 
 Product planning
 * Chonyong Lee
+* Minkyung Kook
+* Jaegon Lee
 * Youngjoo Choi
 * Hyeyoung Ryu
 * Kyungchang Ryoo

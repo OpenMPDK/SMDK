@@ -12,9 +12,17 @@ int cmd_init_labels(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_check_labels(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_disable_memdev(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_enable_memdev(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_reserve_dpa(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_free_dpa(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_disable_port(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_enable_port(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_set_partition(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_disable_bus(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_create_region(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_enable_region(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_disable_region(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_destroy_region(int argc, const char **argv, struct cxl_ctx *ctx);
+
 int cmd_get_poison(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_inject_poison(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_clear_poison(int argc, const char **argv, struct cxl_ctx *ctx);
@@ -30,5 +38,10 @@ int cmd_group_dax(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_group_list(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_group_add(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_group_remove(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_latency_matrix(int argc, const char **argv, struct cxl_ctx *ctx);
 
+int cmd_disable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_enable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_check_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_flush_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
 #endif /* _CXL_BUILTIN_H_ */

@@ -1,25 +1,29 @@
 #!/bin/bash
 
-source "../../script/common.sh"
-QEMU_BUILD_PATH=./qemu_cxl2.0v4/build/
+readonly BASEDIR=$(readlink -f $(dirname $0))/../../
+
+source "${BASEDIR}/script/common.sh"
+
+QEMU_PATH=${BASEDIR}/lib/qemu/
+QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
 IMAGE_NAME=qemu-image.img
 
 if [ ! -f "${QEMU_BUILD_PATH}/qemu-img" ]; then
-	log_error "qemu-img binary is necessary. Run build_qemu.sh first."
-	exit 1
+	log_error "qemu-img binary does not exist. Run 'build_lib.sh qemu' in /path/to/SMDK/lib/"
+	exit 2
 fi
 
-${QEMU_BUILD_PATH}/qemu-img create ./${IMAGE_NAME} 10g
-mkfs.ext4 ./${IMAGE_NAME}
-mkdir -p mount-point.dir
-sudo mount -o loop ./${IMAGE_NAME} ./mount-point.dir/
+${QEMU_BUILD_PATH}/qemu-img create ${QEMU_PATH}/${IMAGE_NAME} 10g
+mkfs.ext4 ${QEMU_PATH}/${IMAGE_NAME}
+mkdir -p ${QEMU_PATH}/mount-point.dir
+sudo mount -o loop ${QEMU_PATH}/${IMAGE_NAME} ${QEMU_PATH}/mount-point.dir/
 sudo apt install debootstrap debian-keyring debian-archive-keyring
 # When debootstrap install if wget error occurs,
 # add proxy configuration to /etc/wgetrc (http_proxy, https_proxy, ftp_proxy)
-sudo debootstrap --no-check-certificate --arch amd64 jessie ./mount-point.dir/
-mkdir mnt
-sudo mount ${IMAGE_NAME} ./mnt
-cd mnt
+sudo debootstrap --no-check-certificate --arch amd64 jessie ${QEMU_PATH}/mount-point.dir/
+mkdir ${QEMU_PATH}/mnt
+sudo mount ${IMAGE_NAME} ${QEMU_PATH}/mnt
+cd ${QEMU_PATH}/mnt
 sudo chroot .
 
 # After creating rootfs, 
@@ -51,6 +55,9 @@ sudo chroot .
 # # add below lines
 # auto ens3
 # iface ens3 inet dhcp
+# # for q35 machine
+# auto enp0s2
+# iface enp0s2 inet dhcp
 
 # 7) Quit
 # $ exit

@@ -1,3 +1,0 @@
-# Feature 'deprecated' is not supported for types
-{ 'struct': 'S', 'data': {},
-  'features': [ 'deprecated' ] }

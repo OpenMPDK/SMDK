@@ -22,6 +22,9 @@ filedeps = [
   '../copyright.txt',
   'memdev-option.txt',
   'labels-options.txt',
+  'debug-option.txt',
+  'region-description.txt',
+  'decoder-option.txt',
 ]
 
 cxl_manpages = [
@@ -34,7 +37,14 @@ cxl_manpages = [
   'cxl-disable-memdev.txt',
   'cxl-enable-port.txt',
   'cxl-disable-port.txt',
+  'cxl-disable-bus.txt',
   'cxl-set-partition.txt',
+  'cxl-reserve-dpa.txt',
+  'cxl-free-dpa.txt',
+  'cxl-create-region.txt',
+  'cxl-disable-region.txt',
+  'cxl-enable-region.txt',
+  'cxl-destroy-region.txt',
 ]
 
 foreach man : cxl_manpages

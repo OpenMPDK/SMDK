@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
 			"\ttype    : access operation type : [b]yte, [h]alfword, [w]ord\n"
 			"\tdata    : data to be written\n\n",
 			argv[0]);
-		exit(1);
+		exit(2);
 	}
 	target = strtoul(argv[1], 0, 0);
 

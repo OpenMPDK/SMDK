@@ -83,12 +83,11 @@ tsd_wrapper_get(bool init) {
             wrapper->initialized = false;
       JEMALLOC_DIAGNOSTIC_PUSH
       JEMALLOC_DIAGNOSTIC_IGNORE_MISSING_STRUCT_FIELD_INITIALIZERS
-            tsd_t initializer = TSD_INITIALIZER;
+            tsd_t initializer_normal = TSD_INITIALIZER;
+            tsd_t initializer_exmem = TSD_EXMEM_INITIALIZER;
       JEMALLOC_DIAGNOSTIC_POP
-            wrapper->val[0] = initializer;
-            wrapper->val[0].memtype = MEM_ZONE_NORMAL; /*mem_zone_normal*/
-            wrapper->val[1] = initializer;
-            wrapper->val[1].memtype = MEM_ZONE_EXMEM; /*mem_zone_exmem*/
+            wrapper->val[0] = initializer_normal;
+            wrapper->val[1] = initializer_exmem;
             wrapper->cur_type = MEM_ZONE_NORMAL;
             wrapper->mem_policy_enabled = false;
         }
@@ -136,12 +135,11 @@ tsd_boot1(void) {
     wrapper->initialized = false;
 JEMALLOC_DIAGNOSTIC_PUSH
 JEMALLOC_DIAGNOSTIC_IGNORE_MISSING_STRUCT_FIELD_INITIALIZERS
-    tsd_t initializer = TSD_INITIALIZER;
+    tsd_t initializer_normal = TSD_INITIALIZER;
+    tsd_t initializer_exmem = TSD_EXMEM_INITIALIZER;;
 JEMALLOC_DIAGNOSTIC_POP
-    wrapper->val[0] = initializer;
-    wrapper->val[0].memtype = MEM_ZONE_NORMAL;
-    wrapper->val[1] = initializer;
-    wrapper->val[1].memtype = MEM_ZONE_EXMEM;
+    wrapper->val[0] = initializer_normal;
+    wrapper->val[1] = initializer_exmem;
     wrapper->cur_type = MEM_ZONE_NORMAL;
     wrapper->mem_policy_enabled = false;
     tsd_wrapper_set(wrapper);
@@ -205,6 +203,20 @@ tsd_set_mem_policy_info(bool policy) {
     wrapper = tsd_wrapper_get(true);
     assert(wrapper != NULL);
     wrapper->mem_policy_enabled = policy;
+}
+
+JEMALLOC_ALWAYS_INLINE void
+tsd_set_aid(int aid) {
+    tsd_t *tsd = tsd_get(false);
+    assert(tsd);
+    tsd->aid = aid;
+}
+
+JEMALLOC_ALWAYS_INLINE int
+tsd_get_aid(void) {
+    tsd_t *tsd = tsd_get(false);
+    assert(tsd);
+    return tsd->aid;
 }
 
 JEMALLOC_ALWAYS_INLINE bool

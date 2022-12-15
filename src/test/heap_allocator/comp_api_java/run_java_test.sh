@@ -61,22 +61,65 @@ function run_jni(){
     $JAVA javaJNITest $PRIORITY
 }
 
+function usage(){
+    echo "Usage: $0 [-e | -n] [-a | -j]"
+    exit 2
+}
+
+MEM_SET=0
+APP=0
+
 while getopts ":enaj" opt; do
     case "$opt" in
         e)
-            PRIORITY='exmem'
+            if [ $MEM_SET == 0 ]; then
+                PRIORITY='exmem'
+                MEM_SET=1
+            fi
             ;;
         n)
-            PRIORITY='normal'
+            if [ $MEM_SET == 0 ]; then
+                PRIORITY='normal'
+                MEM_SET=1
+            fi
             ;;
         a)
-            run_java
+            if [ $APP == 0 ]; then
+                APP="java"
+            fi
             ;;
         j)
-            run_jni
+            if [ $APP == 0 ]; then
+                APP="jni"
+            fi
             ;;
         :)
-            echo "Usage: $0 [-e | -n] [-a | -j]"
+            usage
+            ;;
     esac
-
 done
+
+case "$APP" in
+    java)
+        run_java
+        ret=$?
+        ;;
+    jni)
+        run_jni
+        ret=$?
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+echo
+if [ $ret == 0 ]; then
+    echo "PASS"
+else
+    echo "FAIL"
+    exit 1
+fi
+
+exit 0
+

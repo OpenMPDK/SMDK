@@ -102,12 +102,14 @@ typedef void (*test_callback_t)(int *);
 
 #define TSD_INITIALIZER {                       \
     _TSD_INITIALIZER,				\
-    MEM_ZONE_NORMAL /* mem_zone_normal */	\
+    MEM_ZONE_NORMAL, /* mem_zone_normal */	\
+    -1		     /* not allocated aid */	\
 }
 
 #define TSD_EXMEM_INITIALIZER {			\
     _TSD_INITIALIZER,				\
-    MEM_ZONE_EXMEM /* mem_zone_exmem */		\
+    MEM_ZONE_EXMEM, /* mem_zone_exmem */	\
+    -1		    /* not allocated aid */	\
 }
 
 void *malloc_tsd_malloc(size_t size);
@@ -208,6 +210,7 @@ struct tsd_s {
 MALLOC_TSD
 #undef O
 	int memtype;
+	int aid;
 };
 
 JEMALLOC_ALWAYS_INLINE uint8_t

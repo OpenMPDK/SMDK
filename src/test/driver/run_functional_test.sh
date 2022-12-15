@@ -1,6 +1,9 @@
-#!/usr/bin/bash
+#!/bin/bash
 deviceId=0
 DEVICE_PATH=/sys/kernel/cxl/devices/cxl$deviceId
+
+readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
+source "$BASEDIR/script/common.sh"
 
 function print_buddyinfo() {
     echo [[Buddy Info]]
@@ -21,13 +24,18 @@ function print_deviceinfo() {
     echo state: $state
 }
 
+if [ `whoami` != 'root' ]; then
+    log_error "This test requires root privileges"
+    exit 2
+fi
+
 print_buddyinfo
 print_deviceinfo
 echo
 
 #offline test
 echo [OFFLINE TEST]
-state=$(cat $DEVICE_PATH/state)
+state=`cat $DEVICE_PATH/state`
 if [ $state == "online" ]; then
     echo -1 > $DEVICE_PATH/node_id
     new_state=`cat $DEVICE_PATH/state`
@@ -37,11 +45,12 @@ if [ $state == "online" ]; then
         echo "PASS"
     else
         echo "FAIL"
-        exit
+        exit 1
     fi
 else
     echo "Device is not online. state: $state"
-    exit
+    echo "Try again after onlining CXL device"
+    exit 2
 fi
 
 echo
@@ -58,11 +67,12 @@ if [ $state == "offline" ]; then
         echo "PASS"
     else
         echo "FAIL"
-        exit
+        exit 1
     fi
 else
+    #never reached here
     echo "Device is not offline. state: $state"
-    exit
+    exit 1
 fi
 
 echo
@@ -78,8 +88,10 @@ if [ $new_nodeid == "1" ]; then
     echo "PASS"
 else
     echo "FAIL"
-    exit
+    exit 1
 fi
+
+echo
 
 #kobject release test
 echo [KOBJECT RELEASE TEST]
@@ -87,27 +99,34 @@ SYSFS_PATH=/sys/kernel/cxl
 KERNEL_NAME=`uname -r`
 rmmod cxl_pci
 if [ $? == "0" ]; then
-        if [ ! -d "$SYSFS_PATH" ]; then
-                echo "kobject is released"
-                echo "PASS"
-                insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
-        else
-                echo "koject release is failed"
-                echo "FAIL"
-                insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
-                exit
-        fi
+    if [ ! -d "$SYSFS_PATH" ]; then
+        echo "kobject is released"
+        echo "PASS"
+        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
+    else
+        echo "koject release is failed"
+        echo "FAIL"
+        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
+        exit 1
+    fi
 else
-        echo "rmmod fail"
-        exit
+    echo "rmmod fail"
+    exit 1
 fi
 
+echo
+
 #check symlink 
+echo [SYMLINK CHECK]
 for memdev_path in $DEVICE_PATH/mem*; do
-	if [ -d "$memdev_path" ]; then
-		echo "memdev: $(readlink -f $memdev_path)"
-	else
-		echo "memdev: not exist"
-	fi
-	break
+    if [ -d "$memdev_path" ]; then
+        echo "memdev: $(readlink -f $memdev_path)"
+        echo "PASS"
+    else
+        echo "memdev: not exist"
+        exit 1
+    fi
+    break
 done
+
+exit 0

@@ -1,0 +1,50 @@
+check-dco:
+  stage: sanity_checks
+  needs: []
+  image: registry.gitlab.com/libvirt/libvirt-ci/check-dco:master
+  script:
+    - /check-dco test-group
+  except:
+    variables:
+      - $CI_PROJECT_NAMESPACE == 'test-group'
+  variables:
+    GIT_DEPTH: 1000
+
+
+cargo-fmt:
+  stage: sanity_checks
+  image: registry.gitlab.com/libvirt/libvirt-ci/cargo-fmt:master
+  needs: []
+  script:
+    - /cargo-fmt
+  artifacts:
+    paths:
+      - cargo-fmt.txt
+    expire_in: 1 week
+    when: on_failure
+
+
+go-fmt:
+  stage: sanity_checks
+  image: registry.gitlab.com/libvirt/libvirt-ci/go-fmt:master
+  needs: []
+  script:
+    - /go-fmt
+  artifacts:
+    paths:
+      - go-fmt.patch
+    expire_in: 1 week
+    when: on_failure
+
+
+clang-format:
+  stage: sanity_checks
+  image: registry.gitlab.com/libvirt/libvirt-ci/clang-format:master
+  needs: []
+  script:
+    - /clang-format
+  artifacts:
+    paths:
+      - clang-format.patch
+    expire_in: 1 week
+    when: on_failure

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#Change the number of devces and address of devices according to your system
+#Change the number of devices and address of devices according to your system
 NUM_DEVICE=3
 ADDRESS=("1080000000-307fffffff" "3080000000-507fffffff" "5080000000-707fffffff")
 
@@ -20,18 +20,18 @@ function print_result(){
 
 if [ ! -d $FIO_PATH ]; then
 	echo "Change FIO PATH"
-	exit
+	exit 2
 fi
 
 if [ `whoami` != 'root' ]; then
 	echo "This test requires root privileges"
-	exit
+	exit 2
 fi
 
 for ((i=0 ; i < $NUM_DEVICE ; i ++)) do
 	if [ ! -d "/sys/devices/platform/hmem.$i/dax$i.0" ]; then
 	   	echo Check Device list
-		exit
+		exit 2
 	fi
 done
 
@@ -52,6 +52,7 @@ print_result
 
 echo "FIO TEST"
 $FIO_PATH/fio $FIO_PATH/examples/dev-dax.fio
+ret=$?
 
 for ((i=0 ; i < $NUM_DEVICE ; i ++)) do
 	echo dax$i.0 > /sys/bus/dax/drivers/device_dax/unbind
@@ -62,3 +63,14 @@ for cxldev in /sys/kernel/cxl/devices/cxl*; do
 done
 
 print_result
+
+echo
+if [ $ret == 0 ]; then
+    echo "PASS"
+else
+    echo "FAIL"
+    exit 1
+fi
+
+exit 0
+

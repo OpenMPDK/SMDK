@@ -1,4 +1,6 @@
 CC := gcc
+CXX := g++
+
 LIBCXLMALLOC = ../lib/libcxlmalloc.so
 LIBCXLMALLOC_STATIC = ../lib/libcxlmalloc.a
 
@@ -14,8 +16,9 @@ C_SRC := smdk_comp_api.c \
 	 $(CORE_DIR)/init.c \
 	 $(CORE_DIR)/alloc.c \
 	 $(CORE_DIR)/config.c
-
 C_OBJS := $(C_SRC:%.c=%.o)
+C_OBJS := $(C_OBJS:%.cpp=%.o)
+
 
 override CFLAGS += -I$(JEMALLOC_DIR)/include \
 		   -I./include \
@@ -27,7 +30,11 @@ override LIBS +=-Wl,--whole-archive $(JEMALLOC_SLIB_PIC) -Wl,--no-whole-archive 
 
 all: $(LIBCXLMALLOC) static_lib
 $(LIBCXLMALLOC): $(C_OBJS)
-	$(CC) -Wall -shared -o $@ $^ $(CFLAGS) $(LDFLAGS) $(LIBS)
+	$(CXX) -Wall -shared -o $@ $^ $(LDFLAGS) $(LIBS)
+.c.o:
+	$(CC) -Wall -shared -o $@ $< -c $(CFLAGS)
+.cpp.o:
+	$(CXX) -Wall -shared -o $@ $< -c $(CFLAGS)
 
 define libadd
 create $(LIBCXLMALLOC_STATIC)\n\

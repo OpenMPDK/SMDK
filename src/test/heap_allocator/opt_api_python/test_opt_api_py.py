@@ -30,11 +30,11 @@ memtype = py_smalloc.SMDK_MEM_EXMEM
 mydata = "hello smdk"
 smdk_obj = py_smalloc.mem_obj(memtype, size=sys.getsizeof(mydata))
 smdk_obj.set(mydata)
-print(smdk_obj.data) #or print(smdk_obj.get())
+#print(smdk_obj.data) #or print(smdk_obj.get())
 mydata_changed = "nice to meet you!"
 smdk_obj.resize(memtype, sys.getsizeof(mydata_changed))
 smdk_obj.set(mydata_changed)
-print(smdk_obj.data) #or print(smdk_obj.get())
+#print(smdk_obj.data) #or print(smdk_obj.get())
 del smdk_obj
 print("test 0 done")
 
@@ -131,7 +131,7 @@ print("test 7 done")
 smdk_obj = py_smalloc.mem_obj(memtype, my_list)
 for i in range(4): #changing values
     smdk_obj.data[i]=i
-print(smdk_obj.data)
+#print(smdk_obj.data)
 print("len obj = %d"%len(smdk_obj.data))
 smdk_obj.data.pop() #use pop
 print("pop data =", smdk_obj.data)
@@ -145,7 +145,7 @@ print("list usage checked")
 
 #8-2_tuple
 smdk_obj = py_smalloc.mem_obj(memtype, my_tuple)
-print(smdk_obj.data)
+#print(smdk_obj.data)
 print("3rd item is", smdk_obj.data[2])
 print("slicing tuple", smdk_obj.data[0:2])
 print("len tuple = %d"%len(smdk_obj.data))
@@ -156,14 +156,14 @@ print("tuple usage checked")
 
 #8-3_dictionary
 smdk_obj_dic = py_smalloc.mem_obj(memtype, my_dictionary)
-print(smdk_obj_dic.data)
+#print(smdk_obj_dic.data)
 for key, val in smdk_obj_dic.data.items():
     print(key, val)
-print(smdk_obj_dic.data['key1'])
+#print(smdk_obj_dic.data['key1'])
 smdk_obj_dic.data['key1'] = 1
 smdk_obj_dic.data['key2'] = 2
 smdk_obj_dic.data['key3'] = 3
-print(smdk_obj_dic.data)
+#print(smdk_obj_dic.data)
 smdk_obj_dic.free()
 print("Dictionary usage checked")
 
@@ -172,7 +172,7 @@ set1 = set([0, 1, 2, 3])
 set2 = set([2, 3, 4, 5, 6])
 smdk_obj1 = py_smalloc.mem_obj(memtype, set1)
 smdk_obj2 = py_smalloc.mem_obj(memtype, set2)
-print(smdk_obj1.data, smdk_obj2.data)
+#print(smdk_obj1.data, smdk_obj2.data)
 print("Intersection set", smdk_obj1.data & smdk_obj2.data)
 print("Union set", smdk_obj1.data | smdk_obj2.data)
 print("Difference set", smdk_obj1.data - smdk_obj2.data)
@@ -189,15 +189,15 @@ print("test 9 done")
 #test10: mem_obj_nodes
 memtype = py_smalloc.SMDK_MEM_EXMEM
 smdk_obj_node = py_smalloc.mem_obj_node(memtype, "0", "SMDK")
-print(smdk_obj_node.data, smdk_obj_node.buf)
+#print(smdk_obj_node.data, smdk_obj_node.buf)
 smdk_obj_node2 = py_smalloc.mem_obj_node(memtype, "0", size=1024)
 smdk_obj_node2.set("SMDK")
-print(smdk_obj_node2.data, smdk_obj_node2.buf)
+#print(smdk_obj_node2.data, smdk_obj_node2.buf)
 smdk_obj_node2.set("Hello SMDK")
-print(smdk_obj_node2.data, smdk_obj_node2.buf)
+#print(smdk_obj_node2.data, smdk_obj_node2.buf)
 my_set = [1,2,3,4]
 smdk_obj_node2.set(my_set)
-print(smdk_obj_node2.data, smdk_obj_node2.buf)
+#print(smdk_obj_node2.data, smdk_obj_node2.buf)
 del smdk_obj_node
 del smdk_obj_node2
 print("test 10_1 done")

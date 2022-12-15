@@ -74,6 +74,9 @@ struct cxl_endpoint *util_cxl_endpoint_filter(struct cxl_endpoint *endpoint,
 
 		if (strcmp(arg, cxl_endpoint_get_devname(endpoint)) == 0)
 			break;
+
+		if (strcmp(arg, cxl_endpoint_get_host(endpoint)) == 0)
+			break;
 	}
 
 	free(ident);
@@ -116,6 +119,9 @@ static struct cxl_port *__util_cxl_port_filter(struct cxl_port *port,
 			break;
 
 		if (strcmp(arg, cxl_port_get_devname(port)) == 0)
+			break;
+
+		if (strcmp(arg, cxl_port_get_host(port)) == 0)
 			break;
 	}
 
@@ -177,8 +183,7 @@ util_cxl_decoder_filter_by_port(struct cxl_decoder *decoder, const char *ident,
 	return NULL;
 }
 
-static struct cxl_bus *util_cxl_bus_filter(struct cxl_bus *bus,
-					   const char *__ident)
+struct cxl_bus *util_cxl_bus_filter(struct cxl_bus *bus, const char *__ident)
 {
 	char *ident, *save;
 	const char *arg;
@@ -302,7 +307,7 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 		if (strcmp(name, "all") == 0)
 			break;
 
-		if (sscanf(name, "cxl%d", &id) == 1){
+		if (sscanf(name, "cxl%d", &id) == 1) {
 			sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", id);
 			d = opendir(path);
 			if (d) {
@@ -321,12 +326,15 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 				break;
 			}
 		}
-
+		
 		if (sscanf(name, "%d", &memdev_id) == 1 &&
-		    cxl_memdev_get_id(memdev) == memdev_id)
+			cxl_memdev_get_id(memdev) == memdev_id)
 			break;
 
 		if (strcmp(name, cxl_memdev_get_devname(memdev)) == 0)
+			break;
+
+		if (strcmp(name, cxl_memdev_get_host(memdev)) == 0)
 			break;
 	}
 
@@ -396,8 +404,8 @@ struct cxl_port *util_cxl_port_filter_by_memdev(struct cxl_port *port,
 	return NULL;
 }
 
-static struct cxl_decoder *util_cxl_decoder_filter(struct cxl_decoder *decoder,
-						   const char *__ident)
+struct cxl_decoder *util_cxl_decoder_filter(struct cxl_decoder *decoder,
+					    const char *__ident)
 {
 	struct cxl_port *port = cxl_decoder_get_port(decoder);
 	int pid, did;
@@ -444,7 +452,9 @@ util_cxl_decoder_filter_by_memdev(struct cxl_decoder *decoder,
 				  const char *ident, const char *serial)
 {
 	struct cxl_ctx *ctx = cxl_decoder_get_ctx(decoder);
+	struct cxl_endpoint *endpoint;
 	struct cxl_memdev *memdev;
+	struct cxl_port *port;
 
 	if (!ident && !serial)
 		return decoder;
@@ -453,6 +463,12 @@ util_cxl_decoder_filter_by_memdev(struct cxl_decoder *decoder,
 		if (!util_cxl_memdev_filter(memdev, ident, serial))
 			continue;
 		if (cxl_decoder_get_target_by_memdev(decoder, memdev))
+			return decoder;
+		port = cxl_decoder_get_port(decoder);
+		if (!port || !cxl_port_is_endpoint(port))
+			continue;
+		endpoint = cxl_port_to_endpoint(port);
+		if (cxl_endpoint_get_memdev(endpoint) == memdev)
 			return decoder;
 	}
 
@@ -593,6 +609,93 @@ util_cxl_memdev_filter_by_port(struct cxl_memdev *memdev, const char *bus_ident,
 	return NULL;
 }
 
+static struct cxl_region *
+util_cxl_region_filter_by_bus(struct cxl_region *region, const char *__ident)
+{
+	struct cxl_decoder *decoder = cxl_region_get_decoder(region);
+
+	if (!util_cxl_decoder_filter_by_bus(decoder, __ident))
+		return NULL;
+	return region;
+}
+
+static struct cxl_region *
+util_cxl_region_filter_by_port(struct cxl_region *region, const char *__ident)
+{
+	struct cxl_decoder *decoder = cxl_region_get_decoder(region);
+	struct cxl_port *port = cxl_decoder_get_port(decoder);
+
+	if (!util_cxl_port_filter(port, __ident ,CXL_PF_ANCESTRY))
+		return NULL;
+	return region;
+}
+
+static struct cxl_region *
+util_cxl_region_filter_by_decoder(struct cxl_region *region,
+				  const char *__ident)
+{
+	struct cxl_decoder *decoder = cxl_region_get_decoder(region);
+
+	if (!util_cxl_decoder_filter(decoder, __ident))
+		return NULL;
+	return region;
+}
+
+struct cxl_region *util_cxl_region_filter(struct cxl_region *region,
+					    const char *__ident)
+{
+	char *ident, *save;
+	const char *name;
+	int id;
+
+	if (!__ident)
+		return region;
+
+	ident = strdup(__ident);
+	if (!ident)
+		return NULL;
+
+	for (name = strtok_r(ident, which_sep(__ident), &save); name;
+	     name = strtok_r(NULL, which_sep(__ident), &save)) {
+		if (strcmp(name, "all") == 0)
+			break;
+
+		if ((sscanf(name, "%d", &id) == 1 ||
+		     sscanf(name, "region%d", &id) == 1) &&
+		    cxl_region_get_id(region) == id)
+			break;
+
+		if (strcmp(name, cxl_region_get_devname(region)) == 0)
+			break;
+	}
+
+	free(ident);
+	if (name)
+		return region;
+	return NULL;
+
+}
+
+static struct cxl_decoder *
+util_cxl_decoder_filter_by_region(struct cxl_decoder *decoder,
+				  const char *__ident)
+{
+	struct cxl_region *region;
+
+	if (!__ident)
+		return decoder;
+
+	region = cxl_decoder_get_region(decoder);
+	if (!region)
+		return NULL;
+
+	region = util_cxl_region_filter(region, __ident);
+	if (!region)
+		return NULL;
+
+	return decoder;
+}
+
 static unsigned long params_to_flags(struct cxl_filter_params *param)
 {
 	unsigned long flags = 0;
@@ -680,26 +783,60 @@ static struct json_object *pick_array(struct json_object *child,
 	return NULL;
 }
 
+static void walk_regions(struct cxl_decoder *decoder,
+			 struct json_object *jregions,
+			 struct cxl_filter_params *p,
+			 unsigned long flags)
+{
+	struct json_object *jregion;
+	struct cxl_region *region;
+
+	cxl_region_foreach(decoder, region) {
+		if (!util_cxl_region_filter(region, p->region_filter))
+			continue;
+		if (!util_cxl_region_filter_by_bus(region, p->bus_filter))
+			continue;
+		if (!util_cxl_region_filter_by_port(region, p->port_filter))
+			continue;
+		if (!util_cxl_region_filter_by_decoder(region, p->decoder_filter))
+			continue;
+		if (!p->idle && !cxl_region_is_enabled(region))
+			continue;
+		jregion = util_cxl_region_to_json(region, flags);
+		if (!jregion)
+			continue;
+		json_object_array_add(jregions, jregion);
+	}
+
+	return;
+}
+
 static void walk_decoders(struct cxl_port *port, struct cxl_filter_params *p,
-			  struct json_object *jdecoders, unsigned long flags)
+			  struct json_object *jdecoders,
+			  struct json_object *jregions, unsigned long flags)
 {
 	struct cxl_decoder *decoder;
 
 	cxl_decoder_foreach(port, decoder) {
-		struct json_object *jdecoder;
+		const char *devname = cxl_decoder_get_devname(decoder);
+		struct json_object *jchildregions = NULL;
+		struct json_object *jdecoder = NULL;
 
 		if (!p->decoders)
-			continue;
+			goto walk_children;
 		if (!util_cxl_decoder_filter(decoder, p->decoder_filter))
-			continue;
+			goto walk_children;
 		if (!util_cxl_decoder_filter_by_bus(decoder, p->bus_filter))
-			continue;
+			goto walk_children;
 		if (!util_cxl_decoder_filter_by_port(decoder, p->port_filter,
 						     pf_mode(p)))
-			continue;
+			goto walk_children;
 		if (!util_cxl_decoder_filter_by_memdev(
 			    decoder, p->memdev_filter, p->serial_filter))
-			continue;
+			goto walk_children;
+		if (!util_cxl_decoder_filter_by_region(decoder,
+						       p->region_filter))
+			goto walk_children;
 		if (!p->idle && cxl_decoder_get_size(decoder) == 0)
 			continue;
 		jdecoder = util_cxl_decoder_to_json(decoder, flags);
@@ -710,7 +847,27 @@ static void walk_decoders(struct cxl_port *port, struct cxl_filter_params *p,
 		util_cxl_targets_append_json(jdecoder, decoder,
 					     p->memdev_filter, p->serial_filter,
 					     flags);
+
+		if (p->regions) {
+			jchildregions = json_object_new_array();
+			if (!jchildregions) {
+				err(p, "failed to allocate region object\n");
+				return;
+			}
+		}
+
 		json_object_array_add(jdecoders, jdecoder);
+
+walk_children:
+		if (!p->regions)
+			continue;
+		if (!cxl_port_is_root(port))
+			continue;
+		walk_regions(decoder,
+			     pick_array(jchildregions, jregions),
+			     p, flags);
+		cond_add_put_array_suffix(jdecoder, "regions", devname,
+					  jchildregions);
 	}
 }
 
@@ -790,7 +947,7 @@ static void walk_endpoints(struct cxl_port *port, struct cxl_filter_params *p,
 		if (!p->decoders)
 			continue;
 		walk_decoders(cxl_endpoint_get_port(endpoint), p,
-			      pick_array(jchilddecoders, jdecoders), flags);
+			      pick_array(jchilddecoders, jdecoders), NULL, flags);
 		cond_add_put_array_suffix(jendpoint, "decoders", devname,
 					  jchilddecoders);
 	}
@@ -877,7 +1034,8 @@ walk_children:
 				       flags);
 
 		walk_decoders(port, p,
-			      pick_array(jchilddecoders, jportdecoders), flags);
+			      pick_array(jchilddecoders, jportdecoders), NULL,
+			      flags);
 		walk_child_ports(port, p, pick_array(jchildports, jports),
 				 pick_array(jchilddecoders, jportdecoders),
 				 pick_array(jchildeps, jeps),
@@ -902,6 +1060,7 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 	struct json_object *jbusdecoders = NULL;
 	struct json_object *jepdecoders = NULL;
 	struct json_object *janondevs = NULL;
+	struct json_object *jregions = NULL;
 	struct json_object *jeps = NULL;
 	struct cxl_memdev *memdev;
 	int top_level_objs = 0;
@@ -944,6 +1103,10 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 	if (!jepdecoders)
 		goto err;
 
+	jregions = json_object_new_array();
+	if (!jregions)
+		goto err;
+
 	dbg(p, "walk memdevs\n");
 	cxl_memdev_foreach(ctx, memdev) {
 		struct json_object *janondev;
@@ -972,6 +1135,7 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 		struct json_object *jchildports = NULL;
 		struct json_object *jchilddevs = NULL;
 		struct json_object *jchildeps = NULL;
+		struct json_object *jchildregions = NULL;
 		struct cxl_port *port = cxl_bus_get_port(bus);
 		const char *devname = cxl_bus_get_devname(bus);
 
@@ -1029,11 +1193,20 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 					continue;
 				}
 			}
+			if (p->regions && !p->decoders) {
+				jchildregions = json_object_new_array();
+				if (!jchildregions) {
+					err(p,
+					    "%s: failed to enumerate child regions\n",
+					    devname);
+					continue;
+				}
+			}
 		}
 walk_children:
 		dbg(p, "walk decoders\n");
 		walk_decoders(port, p, pick_array(jchilddecoders, jbusdecoders),
-			      flags);
+			      pick_array(jchildregions, jregions), flags);
 
 		dbg(p, "walk ports\n");
 		walk_child_ports(port, p, pick_array(jchildports, jports),
@@ -1046,6 +1219,8 @@ walk_children:
 					  jchildeps);
 		cond_add_put_array_suffix(jbus, "decoders", devname,
 					  jchilddecoders);
+		cond_add_put_array_suffix(jbus, "regions", devname,
+					  jchildregions);
 		cond_add_put_array_suffix(jbus, "memdevs", devname, jchilddevs);
 	}
 
@@ -1065,6 +1240,8 @@ walk_children:
 		top_level_objs++;
 	if (json_object_array_length(jepdecoders))
 		top_level_objs++;
+	if (json_object_array_length(jregions))
+		top_level_objs++;
 
 	splice_array(p, janondevs, jplatform, "anon memdevs", top_level_objs > 1);
 	splice_array(p, jbuses, jplatform, "buses", top_level_objs > 1);
@@ -1077,6 +1254,7 @@ walk_children:
 		     top_level_objs > 1);
 	splice_array(p, jepdecoders, jplatform, "endpoint decoders",
 		     top_level_objs > 1);
+	splice_array(p, jregions, jplatform, "regions", top_level_objs > 1);
 
 	util_display_json_array(stdout, jplatform, flags);
 
@@ -1090,6 +1268,7 @@ err:
 	json_object_put(jbusdecoders);
 	json_object_put(jportdecoders);
 	json_object_put(jepdecoders);
+	json_object_put(jregions);
 	json_object_put(jplatform);
 	return -ENOMEM;
 }

@@ -36,20 +36,24 @@ static const struct option options[] = {
 		   "filter by CXL endpoint device name(s)"),
 	OPT_BOOLEAN('E', "endpoints", &param.endpoints,
 		    "include CXL endpoint info"),
-	OPT_STRING('d', "decoder", &param.decoder_filter,
-		   "decoder device name",
+	OPT_STRING('d', "decoder", &param.decoder_filter, "decoder device name",
 		   "filter by CXL decoder device name(s) / class"),
 	OPT_BOOLEAN('D', "decoders", &param.decoders,
 		    "include CXL decoder info"),
 	OPT_BOOLEAN('T', "targets", &param.targets,
-		    "include CXL target data with decoders or ports"),
+		    "include CXL target data with decoders, ports, or regions"),
+	OPT_STRING('r', "region", &param.region_filter, "region name",
+		   "filter by CXL region name(s)"),
+	OPT_BOOLEAN('R', "regions", &param.regions, "include CXL regions"),
 	OPT_BOOLEAN('i', "idle", &param.idle, "include disabled devices"),
 	OPT_BOOLEAN('u', "human", &param.human,
-		    "use human friendly number formats "),
+		    "use human friendly number formats"),
 	OPT_BOOLEAN('H', "health", &param.health,
-		    "include memory device health information "),
+		    "include memory device health information"),
 	OPT_BOOLEAN('I', "partition", &param.partition,
-		    "include memory device partition information "),
+		    "include memory device partition information"),
+	OPT_INCR('v', "verbose", &param.verbose,
+		 "increase output detail"),
 #ifdef ENABLE_DEBUG
 	OPT_BOOLEAN(0, "debug", &debug, "debug list walk"),
 #endif
@@ -59,7 +63,7 @@ static const struct option options[] = {
 static int num_list_flags(void)
 {
 	return !!param.memdevs + !!param.buses + !!param.ports +
-	       !!param.endpoints + !!param.decoders;
+	       !!param.endpoints + !!param.decoders + !!param.regions;
 }
 
 int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
@@ -93,17 +97,34 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 			param.endpoints = true;
 		if (param.decoder_filter)
 			param.decoders = true;
-		if (num_list_flags() == 0) {
-			/*
-			 * TODO: We likely want to list regions by default if
-			 * nothing was explicitly asked for. But until we have
-			 * region support, print this error asking for devices
-			 * explicitly.  Once region support is added, this TODO
-			 * can be removed.
-			 */
-			error("please specify entities to list, e.g. using -m/-M\n");
-			usage_with_options(u, options);
-		}
+		param.single = true;
+		if (param.region_filter)
+			param.regions = true;
+	}
+
+	/* List regions and memdevs by default */
+	if (num_list_flags() == 0) {
+		param.regions = true;
+		param.memdevs = true;
+	}
+
+	switch(param.verbose){
+	default:
+	case 3:
+		param.health = true;
+		param.partition = true;
+		/* fallthrough */
+	case 2:
+		param.idle = true;
+		/* fallthrough */
+	case 1:
+		param.buses = true;
+		param.ports = true;
+		param.decoders = true;
+		param.targets = true;
+		/*fallthrough*/
+	case 0:
+		break;
 	}
 
 	log_init(&param.ctx, "cxl list", "CXL_LIST_LOG");

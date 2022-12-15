@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
         } else {
             printf("\n[TEST ERROR] argv[%d]: %s, Please check user input\n\
                     e.g) size xx iter xx nthreads 3 \n", i, argv[i]);
-            return -1;
+            return 2;
         }
     }
     printf("[TEST START] smdk compatible API multi-thread malloc test\n");

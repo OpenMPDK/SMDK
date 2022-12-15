@@ -7,7 +7,8 @@ if sys.argv[1] == "exmem":
 else:
     MEMTYPE_FLAG = py_smalloc.MAP_NORMAL
 
-filename = "./4M.dummy"
+filepath = os.path.dirname(os.path.realpath(__file__))
+filename = filepath + "/4M.dummy"
 fileno = -1 #for MAP_ANON
 length = 4*1024*1024 #4MB
 num = 1000
@@ -15,10 +16,10 @@ flags = mmap.MAP_ANON | mmap.MAP_PRIVATE | MEMTYPE_FLAG #cf.mmap.MAP_POPULATE fr
 prot = mmap.PROT_WRITE | mmap.PROT_READ
 
 try:
-    f = open("./4M.dummy", "r")
+    f = open(filename, "r")
 except:
-    print("You need to make dummy file first (e.g.$dd if=/dev/zero of=4M.dummy bs=1M count=4)")
-    sys.exit()
+    print("You need to make dummy file first (e.g.$dd if=/dev/zero of=%s/4M.dummy bs=1M count=4)" % filepath)
+    sys.exit(2)
 
 data = f.read().encode() #4MB data chunk
 

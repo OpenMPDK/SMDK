@@ -30,7 +30,7 @@ apt-get install -y openjdk-8-jdk openjdk-11-jdk
 # SMDK
 apt-get install -y dialog
 apt-get install -y flex bison
-apt-get install -y libelf-dev
+apt-get install -y libelf-dev zstd
 
 # memcached
 apt-get install -y libevent-dev
@@ -55,15 +55,18 @@ apt-get install -y cmake junit4
 apt-get install -y ant ant-optional
 
 # opt_api python binding
-apt-get install -y python-dev python3-dev
-pip install cffi
+apt-get install -y python-dev python3-dev libffi-dev
+python3 -m pip install cffi
 
 # meson
 apt-get install -y libiniparser1 libiniparser-dev libkmod-dev libkeyutils-dev
 apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build meson
 
-# docker repository
-#apt-get install -y apt-get install ca-certificates curl gnupg lsb-release software-properties-common
+# cxl_cli
+apt-get install -y libiniparser1 libiniparser-dev libkmod-dev libkeyutils-dev
+apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build asciidoctor meson
 
-# docker 
-#apt-get install -y docker-ce docker-ce-cli containerd.io
+# docker
+# Two ways to install Docker Engine
+# 1) Install static binaries: https://docs.docker.com/engine/install/binaries/
+# 2) Install the engine from Docker repository: https://docs.docker.com/engine/install/ubuntu/ (Here you can also find more guides for other OSes)

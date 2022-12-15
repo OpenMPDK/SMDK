@@ -2,13 +2,16 @@ cxl_src = [
   'cxl.c',
   'list.c',
   'port.c',
+  'bus.c',
+  'region.c',
   'memdev.c',
   'smdk.c',
-  '../util/json.c',
-  '../util/log.c',
+  'smdk_lat_matrix.c',
   'json.c',
   'filter.c',
 ]
+
+numa_dep = cc.find_library('numa', required: false)
 
 cxl_tool = executable('cxl',
   cxl_src,
@@ -20,6 +23,7 @@ cxl_tool = executable('cxl',
     kmod,
     json,
     versiondep,
+    numa_dep,
   ],
   install : true,
   install_dir : rootbindir,

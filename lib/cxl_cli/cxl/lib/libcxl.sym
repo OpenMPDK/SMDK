@@ -101,6 +101,7 @@ global:
 	cxl_bus_get_id;
 	cxl_bus_get_port;
 	cxl_bus_get_ctx;
+	cxl_bus_disable_invalidate;
 	cxl_port_get_first;
 	cxl_port_get_next;
 	cxl_port_get_devname;
@@ -110,6 +111,7 @@ global:
 	cxl_port_get_parent;
 	cxl_port_is_root;
 	cxl_port_is_switch;
+	cxl_port_get_depth;
 	cxl_port_to_bus;
 	cxl_port_is_endpoint;
 	cxl_port_to_endpoint;
@@ -154,6 +156,7 @@ global:
 	cxl_decoder_is_mem_capable;
 	cxl_decoder_is_accelmem_capable;
 	cxl_decoder_is_locked;
+	cxl_decoder_create_pmem_region;
 	cxl_target_get_first;
 	cxl_target_get_next;
 	cxl_target_get_decoder;
@@ -181,3 +184,51 @@ global:
 	cxl_cmd_new_set_partition;
 	cxl_cmd_partition_set_mode;
 } LIBCXL_1;
+
+LIBCXL_3 {
+global:
+	cxl_decoder_get_dpa_resource;
+	cxl_decoder_get_dpa_size;
+	cxl_decoder_get_mode;
+	cxl_decoder_get_last;
+	cxl_decoder_get_prev;
+	cxl_decoder_set_dpa_size;
+	cxl_decoder_set_mode;
+	cxl_region_get_first;
+	cxl_region_get_next;
+	cxl_region_decode_is_committed;
+	cxl_region_is_enabled;
+	cxl_region_disable;
+	cxl_region_enable;
+	cxl_region_delete;
+	cxl_region_get_ctx;
+	cxl_region_get_decoder;
+	cxl_region_get_id;
+	cxl_region_get_devname;
+	cxl_region_get_uuid;
+	cxl_region_get_size;
+	cxl_region_get_resource;
+	cxl_region_get_interleave_ways;
+	cxl_region_get_interleave_granularity;
+	cxl_region_get_target_decoder;
+	cxl_region_set_size;
+	cxl_region_set_uuid;
+	cxl_region_set_interleave_ways;
+	cxl_region_set_interleave_granularity;
+	cxl_region_set_target;
+	cxl_region_clear_target;
+	cxl_region_clear_all_targets;
+	cxl_region_decode_commit;
+	cxl_region_decode_reset;
+	cxl_mapping_get_first;
+	cxl_mapping_get_next;
+	cxl_mapping_get_decoder;
+	cxl_mapping_get_region;
+	cxl_mapping_get_position;
+	cxl_decoder_get_by_name;
+	cxl_decoder_get_memdev;
+	cxl_decoder_get_interleave_granularity;
+	cxl_decoder_get_interleave_ways;
+	cxl_decoder_get_max_available_extent;
+	cxl_decoder_get_region;
+} LIBCXL_2;

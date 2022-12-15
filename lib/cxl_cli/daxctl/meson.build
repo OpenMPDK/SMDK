@@ -4,7 +4,6 @@ daxctl_src = [
   'list.c',
   'migrate.c',
   'device.c',
-  '../util/json.c',
   'json.c',
   'filter.c',
 ]
@@ -15,7 +14,6 @@ daxctl_tool = executable('daxctl',
   dependencies : [
     daxctl_dep,
     ndctl_dep,
-    iniparser,
     util_dep,
     uuid,
     kmod,

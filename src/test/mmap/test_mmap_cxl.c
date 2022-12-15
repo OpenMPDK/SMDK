@@ -15,14 +15,17 @@ int main(int argc, char* argv[]) {
 	int count = 0, i;
 	unsigned long size = 4 * 1024 * 1024;
 	unsigned int flag = MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_POPULATE;
+    int zone_set = 0;
 
 	for (i = 1; i < argc; i++) {
 		if (*argv[i] == 'e' || *argv[i] == 'E') {
 			flag |= MAP_EXMEM;
 			fprintf(stderr, "MAP_EXMEM\n");
+            zone_set++;
 		} else if (*argv[i] == 'n' || *argv[i] == 'N') {
 			flag |= MAP_NORMAL;
 			fprintf(stderr, "MAP_NORMAL\n");
+            zone_set++;
 		} else if (!strcmp(argv[i], "loop")) {
 			loop_count = (int)atoi(argv[++i]);
 		} else if (!strcmp(argv[i], "usleep")) {
@@ -33,8 +36,15 @@ int main(int argc, char* argv[]) {
 			fprintf(stderr, "Usage: 'test_mmap_cxl [ZONE] [loop N] [usleep N(us)]', "
 					"[ZONE=e|E : ZONE_EXMEM, n|N : Excluding ZONE_EXMEM, "
 					"otherwise : all zones]\n");
-			exit(1);
+			exit(2);
 		}
+        if(zone_set > 1){
+            fprintf(stderr, "Invald ZONE option\n");
+ 			fprintf(stderr, "Usage: 'test_mmap_cxl [ZONE] [loop N] [usleep N(us)]', "
+					"[ZONE=e|E : ZONE_EXMEM, n|N : Excluding ZONE_EXMEM, "
+					"otherwise : all zones]\n");
+            exit(2);
+        }
 	}
 
 	if (print_buddyinfo)
@@ -53,6 +63,11 @@ int main(int argc, char* argv[]) {
 		memset(addr, '0', size);
 		zero = *(addr + size / 2);
 		printf("addr[%p], one='%c' zero='%c'\n", (void *)addr, one, zero);
+        
+        if(one != '1' || zero != '0'){
+            perror("memset error");
+            exit(1);
+        }
 
 #if 0
 		if (munmap(tmp, 1024) == -1) {

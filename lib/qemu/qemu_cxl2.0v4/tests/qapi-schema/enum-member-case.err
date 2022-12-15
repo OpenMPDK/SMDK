@@ -1,2 +1,0 @@
-enum-member-case.json: In enum 'NoWayThisWillGetWhitelisted':
-enum-member-case.json:4: 'data' member 'Value' uses uppercase in name

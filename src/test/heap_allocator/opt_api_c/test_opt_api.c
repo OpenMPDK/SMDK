@@ -426,6 +426,7 @@ int main(int argc, char* argv[]){
 param_err:
 	print_test_desc(max_num_tests);
 	print_test_options(sizeof(arr_desc_test_option)/sizeof(char*));
+    return 2;
 
 ret:
 	return 0;
