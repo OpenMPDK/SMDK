@@ -20,44 +20,44 @@ ENV_SET_FAIL=2
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
 
 if [ ! -e $BASEDIR/script/common.sh ]; then
-        echo common.sh Not Exist.
-        echo Please locate TC under /path/to/dmdk.cxlmalloc/src/test/cxlswap/
-        exit $ENV_SET_FAIL
+	echo common.sh Not Exist.
+	echo Please locate TC under /path/to/dmdk.cxlmalloc/src/test/cxlswap/
+	exit $ENV_SET_FAIL
 fi
 source "$BASEDIR/script/common.sh"
 
 #Binary Path
 CXLSWAP_TEST=$BASEDIR/src/test/cxlswap/test_cxlswap
 if [ ! -e $CXLSWAP_TEST ]; then
-        echo Binary File Not Exist
-        echo Please make before run
-        exit $ENV_SET_FAIL
+	echo Binary File Not Exist
+	echo Please make before run
+	exit $ENV_SET_FAIL
 fi
 
 function check_privilege() {
-        if [ $EUID -ne 0 ]; then
-                echo Please Run as Root if you want to modify status
-                exit $ENV_SET_FAIL
-        fi
+	if [ $EUID -ne 0 ]; then
+		echo Please Run as Root if you want to modify status
+		exit $ENV_SET_FAIL
+	fi
 }
 
 CXLSWAPMODULE="/sys/module/cxlswap/parameters/enabled"
 function check_cxlswap_exist() {
-        if [ ! -e $CXLSWAPMODULE ]; then
-                echo Cannot Modify CXL Swap Status. Module Not Exist
-                exit $ENV_SET_FAIL
-        fi
+	if [ ! -e $CXLSWAPMODULE ]; then
+		echo Cannot Modify CXL Swap Status. Module Not Exist
+		exit $ENV_SET_FAIL
+	fi
 }
 
 CXLSWAP_STATUS=$(cat ${CXLSWAPMODULE})
 function modify_cxlswap_to_enabled() {
-        if [ $CXLSWAP_STATUS = "N" ]; then
-                echo 1 > $CXLSWAPMODULE
-                if [ $? -ne 0 ]; then
-                    echo Cannot modify CXL Swap Status to Enabled
-                    exit $ENV_SET_FAIL
-                fi
-        fi
+	if [ $CXLSWAP_STATUS = "N" ]; then
+		echo 1 > $CXLSWAPMODULE
+		if [ $? -ne 0 ]; then
+			echo Cannot modify CXL Swap Status to Enabled
+			exit $ENV_SET_FAIL
+		fi
+	fi
 }
 
 ################################# Run Test #################################
@@ -80,18 +80,18 @@ modify_cxlswap_to_enabled
 
 for ((i = 90; i > 50; i -= 20));
 do
-        for j in 512m 1g;
-        do
-                $CXLSWAP_TEST $j $i shared_memory
-                RETURN=$?
-                if [ $RETURN -eq $ENV_SET_FAIL ]; then
-						echo Environment setting for Test Fail.
-                        exit $ENV_SET_FAIL
-                elif [ $RETURN -eq $TEST_FAILURE ]; then
-						echo CXL Swap Test Fail.
-                        exit $TEST_FAILURE
-                fi
-        done
+	for j in 512m 1g;
+	do
+		$CXLSWAP_TEST $j $i shared_memory
+		RETURN=$?
+		if [ $RETURN -eq $ENV_SET_FAIL ]; then
+			echo Environment setting for Test Fail.
+			exit $ENV_SET_FAIL
+		elif [ $RETURN -eq $TEST_FAILURE ]; then
+			echo CXL Swap Test Fail.
+			exit $TEST_FAILURE
+		fi
+	done
 done
 echo Shared Memory Test Finish
 

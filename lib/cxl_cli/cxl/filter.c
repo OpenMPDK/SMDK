@@ -322,13 +322,14 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 				}
 				closedir(d);
 			}
-			if (memdev_id == cxl_memdev_get_id(memdev)){
+			if (memdev_id == cxl_memdev_get_id(memdev)) {
 				break;
 			}
 		}
-		
-		if (sscanf(name, "%d", &memdev_id) == 1 &&
-			cxl_memdev_get_id(memdev) == memdev_id)
+
+		if ((sscanf(name, "%d", &memdev_id) == 1 ||
+		     sscanf(name, "mem%d", &memdev_id) == 1) &&
+		    cxl_memdev_get_id(memdev) == memdev_id)
 			break;
 
 		if (strcmp(name, cxl_memdev_get_devname(memdev)) == 0)
@@ -696,23 +697,6 @@ util_cxl_decoder_filter_by_region(struct cxl_decoder *decoder,
 	return decoder;
 }
 
-static unsigned long params_to_flags(struct cxl_filter_params *param)
-{
-	unsigned long flags = 0;
-
-	if (param->idle)
-		flags |= UTIL_JSON_IDLE;
-	if (param->human)
-		flags |= UTIL_JSON_HUMAN;
-	if (param->health)
-		flags |= UTIL_JSON_HEALTH;
-	if (param->targets)
-		flags |= UTIL_JSON_TARGETS;
-	if (param->partition)
-		flags |= UTIL_JSON_PARTITION;
-	return flags;
-}
-
 static void splice_array(struct cxl_filter_params *p, struct json_object *jobjs,
 			 struct json_object *platform,
 			 const char *container_name, bool do_container)
@@ -995,7 +979,7 @@ walk_child_ports(struct cxl_port *parent_port, struct cxl_filter_params *p,
 				continue;
 			}
 
-			if (p->memdevs && !p->endpoints) {
+			if (p->memdevs) {
 				jchilddevs = json_object_new_array();
 				if (!jchilddevs) {
 					err(p,
@@ -1051,11 +1035,12 @@ walk_children:
 	}
 }
 
-int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
+struct json_object *cxl_filter_walk(struct cxl_ctx *ctx,
+				    struct cxl_filter_params *p)
 {
 	struct json_object *jdevs = NULL, *jbuses = NULL, *jports = NULL;
 	struct json_object *jplatform = json_object_new_array();
-	unsigned long flags = params_to_flags(p);
+	unsigned long flags = cxl_filter_to_flags(p);
 	struct json_object *jportdecoders = NULL;
 	struct json_object *jbusdecoders = NULL;
 	struct json_object *jepdecoders = NULL;
@@ -1068,7 +1053,7 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 
 	if (!jplatform) {
 		dbg(p, "platform object allocation failure\n");
-		return -ENOMEM;
+		return NULL;
 	}
 
 	janondevs = json_object_new_array();
@@ -1175,7 +1160,7 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 				}
 			}
 
-			if (p->memdevs && !p->ports && !p->endpoints) {
+			if (p->memdevs) {
 				jchilddevs = json_object_new_array();
 				if (!jchilddevs) {
 					err(p,
@@ -1193,7 +1178,7 @@ int cxl_filter_walk(struct cxl_ctx *ctx, struct cxl_filter_params *p)
 					continue;
 				}
 			}
-			if (p->regions && !p->decoders) {
+			if (p->regions) {
 				jchildregions = json_object_new_array();
 				if (!jchildregions) {
 					err(p,
@@ -1207,6 +1192,14 @@ walk_children:
 		dbg(p, "walk decoders\n");
 		walk_decoders(port, p, pick_array(jchilddecoders, jbusdecoders),
 			      pick_array(jchildregions, jregions), flags);
+
+		dbg(p, "walk rch endpoints\n");
+		if (p->endpoints || p->memdevs || p->decoders)
+			walk_endpoints(port, p,
+				       pick_array(jchildeps, jeps),
+				       pick_array(jchilddevs, jdevs),
+				       pick_array(jchilddecoders, jepdecoders),
+				       flags);
 
 		dbg(p, "walk ports\n");
 		walk_child_ports(port, p, pick_array(jchildports, jports),
@@ -1256,9 +1249,7 @@ walk_children:
 		     top_level_objs > 1);
 	splice_array(p, jregions, jplatform, "regions", top_level_objs > 1);
 
-	util_display_json_array(stdout, jplatform, flags);
-
-	return 0;
+	return jplatform;
 err:
 	json_object_put(janondevs);
 	json_object_put(jbuses);
@@ -1270,5 +1261,5 @@ err:
 	json_object_put(jepdecoders);
 	json_object_put(jregions);
 	json_object_put(jplatform);
-	return -ENOMEM;
+	return NULL;
 }

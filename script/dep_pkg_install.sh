@@ -65,6 +65,7 @@ apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build mes
 # cxl_cli
 apt-get install -y libiniparser1 libiniparser-dev libkmod-dev libkeyutils-dev
 apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build asciidoctor meson
+apt-get install -y libtracefs-dev libtracefs1 libtraceevent-dev libtraceevent1 #ubuntu 22.04+
 
 # docker
 # Two ways to install Docker Engine

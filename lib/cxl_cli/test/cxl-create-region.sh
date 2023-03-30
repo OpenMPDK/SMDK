@@ -4,7 +4,7 @@
 
 . $(dirname $0)/common
 
-rc=1
+rc=77
 
 set -ex
 
@@ -14,7 +14,7 @@ check_prereq "jq"
 
 modprobe -r cxl_test
 modprobe cxl_test
-udevadm settle
+rc=1
 
 destroy_regions()
 {
@@ -96,7 +96,6 @@ create_subregions()
 			echo "create sub-region failed for $decoder / $mem"
 			err "$LINENO"
 		fi
-		udevadm settle
 	done
 
 	echo "created $num_regions subregions:"
@@ -108,6 +107,34 @@ create_subregions()
 		destroy_regions "${regions[$i]}"
 	done
 }
+
+create_single()
+{
+	# the 5th cxl_test decoder is expected to target a single-port
+	# host-bridge. Older cxl_test implementations may not define it,
+	# so skip the test in that case.
+	decoder=$($CXL list -b cxl_test -D -d root |
+		  jq -r ".[4] |
+		  select(.pmem_capable == true) |
+		  select(.nr_targets == 1) |
+		  .decoder")
+
+        if [[ ! $decoder ]]; then
+                echo "no single-port host-bridge decoder found, skipping"
+                return
+        fi
+
+	region=$($CXL create-region -d "$decoder" | jq -r ".region")
+	if [[ ! $region ]]; then
+		echo "failed to create single-port host-bridge region"
+		err "$LINENO"
+	fi
+
+	destroy_regions "$region"
+}
+
+# test region creation on devices behind a single-port host-bridge
+create_single
 
 # test reading labels directly through cxl-cli
 readarray -t mems < <("$CXL" list -b cxl_test -M | jq -r '.[].memdev')
@@ -121,5 +148,7 @@ done
 for mem in ${mems[@]}; do
 	create_subregions "$mem"
 done
+
+check_dmesg "$LINENO"
 
 modprobe -r cxl_test

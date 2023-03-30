@@ -80,4 +80,22 @@ log_normal "[get-event-record]"
 echo "$ cxl get-event-record mem0 -t 3"
 $CLI get-event-record mem0 -t 3
 
+# identify cmd
+log_normal "[identify]"
+echo "$ cxl identify mem0"
+$CLI identify mem0
+
+# health info and alerts cmds
+log_normal "[get-health-info]"
+echo "$ cxl get-health-info mem0"
+$CLI get-health-info mem0
+
+log_normal "[get-alert-config]"
+echo "$ cxl get-alert-config mem0"
+$CLI get-alert-config mem0
+
+log_normal "[set-alert-config]"
+echo "$ cxl set-alert-config mem0 -e life_used -a enable -t 50"
+$CLI set-alert-config mem0 -e life_used -a enable -t 50
+
 exit 0

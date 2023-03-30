@@ -43,6 +43,9 @@ struct cxl_ctx {
 	void *userdata;
 	int memdevs_init;
 	int buses_init;
+	unsigned long timeout;
+	struct udev *udev;
+	struct udev_queue *udev_queue;
 	struct list_head memdevs;
 	struct list_head buses;
 	struct kmod_ctx *kmod_ctx;
@@ -77,6 +80,7 @@ static void free_target(struct cxl_target *target, struct list_head *head)
 		list_del_from(head, &target->list);
 	free(target->dev_path);
 	free(target->phys_path);
+	free(target->fw_path);
 	free(target);
 }
 
@@ -134,6 +138,7 @@ static void free_dport(struct cxl_dport *dport, struct list_head *head)
 	free(dport->dev_buf);
 	free(dport->dev_path);
 	free(dport->phys_path);
+	free(dport->fw_path);
 	free(dport);
 }
 
@@ -226,7 +231,9 @@ CXL_EXPORT void *cxl_get_private_data(struct cxl_ctx *ctx)
  */
 CXL_EXPORT int cxl_new(struct cxl_ctx **ctx)
 {
+	struct udev_queue *udev_queue;
 	struct kmod_ctx *kmod_ctx;
+	struct udev *udev;
 	struct cxl_ctx *c;
 	int rc = 0;
 
@@ -237,7 +244,19 @@ CXL_EXPORT int cxl_new(struct cxl_ctx **ctx)
 	kmod_ctx = kmod_new(NULL, NULL);
 	if (check_kmod(kmod_ctx) != 0) {
 		rc = -ENXIO;
-		goto out;
+		goto err_kmod;
+	}
+
+	udev = udev_new();
+	if (!udev) {
+		rc = -ENOMEM;
+		goto err_udev;
+	}
+
+	udev_queue = udev_queue_new(udev);
+	if (!udev_queue) {
+		rc = -ENOMEM;
+		goto err_udev_queue;
 	}
 
 	c->refcount = 1;
@@ -248,9 +267,17 @@ CXL_EXPORT int cxl_new(struct cxl_ctx **ctx)
 	list_head_init(&c->memdevs);
 	list_head_init(&c->buses);
 	c->kmod_ctx = kmod_ctx;
+	c->udev = udev;
+	c->udev_queue = udev_queue;
+	c->timeout = 5000;
 
 	return 0;
-out:
+
+err_udev_queue:
+	udev_queue_unref(udev_queue);
+err_udev:
+	kmod_unref(kmod_ctx);
+err_kmod:
 	free(c);
 	return rc;
 }
@@ -291,14 +318,11 @@ CXL_EXPORT void cxl_unref(struct cxl_ctx *ctx)
 	list_for_each_safe(&ctx->buses, bus, _b, port.list)
 		free_bus(bus, &ctx->buses);
 
+	udev_queue_unref(ctx->udev_queue);
+	udev_unref(ctx->udev);
 	kmod_unref(ctx->kmod_ctx);
 	info(ctx, "context %p released\n", ctx);
 	free(ctx);
-}
-
-static int cxl_flush(struct cxl_ctx *ctx)
-{
-	return sysfs_write_attr(ctx, "/sys/bus/cxl/flush", "1\n");
 }
 
 /**
@@ -562,6 +586,40 @@ err_path:
 	return NULL;
 }
 
+static int cxl_flush(struct cxl_ctx *ctx)
+{
+	return sysfs_write_attr(ctx, "/sys/bus/cxl/flush", "1\n");
+}
+
+static int cxl_wait_probe(struct cxl_ctx *ctx)
+{
+	unsigned long tmo = ctx->timeout;
+	int rc, sleep = 0;
+
+	do {
+		rc = cxl_flush(ctx);
+		if (rc < 0)
+			break;
+		if (udev_queue_get_queue_is_empty(ctx->udev_queue))
+			break;
+		sleep++;
+		usleep(1000);
+	} while (ctx->timeout == 0 || tmo-- != 0);
+
+	if (sleep)
+		dbg(ctx, "waited %d millisecond%s...\n", sleep,
+		    sleep == 1 ? "" : "s");
+
+	return rc < 0 ? -ENXIO : 0;
+}
+
+static int device_parse(struct cxl_ctx *ctx, const char *base_path,
+			const char *dev_name, void *parent, add_dev_fn add_dev)
+{
+	cxl_wait_probe(ctx);
+	return sysfs_device_parse(ctx, base_path, dev_name, parent, add_dev);
+}
+
 static void cxl_regions_init(struct cxl_decoder *decoder)
 {
 	struct cxl_port *port = cxl_decoder_get_port(decoder);
@@ -576,8 +634,7 @@ static void cxl_regions_init(struct cxl_decoder *decoder)
 
 	decoder->regions_init = 1;
 
-	sysfs_device_parse(ctx, decoder->dev_path, "region", decoder,
-			   add_cxl_region);
+	device_parse(ctx, decoder->dev_path, "region", decoder, add_cxl_region);
 }
 
 CXL_EXPORT struct cxl_region *cxl_region_get_first(struct cxl_decoder *decoder)
@@ -1154,7 +1211,7 @@ static void *add_cxl_memdev(void *parent, int id, const char *cxlmem_base)
 		goto err_read;
 	memdev->buf_len = strlen(cxlmem_base) + 50;
 
-	sysfs_device_parse(ctx, cxlmem_base, "pmem", memdev, add_cxl_pmem);
+	device_parse(ctx, cxlmem_base, "pmem", memdev, add_cxl_pmem);
 
 	cxl_memdev_foreach(ctx, memdev_dup)
 		if (memdev_dup->id == memdev->id) {
@@ -1185,8 +1242,7 @@ static void cxl_memdevs_init(struct cxl_ctx *ctx)
 
 	ctx->memdevs_init = 1;
 
-	sysfs_device_parse(ctx, "/sys/bus/cxl/devices", "mem", ctx,
-			   add_cxl_memdev);
+	device_parse(ctx, "/sys/bus/cxl/devices", "mem", ctx, add_cxl_memdev);
 }
 
 CXL_EXPORT struct cxl_ctx *cxl_memdev_get_ctx(struct cxl_memdev *memdev)
@@ -1265,6 +1321,11 @@ CXL_EXPORT unsigned long long cxl_memdev_get_ram_size(struct cxl_memdev *memdev)
 CXL_EXPORT const char *cxl_memdev_get_firmware_verison(struct cxl_memdev *memdev)
 {
 	return memdev->firmware_version;
+}
+
+CXL_EXPORT int cxl_memdev_get_payload_max(struct cxl_memdev *memdev)
+{
+	return memdev->payload_max;
 }
 
 static void bus_invalidate(struct cxl_bus *bus)
@@ -1542,8 +1603,7 @@ static void cxl_endpoints_init(struct cxl_port *port)
 
 	port->endpoints_init = 1;
 
-	sysfs_device_parse(ctx, port->dev_path, "endpoint", port,
-			   add_cxl_endpoint);
+	device_parse(ctx, port->dev_path, "endpoint", port, add_cxl_endpoint);
 }
 
 CXL_EXPORT struct cxl_ctx *cxl_endpoint_get_ctx(struct cxl_endpoint *endpoint)
@@ -1856,6 +1916,16 @@ static void *add_cxl_decoder(void *parent, int id, const char *cxldecoder_base)
 		dbg(ctx, "%s: target%ld %s phys_path: %s\n", devname, i,
 		    target->dev_path,
 		    target->phys_path ? target->phys_path : "none");
+
+		sprintf(port->dev_buf, "%s/dport%d/firmware_node",
+			port->dev_path, did);
+		target->fw_path = realpath(port->dev_buf, NULL);
+		dbg(ctx, "%s: target%ld %s fw_path: %s\n", devname, i,
+		    target->dev_path,
+		    target->fw_path ? target->fw_path : "none");
+
+		if (!target->phys_path && target->fw_path)
+			target->phys_path = strdup(target->dev_path);
 		list_add(&decoder->targets, &target->list);
 	}
 
@@ -1901,8 +1971,7 @@ static void cxl_decoders_init(struct cxl_port *port)
 
 	port->decoders_init = 1;
 
-	sysfs_device_parse(ctx, port->dev_path, decoder_fmt, port,
-			   add_cxl_decoder);
+	device_parse(ctx, port->dev_path, decoder_fmt, port, add_cxl_decoder);
 
 	free(decoder_fmt);
 }
@@ -2288,6 +2357,13 @@ CXL_EXPORT const char *cxl_target_get_physical_node(struct cxl_target *target)
 	return devpath_to_devname(target->phys_path);
 }
 
+CXL_EXPORT const char *cxl_target_get_firmware_node(struct cxl_target *target)
+{
+	if (!target->fw_path)
+		return NULL;
+	return devpath_to_devname(target->fw_path);
+}
+
 CXL_EXPORT struct cxl_target *
 cxl_decoder_get_target_by_memdev(struct cxl_decoder *decoder,
 				 struct cxl_memdev *memdev)
@@ -2354,7 +2430,7 @@ static void cxl_ports_init(struct cxl_port *port)
 
 	port->ports_init = 1;
 
-	sysfs_device_parse(ctx, port->dev_path, "port", port, add_cxl_port);
+	device_parse(ctx, port->dev_path, "port", port, add_cxl_port);
 }
 
 CXL_EXPORT struct cxl_ctx *cxl_port_get_ctx(struct cxl_port *port)
@@ -2568,6 +2644,12 @@ static void *add_cxl_dport(void *parent, int id, const char *cxldport_base)
 
 	sprintf(dport->dev_buf, "%s/physical_node", cxldport_base);
 	dport->phys_path = realpath(dport->dev_buf, NULL);
+	
+	sprintf(dport->dev_buf, "%s/firmware_node", cxldport_base);
+	dport->fw_path = realpath(dport->dev_buf, NULL);
+
+	if (!dport->phys_path && dport->fw_path)
+		dport->phys_path = strdup(dport->dev_path);
 
 	cxl_dport_foreach(port, dport_dup)
 		if (dport_dup->id == dport->id) {
@@ -2593,7 +2675,7 @@ static void cxl_dports_init(struct cxl_port *port)
 
 	port->dports_init = 1;
 
-	sysfs_device_parse(ctx, port->dev_path, "dport", port, add_cxl_dport);
+	device_parse(ctx, port->dev_path, "dport", port, add_cxl_dport);
 }
 
 CXL_EXPORT int cxl_port_get_nr_dports(struct cxl_port *port)
@@ -2627,6 +2709,13 @@ CXL_EXPORT const char *cxl_dport_get_physical_node(struct cxl_dport *dport)
 	if (!dport->phys_path)
 		return NULL;
 	return devpath_to_devname(dport->phys_path);
+}
+
+CXL_EXPORT const char *cxl_dport_get_firmware_node(struct cxl_dport *dport)
+{
+	if (!dport->fw_path)
+		return NULL;
+	return devpath_to_devname(dport->fw_path);
 }
 
 CXL_EXPORT int cxl_dport_get_id(struct cxl_dport *dport)
@@ -2702,8 +2791,7 @@ static void cxl_buses_init(struct cxl_ctx *ctx)
 
 	ctx->buses_init = 1;
 
-	sysfs_device_parse(ctx, "/sys/bus/cxl/devices", "root", ctx,
-			   add_cxl_bus);
+	device_parse(ctx, "/sys/bus/cxl/devices", "root", ctx, add_cxl_bus);
 }
 
 CXL_EXPORT struct cxl_bus *cxl_bus_get_first(struct cxl_ctx *ctx)
@@ -3009,9 +3097,6 @@ static int cxl_cmd_alloc_send(struct cxl_cmd *cmd, u32 cmd_id)
 	struct cxl_command_info *cinfo = &query->commands[cmd->query_idx];
 	size_t size;
 
-	if (!query)
-		return -EINVAL;
-
 	size = sizeof(struct cxl_send_command);
 	cmd->send_cmd = calloc(1, size);
 	if (!cmd->send_cmd)
@@ -3139,6 +3224,169 @@ do {									\
 		return rc;						\
 	return !!(c->field & mask);					\
 } while(0)
+
+CXL_EXPORT struct cxl_cmd *
+cxl_cmd_new_get_alert_config(struct cxl_memdev *memdev)
+{
+	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_ALERT_CONFIG);
+}
+
+#define cmd_alert_get_valid_alerts_field(c, m)                                 \
+	cmd_get_field_u8_mask(c, get_alert_config, GET_ALERT_CONFIG,           \
+			      valid_alerts, m)
+
+CXL_EXPORT int
+cxl_cmd_alert_config_life_used_prog_warn_threshold_valid(struct cxl_cmd *cmd)
+{
+	cmd_alert_get_valid_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_VALID_ALERTS_LIFE_USED_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_dev_over_temperature_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_valid_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_VALID_ALERTS_DEV_OVER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_dev_under_temperature_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_valid_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_VALID_ALERTS_DEV_UNDER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_corrected_volatile_mem_err_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_valid_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_VALID_ALERTS_CORRECTED_VOLATILE_MEM_ERR_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_corrected_pmem_err_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_valid_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_VALID_ALERTS_CORRECTED_PMEM_ERR_PROG_WARN_THRESHOLD_MASK);
+}
+
+#define cmd_alert_get_prog_alerts_field(c, m)                                  \
+	cmd_get_field_u8_mask(c, get_alert_config, GET_ALERT_CONFIG,           \
+			      programmable_alerts, m)
+
+CXL_EXPORT int
+cxl_cmd_alert_config_life_used_prog_warn_threshold_writable(struct cxl_cmd *cmd)
+{
+	cmd_alert_get_prog_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_PROG_ALERTS_LIFE_USED_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_dev_over_temperature_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_prog_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_PROG_ALERTS_DEV_OVER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_dev_under_temperature_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_prog_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_PROG_ALERTS_DEV_UNDER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_corrected_volatile_mem_err_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_prog_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_PROG_ALERTS_CORRECTED_VOLATILE_MEM_ERR_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_corrected_pmem_err_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd)
+{
+	cmd_alert_get_prog_alerts_field(
+		cmd,
+		CXL_CMD_ALERT_CONFIG_PROG_ALERTS_CORRECTED_PMEM_ERR_PROG_WARN_THRESHOLD_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_life_used_crit_alert_threshold(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8(cmd, get_alert_config, GET_ALERT_CONFIG,
+			 life_used_crit_alert_threshold);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_life_used_prog_warn_threshold(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8(cmd, get_alert_config, GET_ALERT_CONFIG,
+			 life_used_prog_warn_threshold);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_dev_over_temperature_crit_alert_threshold(
+	struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, get_alert_config, GET_ALERT_CONFIG,
+			  dev_over_temperature_crit_alert_threshold);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_dev_under_temperature_crit_alert_threshold(
+	struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, get_alert_config, GET_ALERT_CONFIG,
+			  dev_under_temperature_crit_alert_threshold);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_dev_over_temperature_prog_warn_threshold(
+	struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, get_alert_config, GET_ALERT_CONFIG,
+			  dev_over_temperature_prog_warn_threshold);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_dev_under_temperature_prog_warn_threshold(
+	struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, get_alert_config, GET_ALERT_CONFIG,
+			  dev_under_temperature_prog_warn_threshold);
+}
+
+CXL_EXPORT int
+cxl_cmd_alert_config_get_corrected_volatile_mem_err_prog_warn_threshold(
+	struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, get_alert_config, GET_ALERT_CONFIG,
+			  corrected_volatile_mem_err_prog_warn_threshold);
+}
+
+CXL_EXPORT int cxl_cmd_alert_config_get_corrected_pmem_err_prog_warn_threshold(
+	struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, get_alert_config, GET_ALERT_CONFIG,
+			  corrected_pmem_err_prog_warn_threshold);
+}
 
 CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_health_info(
 		struct cxl_memdev *memdev)
@@ -3465,6 +3713,229 @@ cxl_cmd_identify_get_persistent_only_size(struct cxl_cmd *cmd)
 	if (!c)
 		return ULLONG_MAX;
 	return cxl_capacity_to_bytes(c->persistent_capacity);
+}
+
+CXL_EXPORT int
+cxl_cmd_identify_get_event_log_size(struct cxl_cmd *cmd,
+				    enum cxl_identify_event event)
+{
+	struct cxl_cmd_identify *id =
+		(struct cxl_cmd_identify *)cmd->send_cmd->out.payload;
+	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_IDENTIFY);
+	if (rc)
+		return rc;
+
+	switch (event) {
+	case CXL_IDENTIFY_INFO:
+		return le16_to_cpu(id->info_event_log_size);
+	case CXL_IDENTIFY_WARN:
+		return le16_to_cpu(id->warning_event_log_size);
+	case CXL_IDENTIFY_FAIL:
+		return le16_to_cpu(id->failure_event_log_size);
+	case CXL_IDENTIFY_FATAL:
+		return le16_to_cpu(id->fatal_event_log_size);
+	default:
+		return -EINVAL;
+	}
+}
+
+CXL_EXPORT int cxl_cmd_identify_get_poison_list_max(struct cxl_cmd *cmd)
+{
+	unsigned int max_records = 0;
+	struct cxl_cmd_identify *id =
+		(struct cxl_cmd_identify *)cmd->send_cmd->out.payload;
+	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_IDENTIFY);
+	if (rc)
+		return rc;
+
+	for (int i = 0; i < 3; i++)
+		max_records += id->poison_list_max_mer[i] << (8 * i);
+
+	return max_records;
+}
+
+CXL_EXPORT int cxl_cmd_identify_get_inject_poison_limit(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u16(cmd, identify, IDENTIFY, inject_poison_limit);
+}
+
+CXL_EXPORT int cxl_cmd_identify_injects_persistent_poison(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8_mask(
+		cmd, identify, IDENTIFY, poison_caps,
+		CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_INJECTS_PERSISTENT_POISON_MASK);
+}
+
+CXL_EXPORT int cxl_cmd_identify_scans_for_poison(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8_mask(
+		cmd, identify, IDENTIFY, poison_caps,
+		CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_SCANS_FOR_POISON_MASK);
+}
+
+CXL_EXPORT int cxl_cmd_identify_egress_port_congestion(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8_mask(
+		cmd, identify, IDENTIFY, qos_telemetry_caps,
+		CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_EGRESS_PORT_CONGESTION_MASK);
+}
+
+CXL_EXPORT int
+cxl_cmd_identify_temporary_throughput_reduction(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8_mask(
+		cmd, identify, IDENTIFY, qos_telemetry_caps,
+		CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_TEMPORARY_THROUGHPUT_REDUCTION_MASK);
+}
+
+CXL_EXPORT struct cxl_cmd *
+cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev,
+			     enum cxl_setalert_event event, int enable,
+			     int threshold)
+{
+	struct cxl_cmd_set_alert_config *setalert;
+	struct cxl_cmd *cmd;
+
+	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_SET_ALERT_CONFIG);
+	if (!cmd)
+		return NULL;
+
+	setalert = cmd->input_payload;
+
+	setalert->valid_alert_actions = 1 << event;
+	if (enable) {
+		setalert->enable_alert_actions = 1 << event;
+		if (event == CXL_SETALERT_LIFE)
+			setalert->life_used_prog_warn_threshold = (u8)threshold;
+		else if (event == CXL_SETALERT_OVER_TEMP)
+			setalert->dev_over_temperature_prog_warn_threshold =
+				cpu_to_le16(threshold);
+		else if (event == CXL_SETALERT_UNDER_TEMP)
+			setalert->dev_under_temperature_prog_warn_threshold =
+				cpu_to_le16(threshold);
+		else if (event == CXL_SETALERT_VOLATILE_ERROR)
+			setalert->corrected_volatile_mem_err_prog_warn_threshold =
+				cpu_to_le16(threshold);
+		else if (event == CXL_SETALERT_PMEM_ERROR)
+			setalert->corrected_pmem_err_prog_warn_threshold =
+				cpu_to_le16(threshold);
+		else {
+			cxl_cmd_unref(cmd);
+			return NULL;
+		}
+	}
+
+	return cmd;
+}
+
+CXL_EXPORT struct cxl_cmd *
+cxl_cmd_new_get_firmware_info(struct cxl_memdev *memdev)
+{
+	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_FW_INFO);
+}
+
+CXL_EXPORT int cxl_cmd_firmware_info_get_slots_supported(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8(cmd, get_firmware_info, GET_FW_INFO, slots_supported);
+}
+
+CXL_EXPORT int cxl_cmd_firmware_info_get_active_slot(struct cxl_cmd *cmd)
+{
+	struct cxl_cmd_get_firmware_info *fw =
+		(struct cxl_cmd_get_firmware_info *)cmd->send_cmd->out.payload;
+	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_FW_INFO);
+	if (rc)
+		return rc;
+
+	return FIELD_GET(CXL_CMD_FW_INFO_SLOT_ACTIVE_MASK, fw->slot_info);
+}
+
+CXL_EXPORT int cxl_cmd_firmware_info_get_staged_slot(struct cxl_cmd *cmd)
+{
+	struct cxl_cmd_get_firmware_info *fw =
+		(struct cxl_cmd_get_firmware_info *)cmd->send_cmd->out.payload;
+	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_FW_INFO);
+	if (rc)
+		return rc;
+
+	return FIELD_GET(CXL_CMD_FW_INFO_SLOT_STAGED_MASK, fw->slot_info);
+}
+
+CXL_EXPORT int
+cxl_cmd_firmware_info_online_activation_capable(struct cxl_cmd *cmd)
+{
+	cmd_get_field_u8_mask(
+		cmd, get_firmware_info, GET_FW_INFO, activation_caps,
+		CXL_CMD_FW_INFO_ACTIVATION_CAPABILITIES_ONLINE_FW_ACTIVATION_MASK);
+}
+
+CXL_EXPORT int cxl_cmd_firmware_info_get_fw_rev(struct cxl_cmd *cmd,
+						char *fw_rev, int fw_len,
+						int slot)
+{
+	struct cxl_cmd_get_firmware_info *fw =
+		(struct cxl_cmd_get_firmware_info *)cmd->send_cmd->out.payload;
+	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_FW_INFO);
+	if (rc)
+		return rc;
+
+	if (slot <= 0 || slot > fw->slots_supported)
+		return -EINVAL;
+	if (fw_len > 0)
+		memcpy(fw_rev, fw->fw_revisions[slot - 1],
+		       min(fw_len, CXL_CMD_FW_INFO_FW_REV_LENGTH));
+	return 0;
+}
+
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_transfer_firmware(
+	struct cxl_memdev *memdev, enum cxl_transfer_fw_action action, int slot,
+	unsigned int offset, void *fw_buf, unsigned int length)
+{
+	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
+	struct cxl_cmd_transfer_firmware *transfer_fw;
+	struct cxl_cmd *cmd;
+	int rc;
+
+	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_TRANSFER_FW);
+	if (!cmd)
+		return NULL;
+
+	rc = cxl_cmd_set_input_payload(cmd, NULL,
+				       sizeof(*transfer_fw) + length);
+	if (rc) {
+		err(ctx, "%s: cmd setup failed: %s\n",
+		    cxl_memdev_get_devname(memdev), strerror(-rc));
+		cxl_cmd_unref(cmd);
+		return NULL;
+	}
+	transfer_fw =
+		(struct cxl_cmd_transfer_firmware *)cmd->send_cmd->in.payload;
+	transfer_fw->action = (u8)action;
+	if (length > 0) {
+		transfer_fw->slot = (u8)slot;
+		transfer_fw->offset = cpu_to_le32(offset);
+		memcpy(transfer_fw->fw_data, fw_buf, length);
+	}
+
+	return cmd;
+}
+
+CXL_EXPORT struct cxl_cmd *
+cxl_cmd_new_activate_firmware(struct cxl_memdev *memdev, bool online, int slot)
+{
+	struct cxl_cmd_activate_firmware *activate_fw;
+	struct cxl_cmd *cmd;
+
+	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_ACTIVATE_FW);
+	if (!cmd)
+		return NULL;
+
+	activate_fw =
+		(struct cxl_cmd_activate_firmware *)cmd->send_cmd->in.payload;
+	activate_fw->action = !online;
+	activate_fw->slot = (u8)slot;
+
+	return cmd;
 }
 
 CXL_EXPORT struct cxl_cmd *cxl_cmd_new_raw(struct cxl_memdev *memdev,
@@ -3818,12 +4289,13 @@ static void print_timestamp(unsigned long timestamp)
 	timestamp = timestamp / nano_scale;
 	t = (time_t)timestamp;
 	tm = *localtime(&t);
-	printf( "%d/%d/%d %d:%d:%d\n", tm.tm_mon + 1, tm.tm_mday, 
-			tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+	printf("%d/%d/%d %d:%d:%d\n", tm.tm_mon + 1, tm.tm_mday,
+	       tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
 
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_poison(struct cxl_memdev *memdev, 
-		unsigned long address, unsigned long length)
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_poison(struct cxl_memdev *memdev,
+						  unsigned long address,
+						  unsigned long length)
 {
 	struct cxl_cmd_poison_get_list_in *get_poison;
 	struct cxl_cmd *cmd;
@@ -3832,14 +4304,15 @@ CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_poison(struct cxl_memdev *memdev,
 	if (!cmd)
 		return NULL;
 
-	get_poison = (struct cxl_cmd_poison_get_list_in *)cmd->send_cmd->in.payload;
+	get_poison =
+		(struct cxl_cmd_poison_get_list_in *)cmd->send_cmd->in.payload;
 	get_poison->address = cpu_to_le64(address);
 	get_poison->address_length = cpu_to_le64(length);
 	return cmd;
 }
 
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_inject_poison(struct cxl_memdev *memdev, 
-		unsigned long address)
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_inject_poison(struct cxl_memdev *memdev,
+						     unsigned long address)
 {
 	unsigned long *inject_poison_addr;
 	struct cxl_cmd *cmd;
@@ -3853,8 +4326,9 @@ CXL_EXPORT struct cxl_cmd *cxl_cmd_new_inject_poison(struct cxl_memdev *memdev,
 	return cmd;
 }
 
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev, 
-		void *buf, unsigned long address)
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev,
+						    void *buf,
+						    unsigned long address)
 {
 	struct cxl_cmd_clear_poison_in *clear_poison;
 	struct cxl_cmd *cmd;
@@ -3863,15 +4337,17 @@ CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev,
 	if (!cmd)
 		return NULL;
 
-	clear_poison = (struct cxl_cmd_clear_poison_in *)cmd->send_cmd->in.payload;
+	clear_poison =
+		(struct cxl_cmd_clear_poison_in *)cmd->send_cmd->in.payload;
 	clear_poison->address = cpu_to_le64(address);
-	memcpy(&(clear_poison->clear_data[0]), buf, sizeof(clear_poison->clear_data));
+	memcpy(&(clear_poison->clear_data[0]), buf,
+	       sizeof(clear_poison->clear_data));
 	return cmd;
 }
 
 char *poison_source_type(unsigned long source_flag)
 {
-	char* source = "";
+	char *source = "";
 	switch (source_flag) {
 	case 1:
 		source = "External";
@@ -3898,18 +4374,18 @@ static void print_poison_list(struct cxl_cmd_poison_get_list *ret)
 	unsigned long address;
 	unsigned long source;
 
-	for(i = 0; i < ret->count; i++)
-	{
+	for (i = 0; i < ret->count; i++) {
 		source = ret->rcd[i].dpa & POISON_SOURCE_MASK;
 		address = ret->rcd[i].dpa & POISON_ADDR_MASK;
-		printf("%d. Physical Address : 0x%-18lx, Source : %s\n",
-		       i+1 ,address, poison_source_type(source));
+		printf("%d. Physical Address : 0x%-18lx, Source : %s\n", i + 1,
+		       address, poison_source_type(source));
 	}
 }
 
 CXL_EXPORT ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
-		struct cxl_cmd *cmd, unsigned long address, 
-		unsigned long length)
+						  struct cxl_cmd *cmd,
+						  unsigned long address,
+						  unsigned long length)
 {
 	struct cxl_cmd_poison_get_list *ret;
 	int rc;
@@ -3921,7 +4397,7 @@ CXL_EXPORT ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
 	ret = (struct cxl_cmd_poison_get_list *)cmd->send_cmd->out.payload;
 	if (!ret)
 		return -ENXIO;
-	if (ret->flags & SCANNING_MEDIA){
+	if (ret->flags & SCANNING_MEDIA) {
 		printf("Scan Media in Progress.\n");
 		printf("Scan Media in Progress. List might be incomplete\n");
 	}
@@ -3930,12 +4406,12 @@ CXL_EXPORT ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
 		return 0;
 	}
 	print_poison_list(ret);
-	if (ret->flags & POISON_OVERFLOW){
+	if (ret->flags & POISON_OVERFLOW) {
 		printf("Poison List Overflowed.\n");
 		printf("Poison List Overflow Timestamp : ");
 		print_timestamp(ret->overflow_timestamp);
 	}
-	if (ret->flags & POISON_MORE_RECORD){
+	if (ret->flags & POISON_MORE_RECORD) {
 		printf("More Media Error Records. Sending cmd again.\n");
 		cxl_memdev_get_poison(memdev, address, length);
 	}
@@ -3943,8 +4419,8 @@ CXL_EXPORT ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
 	return sizeof(ret);
 }
 
-static int poison_op(struct cxl_memdev *memdev, int op, void *buf, 
-		unsigned long address, unsigned long length)
+static int poison_op(struct cxl_memdev *memdev, int op, void *buf,
+		     unsigned long address, unsigned long length)
 {
 	const char *devname = cxl_memdev_get_devname(memdev);
 	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
@@ -3971,7 +4447,7 @@ static int poison_op(struct cxl_memdev *memdev, int op, void *buf,
 		cmd = cxl_cmd_new_get_poison(memdev, address, length);
 		if (!cmd)
 			return -ENOMEM;
-		rc = cxl_cmd_set_output_payload(cmd,NULL,memdev->payload_max);
+		rc = cxl_cmd_set_output_payload(cmd, NULL, memdev->payload_max);
 		if (rc) {
 			err(ctx, "%s: cmd setup failed: %s\n",
 			    cxl_memdev_get_devname(memdev), strerror(-rc));
@@ -3994,8 +4470,8 @@ static int poison_op(struct cxl_memdev *memdev, int op, void *buf,
 
 	rc = cxl_cmd_submit(cmd);
 	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n",
-			devname, strerror(-rc));
+		err(ctx, "%s: cmd submission failed: %s\n", devname,
+		    strerror(-rc));
 		goto out;
 	}
 
@@ -4007,8 +4483,8 @@ static int poison_op(struct cxl_memdev *memdev, int op, void *buf,
 	}
 
 	if (op == POISON_GET) {
-		ret_len = cxl_cmd_get_poison_get_payload(memdev, cmd, 
-							 address, length);
+		ret_len = cxl_cmd_get_poison_get_payload(memdev, cmd, address,
+							 length);
 		if (ret_len < 0) {
 			rc = ret_len;
 			goto out;
@@ -4019,25 +4495,26 @@ out:
 	return rc;
 }
 
-CXL_EXPORT int cxl_memdev_inject_poison(struct cxl_memdev *memdev, 
-		unsigned long address)
+CXL_EXPORT int cxl_memdev_inject_poison(struct cxl_memdev *memdev,
+					unsigned long address)
 {
 	return poison_op(memdev, POISON_INJECT, NULL, address, 0);
 }
 
-CXL_EXPORT int cxl_memdev_clear_poison(struct cxl_memdev *memdev, 
-		void *buf, unsigned long address)
+CXL_EXPORT int cxl_memdev_clear_poison(struct cxl_memdev *memdev, void *buf,
+				       unsigned long address)
 {
 	return poison_op(memdev, POISON_CLEAR, buf, address, 0);
 }
 
-CXL_EXPORT int cxl_memdev_get_poison(struct cxl_memdev *memdev, 
-		unsigned long address, unsigned long length)
+CXL_EXPORT int cxl_memdev_get_poison(struct cxl_memdev *memdev,
+				     unsigned long address,
+				     unsigned long length)
 {
 	return poison_op(memdev, POISON_GET, NULL, address, length);
 }
 
-CXL_EXPORT int cxl_memdev_set_timestamp(struct cxl_memdev *memdev, 
+CXL_EXPORT int cxl_memdev_set_timestamp(struct cxl_memdev *memdev,
 					unsigned long curr_time)
 {
 	const char *devname = cxl_memdev_get_devname(memdev);
@@ -4053,8 +4530,9 @@ CXL_EXPORT int cxl_memdev_set_timestamp(struct cxl_memdev *memdev,
 	*set_time = cpu_to_le64(curr_time);
 	rc = cxl_cmd_submit(cmd);
 	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n", 
-				devname, strerror(-rc));
+		err(ctx, "%s: cmd submission failed: %s\n", devname,
+		    strerror(-rc));
+		goto out;
 	}
 
 	rc = cxl_cmd_get_mbox_status(cmd);
@@ -4062,6 +4540,8 @@ CXL_EXPORT int cxl_memdev_set_timestamp(struct cxl_memdev *memdev,
 		err(ctx, "%s: firmware status: %d\n", devname, rc);
 		rc = -ENXIO;
 	}
+out:
+	cxl_cmd_unref(cmd);
 	return rc;
 }
 
@@ -4090,28 +4570,34 @@ CXL_EXPORT int cxl_memdev_get_timestamp(struct cxl_memdev *memdev)
 	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_TIME);
 	if (!cmd)
 		return -ENOMEM;
-	rc = cxl_cmd_set_output_payload(cmd,NULL,sizeof(unsigned long));
+	rc = cxl_cmd_set_output_payload(cmd, NULL, sizeof(unsigned long));
 	if (rc) {
 		err(ctx, "%s: cmd setup failed: %s\n",
 		    cxl_memdev_get_devname(memdev), strerror(-rc));
+		goto out;
 	}
 
 	rc = cxl_cmd_submit(cmd);
-	if (rc <0) {
-		err(ctx, "%s: cmd submission failed: %s\n",
-			devname, strerror(-rc));
+	if (rc < 0) {
+		err(ctx, "%s: cmd submission failed: %s\n", devname,
+		    strerror(-rc));
+		goto out;
 	}
 	rc = cxl_cmd_get_mbox_status(cmd);
 	if (rc != 0) {
 		err(ctx, "%s: firmware status: %d\n", devname, rc);
 		rc = -ENXIO;
+		goto out;
 	}
 	rc = cxl_cmd_get_timestamp_get_payload(cmd);
+out:
+	cxl_cmd_unref(cmd);
 	return rc;
 }
 
-static char *event_flag_type(unsigned int flag){
-	char *type="";
+static char *event_flag_type(unsigned int flag)
+{
+	char *type = "";
 
 	switch (flag) {
 	case 0:
@@ -4145,8 +4631,9 @@ static char *event_flag_type(unsigned int flag){
 	return type;
 }
 
-static char *mevent_desc(unsigned int flag){
-	char *type="";
+static char *mevent_desc(unsigned int flag)
+{
+	char *type = "";
 
 	switch (flag) {
 	case 1:
@@ -4165,8 +4652,9 @@ static char *mevent_desc(unsigned int flag){
 	return type;
 }
 
-static char *mevent_type(unsigned int flag){
-	char *type="";
+static char *mevent_type(unsigned int flag)
+{
+	char *type = "";
 
 	switch (flag) {
 	case 0:
@@ -4185,8 +4673,9 @@ static char *mevent_type(unsigned int flag){
 	return type;
 }
 
-static char *trans_type(unsigned int flag){
-	char *type="";
+static char *trans_type(unsigned int flag)
+{
+	char *type = "";
 
 	switch (flag) {
 	case 1:
@@ -4221,44 +4710,45 @@ static void print_eventlog(struct cxl_cmd_get_event_record_out *ret)
 	unsigned int i;
 	printf("\n Received %u event records from device\n", count);
 
-	for (i=0; i<count; i++){
+	for (i = 0; i < count; i++) {
 		printf("No. %u\n", i);
 		printf("\tUUID               : %x-%x-%x-%x\n",
-			ret->event[i].uuid[0], ret->event[i].uuid[1], 
-			ret->event[i].uuid[2], ret->event[i].uuid[3]);
-		printf("\tEvent Record Flags : %s \n", 
-			event_flag_type(ret->event[i].rcd.event_record_flags));
-		printf("\tPhysical address   : 0x%lx\n", 
-				ret->event[i].physical_address);
-		if(ret->event[i].memory_event_desc == 4)
+		       ret->event[i].uuid[0], ret->event[i].uuid[1],
+		       ret->event[i].uuid[2], ret->event[i].uuid[3]);
+		printf("\tEvent Record Flags : %s \n",
+		       event_flag_type(ret->event[i].rcd.event_record_flags));
+		printf("\tPhysical address   : 0x%lx\n",
+		       ret->event[i].physical_address);
+		if (ret->event[i].memory_event_desc == 4)
 			printf("\tMemory Event Desc  : %s \n", mevent_desc(2));
 		else
-			printf("\tMemory Event Desc  : %s \n", 
-				mevent_desc(ret->event[i].memory_event_desc));
-		printf("\tMemory Event Type  : %s \n", 
-			mevent_type(ret->event[i].memory_event_type));
-		printf("\tTransaction Type   : %s \n", 
-			trans_type(ret->event[i].transaction_type));
+			printf("\tMemory Event Desc  : %s \n",
+			       mevent_desc(ret->event[i].memory_event_desc));
+		printf("\tMemory Event Type  : %s \n",
+		       mevent_type(ret->event[i].memory_event_type));
+		printf("\tTransaction Type   : %s \n",
+		       trans_type(ret->event[i].transaction_type));
 		printf("\tEvent Timestamp    : ");
 		print_timestamp(ret->event[i].rcd.timestamp);
-		
+
 		handle = ret->event[i].rcd.event_record_handle;
-		printf("\tHandle             : %u\n",handle);
+		printf("\tHandle             : %u\n", handle);
 	}
 }
 
 static void handle_eventlog(struct cxl_memdev *memdev,
-		struct cxl_cmd_get_event_record_out *ret, int event_type)
+			    struct cxl_cmd_get_event_record_out *ret,
+			    int event_type)
 {
 	u8 more = ret->flags & EVENT_MORE_RECORD;
-	
+
 	print_eventlog(ret);
 	if (more)
 		cxl_memdev_get_event_record(memdev, event_type);
 }
 
-CXL_EXPORT ssize_t cxl_cmd_get_event_record_get_payload( struct cxl_cmd *cmd, 
-		struct cxl_memdev *memdev, int event_type)
+CXL_EXPORT ssize_t cxl_cmd_get_event_record_get_payload(
+	struct cxl_cmd *cmd, struct cxl_memdev *memdev, int event_type)
 {
 	int rc = 0;
 	struct cxl_cmd_get_event_record_out *ret;
@@ -4273,8 +4763,8 @@ CXL_EXPORT ssize_t cxl_cmd_get_event_record_get_payload( struct cxl_cmd *cmd,
 	return 1;
 }
 
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_event_record(struct cxl_memdev *memdev,
-		int event_type)
+CXL_EXPORT struct cxl_cmd *
+cxl_cmd_new_get_event_record(struct cxl_memdev *memdev, int event_type)
 {
 	u8 *get_event;
 	struct cxl_cmd *cmd;
@@ -4282,14 +4772,14 @@ CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_event_record(struct cxl_memdev *memde
 	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_EVENT_LOG);
 	if (!cmd)
 		return NULL;
-	
+
 	get_event = (u8 *)cmd->send_cmd->in.payload;
 	*get_event = (u8)event_type;
 	return cmd;
 }
 
-CXL_EXPORT int cxl_memdev_get_event_record(struct cxl_memdev *memdev, 
-		int event_type)
+CXL_EXPORT int cxl_memdev_get_event_record(struct cxl_memdev *memdev,
+					   int event_type)
 {
 	const char *devname = cxl_memdev_get_devname(memdev);
 	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
@@ -4300,17 +4790,17 @@ CXL_EXPORT int cxl_memdev_get_event_record(struct cxl_memdev *memdev,
 	cmd = cxl_cmd_new_get_event_record(memdev, event_type);
 	if (!cmd)
 		return -ENOMEM;
-	rc = cxl_cmd_set_output_payload(cmd,NULL,memdev->payload_max);
+	rc = cxl_cmd_set_output_payload(cmd, NULL, memdev->payload_max);
 	if (rc) {
 		err(ctx, "%s: cmd setup failed: %s\n",
 		    cxl_memdev_get_devname(memdev), strerror(-rc));
 		goto out;
 	}
 
-	rc = cxl_cmd_submit(cmd);	
+	rc = cxl_cmd_submit(cmd);
 	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n",
-			devname, strerror(-rc));
+		err(ctx, "%s: cmd submission failed: %s\n", devname,
+		    strerror(-rc));
 		goto out;
 	}
 
@@ -4331,8 +4821,9 @@ out:
 	return rc;
 }
 
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev, 
-		int type, bool clear_all, int handle)
+CXL_EXPORT struct cxl_cmd *
+cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev, int type,
+			       bool clear_all, int handle)
 {
 	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
 	struct cxl_cmd_clear_event_record_in *clear_event;
@@ -4346,11 +4837,12 @@ CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *mem
 	rc = cxl_cmd_set_input_payload(cmd, NULL, sizeof(*clear_event));
 	if (rc) {
 		err(ctx, "%s: cmd setup failed: %s\n",
-			cxl_memdev_get_devname(memdev), strerror(-rc));
+		    cxl_memdev_get_devname(memdev), strerror(-rc));
 		goto out_fail;
 	}
 
-	clear_event = (struct cxl_cmd_clear_event_record_in *)cmd->send_cmd->in.payload;
+	clear_event = (struct cxl_cmd_clear_event_record_in *)
+			      cmd->send_cmd->in.payload;
 	clear_event->event_type = (u8)type;
 	if (clear_all) {
 		clear_event->flags = (u8)1;
@@ -4363,11 +4855,11 @@ CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *mem
 out_fail:
 	cxl_cmd_unref(cmd);
 	return NULL;
-
 }
 
-CXL_EXPORT int cxl_memdev_clear_event_record(struct cxl_memdev *memdev, 
-		int type, bool clear_all, int handle)
+CXL_EXPORT int cxl_memdev_clear_event_record(struct cxl_memdev *memdev,
+					     int type, bool clear_all,
+					     int handle)
 {
 	const char *devname = cxl_memdev_get_devname(memdev);
 	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
@@ -4380,13 +4872,16 @@ CXL_EXPORT int cxl_memdev_clear_event_record(struct cxl_memdev *memdev,
 
 	rc = cxl_cmd_submit(cmd);
 	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n",
-			devname, strerror(-rc));
+		err(ctx, "%s: cmd submission failed: %s\n", devname,
+		    strerror(-rc));
+		goto out;
 	}
 	rc = cxl_cmd_get_mbox_status(cmd);
 	if (rc != 0) {
 		err(ctx, "%s: firmware status: %d\n", devname, rc);
 		rc = -ENXIO;
 	}
+out:
+	cxl_cmd_unref(cmd);
 	return rc;
 }

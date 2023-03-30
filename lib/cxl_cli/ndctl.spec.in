@@ -13,9 +13,13 @@ BuildRequires:	autoconf
 %if 0%{?rhel} < 9
 BuildRequires:	asciidoc
 %define asciidoctor -Dasciidoctor=disabled
+%define libtracefs -Dlibtracefs=disabled
 %else
 BuildRequires:	rubygem-asciidoctor
+BuildRequires:	libtraceevent-devel
+BuildRequires:	libtracefs-devel
 %define asciidoctor -Dasciidoctor=enabled
+%define libtracefs -Dlibtracefs=enabled
 %endif
 BuildRequires:	xmlto
 BuildRequires:	automake
@@ -122,7 +126,7 @@ libcxl is a library for enumerating and communicating with CXL devices.
 %setup -q ndctl-%{version}
 
 %build
-%meson %{?asciidoctor} -Dversion-tag=%{version}
+%meson %{?asciidoctor} %{?libtracefs} -Dversion-tag=%{version}
 %meson_build
 
 %install
@@ -171,9 +175,14 @@ fi
 %{_mandir}/man1/ndctl*
 %{bashcompdir}/ndctl
 %{_unitdir}/ndctl-monitor.service
+
+%dir %{_sysconfdir}/ndctl
+%dir %{_sysconfdir}/ndctl/keys
 %{_sysconfdir}/ndctl/keys/keys.readme
+
 %{_sysconfdir}/modprobe.d/nvdimm-security.conf
 
+%dir %{_sysconfdir}/ndctl.conf.d
 %config(noreplace) %{_sysconfdir}/ndctl.conf.d/monitor.conf
 %config(noreplace) %{_sysconfdir}/ndctl.conf.d/ndctl.conf
 
@@ -182,10 +191,11 @@ fi
 %license LICENSES/preferred/GPL-2.0 LICENSES/other/MIT LICENSES/other/CC0-1.0
 %{_bindir}/daxctl
 %{_mandir}/man1/daxctl*
-%{_datadir}/daxctl/daxctl.conf
+%{_datadir}/daxctl
 %{bashcompdir}/daxctl
 %{_unitdir}/daxdev-reconfigure@.service
 %config %{_udevrulesdir}/90-daxctl-device.rules
+%dir %{_sysconfdir}/daxctl.conf.d/
 %config(noreplace) %{_sysconfdir}/daxctl.conf.d/daxctl.example.conf
 
 %files -n cxl-cli
@@ -194,6 +204,7 @@ fi
 %{_bindir}/cxl
 %{_mandir}/man1/cxl*
 %{bashcompdir}/cxl
+%{_unitdir}/cxl-monitor.service
 
 %files -n LNAME
 %defattr(-,root,root)

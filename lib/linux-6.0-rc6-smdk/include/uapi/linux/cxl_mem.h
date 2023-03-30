@@ -45,6 +45,8 @@
 	___C(SET_TIME, "Set timestamp"),                                  \
 	___C(GET_EVENT_LOG, "Get event log"),                             \
 	___C(CLEAR_EVENT, "Clear event log"),                             \
+	___C(TRANSFER_FW, "Transfer FW Package"),                         \
+	___C(ACTIVATE_FW, "Activate FW"),                                 \
 	___C(MAX, "invalid / last command")
 
 #define ___C(a, b) CXL_MEM_COMMAND_ID_##a

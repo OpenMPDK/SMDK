@@ -1,5 +1,4 @@
 # ndctl
-[![Build Status](https://travis-ci.org/pmem/ndctl.svg?branch=master)](https://travis-ci.org/pmem/ndctl)
 
 Utility library for managing the libnvdimm (non-volatile memory device)
 sub-system in the Linux kernel
@@ -66,7 +65,6 @@ loaded.  To build and install nfit_test.ko:
    CONFIG_ZONE_DEVICE=y
    CONFIG_LIBNVDIMM=m
    CONFIG_BLK_DEV_PMEM=m
-   CONFIG_ND_BLK=m
    CONFIG_BTT=y
    CONFIG_NVDIMM_PFN=y
    CONFIG_NVDIMM_DAX=y

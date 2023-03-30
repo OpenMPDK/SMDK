@@ -1,5 +1,5 @@
 project('ndctl', 'c',
-  version : '74',
+  version : '76.1',
   license : [
     'GPL-2.0',
     'LGPL-2.1',
@@ -89,6 +89,7 @@ env = find_program('env')
 if git.found()
   run_command('clean_config.sh',
     env : 'GIT_DIR=@0@/.git'.format(project_source_root),
+    check : false,
   )
 endif
 
@@ -142,6 +143,11 @@ kmod = dependency('libkmod')
 libudev = dependency('libudev')
 uuid = dependency('uuid')
 json = dependency('json-c')
+if get_option('libtracefs').enabled()
+  traceevent = dependency('libtraceevent')
+  tracefs = dependency('libtracefs')
+endif
+
 if get_option('docs').enabled()
   if get_option('asciidoctor').enabled()
     asciidoc = find_program('asciidoctor', required : true)
@@ -230,20 +236,20 @@ conf.set('ENABLE_TEST', get_option('test').enabled())
 conf.set('ENABLE_DESTRUCTIVE', get_option('destructive').enabled())
 conf.set('ENABLE_LOGGING', get_option('logging').enabled())
 conf.set('ENABLE_DEBUG', get_option('dbg').enabled())
+conf.set('ENABLE_LIBTRACEFS', get_option('libtracefs').enabled())
 
-typeof = cc.run('''
-  int main() {
+typeof_code = '''
+  void func() {
     struct {
       char a[16];
     } x;
     typeof(x) y;
 
-    return sizeof(x) == sizeof(y);
+    char static_assert[2 * (sizeof(x) == sizeof(y)) - 1];
   }
   '''
-)
 
-if typeof.compiled() and typeof.returncode() == 1
+if cc.compiles(typeof_code)
   conf.set('HAVE_TYPEOF', 1)
   conf.set('HAVE_STATEMENT_EXPR', 1)
 endif
@@ -291,17 +297,17 @@ config_h = configure_file(
 )
 add_project_arguments('-include', 'config.h', language : 'c')
 
-LIBNDCTL_CURRENT=26
+LIBNDCTL_CURRENT=27
 LIBNDCTL_REVISION=1
-LIBNDCTL_AGE=20
+LIBNDCTL_AGE=21
 
 LIBDAXCTL_CURRENT=6
-LIBDAXCTL_REVISION=1
+LIBDAXCTL_REVISION=2
 LIBDAXCTL_AGE=5
 
-LIBCXL_CURRENT=3
-LIBCXL_REVISION=0
-LIBCXL_AGE=2
+LIBCXL_CURRENT=4
+LIBCXL_REVISION=1
+LIBCXL_AGE=3
 
 root_inc = include_directories(['.', 'ndctl', ])
 

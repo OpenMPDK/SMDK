@@ -50,6 +50,15 @@ struct cxl_ctx *cxl_memdev_get_ctx(struct cxl_memdev *memdev);
 unsigned long long cxl_memdev_get_pmem_size(struct cxl_memdev *memdev);
 unsigned long long cxl_memdev_get_ram_size(struct cxl_memdev *memdev);
 const char *cxl_memdev_get_firmware_verison(struct cxl_memdev *memdev);
+int cxl_memdev_get_payload_max(struct cxl_memdev *memdev);
+
+/* ABI spelling mistakes are forever */
+static inline const char *
+cxl_memdev_get_firmware_version(struct cxl_memdev *memdev)
+{
+	return cxl_memdev_get_firmware_verison(memdev);
+}
+
 size_t cxl_memdev_get_label_size(struct cxl_memdev *memdev);
 int cxl_memdev_disable_invalidate(struct cxl_memdev *memdev);
 int cxl_memdev_enable(struct cxl_memdev *memdev);
@@ -70,45 +79,99 @@ enum poison_op {
 	POISON_CLEAR,
 };
 
-enum get_poison_out_flag{
+enum get_poison_out_flag {
 	POISON_MORE_RECORD = 1,
 	POISON_OVERFLOW = 2,
 	SCANNING_MEDIA = 3,
 };
 
-enum get_event_record_out_flag{
+enum get_event_record_out_flag {
 	EVENT_OVERFLOW = 1,
 	EVENT_MORE_RECORD = 2,
 };
 
 int cxl_memdev_inject_poison(struct cxl_memdev *memdev, unsigned long address);
-int cxl_memdev_clear_poison(struct cxl_memdev *memdev, void *buf, 
-		unsigned long address);
-int cxl_memdev_get_poison(struct cxl_memdev *memdev, 
-			  unsigned long address, unsigned long length);
+int cxl_memdev_clear_poison(struct cxl_memdev *memdev, void *buf,
+			    unsigned long address);
+int cxl_memdev_get_poison(struct cxl_memdev *memdev, unsigned long address,
+			  unsigned long length);
 struct cxl_cmd *cxl_cmd_new_get_poison(struct cxl_memdev *memdev,
-		unsigned long address, unsigned long length);
+				       unsigned long address,
+				       unsigned long length);
 struct cxl_cmd *cxl_cmd_new_inject_poison(struct cxl_memdev *memdev,
-		unsigned long address);
-struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev,
-		void *buf, unsigned long address);
-ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev, 
-		struct cxl_cmd *cmd, unsigned long address, 
-		unsigned long length);
+					  unsigned long address);
+struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev, void *buf,
+					 unsigned long address);
+ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
+				       struct cxl_cmd *cmd,
+				       unsigned long address,
+				       unsigned long length);
 
-struct cxl_cmd *cxl_cmd_new_get_event_record(struct cxl_memdev *memdev, 
-		int event_type);
-ssize_t cxl_cmd_get_event_record_get_payload(struct cxl_cmd *cmd, 
-		struct cxl_memdev *memdev, int event_type);
-struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev, 
-		int type, bool clear_all, int handle);
+struct cxl_cmd *cxl_cmd_new_get_event_record(struct cxl_memdev *memdev,
+					     int event_type);
+ssize_t cxl_cmd_get_event_record_get_payload(struct cxl_cmd *cmd,
+					     struct cxl_memdev *memdev,
+					     int event_type);
+struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev,
+					       int type, bool clear_all,
+					       int handle);
 int cxl_memdev_get_event_record(struct cxl_memdev *memdev, int event_type);
 int cxl_memdev_clear_event_record(struct cxl_memdev *memdev, int type,
-		bool clear_all, int handle);
+				  bool clear_all, int handle);
 
 int cxl_cmd_get_timestamp_get_payload(struct cxl_cmd *cmd);
 int cxl_memdev_set_timestamp(struct cxl_memdev *memdev, unsigned long time);
 int cxl_memdev_get_timestamp(struct cxl_memdev *memdev);
+
+enum cxl_identify_event {
+	CXL_IDENTIFY_INFO,
+	CXL_IDENTIFY_WARN,
+	CXL_IDENTIFY_FAIL,
+	CXL_IDENTIFY_FATAL,
+};
+
+int cxl_cmd_identify_get_event_log_size(struct cxl_cmd *cmd,
+					enum cxl_identify_event event);
+int cxl_cmd_identify_get_poison_list_max(struct cxl_cmd *cmd);
+int cxl_cmd_identify_get_inject_poison_limit(struct cxl_cmd *cmd);
+int cxl_cmd_identify_injects_persistent_poison(struct cxl_cmd *cmd);
+int cxl_cmd_identify_scans_for_poison(struct cxl_cmd *cmd);
+int cxl_cmd_identify_egress_port_congestion(struct cxl_cmd *cmd);
+int cxl_cmd_identify_temporary_throughput_reduction(struct cxl_cmd *cmd);
+
+enum cxl_setalert_event {
+	CXL_SETALERT_LIFE,
+	CXL_SETALERT_OVER_TEMP,
+	CXL_SETALERT_UNDER_TEMP,
+	CXL_SETALERT_VOLATILE_ERROR,
+	CXL_SETALERT_PMEM_ERROR
+};
+
+struct cxl_cmd *cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev,
+					     enum cxl_setalert_event event,
+					     int enable, int threshold);
+
+struct cxl_cmd *cxl_cmd_new_get_firmware_info(struct cxl_memdev *memdev);
+int cxl_cmd_firmware_info_get_slots_supported(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_get_active_slot(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_get_staged_slot(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_online_activation_capable(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_get_fw_rev(struct cxl_cmd *cmd, char *fw_rev,
+				     int fw_len, int slot);
+
+enum cxl_transfer_fw_action {
+	CXL_TRANSFER_FW_FULL,
+	CXL_TRANSFER_FW_INIT,
+	CXL_TRANSFER_FW_CONT,
+	CXL_TRANSFER_FW_END,
+	CXL_TRANSFER_FW_ABORT,
+};
+
+struct cxl_cmd *cxl_cmd_new_transfer_firmware(
+	struct cxl_memdev *memdev, enum cxl_transfer_fw_action action, int slot,
+	unsigned int offset, void *fw_buf, unsigned int length);
+struct cxl_cmd *cxl_cmd_new_activate_firmware(struct cxl_memdev *memdev,
+					      bool online, int slot);
 /**************** smdk ****************/
 
 #define cxl_memdev_foreach(ctx, memdev) \
@@ -166,6 +229,7 @@ struct cxl_dport *cxl_dport_get_first(struct cxl_port *port);
 struct cxl_dport *cxl_dport_get_next(struct cxl_dport *dport);
 const char *cxl_dport_get_devname(struct cxl_dport *dport);
 const char *cxl_dport_get_physical_node(struct cxl_dport *dport);
+const char *cxl_dport_get_firmware_node(struct cxl_dport *dport);
 struct cxl_port *cxl_dport_get_port(struct cxl_dport *dport);
 int cxl_dport_get_id(struct cxl_dport *dport);
 bool cxl_dport_maps_memdev(struct cxl_dport *dport, struct cxl_memdev *memdev);
@@ -275,6 +339,7 @@ const char *cxl_target_get_devname(struct cxl_target *target);
 bool cxl_target_maps_memdev(struct cxl_target *target,
 			    struct cxl_memdev *memdev);
 const char *cxl_target_get_physical_node(struct cxl_target *target);
+const char *cxl_target_get_firmware_node(struct cxl_target *target);
 
 #define cxl_target_foreach(decoder, target)                                    \
 	for (target = cxl_target_get_first(decoder); target != NULL;           \
@@ -404,6 +469,41 @@ int cxl_cmd_health_info_get_temperature(struct cxl_cmd *cmd);
 int cxl_cmd_health_info_get_dirty_shutdowns(struct cxl_cmd *cmd);
 int cxl_cmd_health_info_get_volatile_errors(struct cxl_cmd *cmd);
 int cxl_cmd_health_info_get_pmem_errors(struct cxl_cmd *cmd);
+struct cxl_cmd *cxl_cmd_new_get_alert_config(struct cxl_memdev *memdev);
+int cxl_cmd_alert_config_life_used_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_dev_over_temperature_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_dev_under_temperature_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_corrected_volatile_mem_err_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_corrected_pmem_err_prog_warn_threshold_valid(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_life_used_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_dev_over_temperature_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_dev_under_temperature_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_corrected_volatile_mem_err_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_corrected_pmem_err_prog_warn_threshold_writable(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_life_used_crit_alert_threshold(struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_life_used_prog_warn_threshold(struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_dev_over_temperature_crit_alert_threshold(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_dev_under_temperature_crit_alert_threshold(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_dev_over_temperature_prog_warn_threshold(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_dev_under_temperature_prog_warn_threshold(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_corrected_volatile_mem_err_prog_warn_threshold(
+	struct cxl_cmd *cmd);
+int cxl_cmd_alert_config_get_corrected_pmem_err_prog_warn_threshold(
+	struct cxl_cmd *cmd);
 struct cxl_cmd *cxl_cmd_new_read_label(struct cxl_memdev *memdev,
 		unsigned int offset, unsigned int length);
 ssize_t cxl_cmd_read_label_get_payload(struct cxl_cmd *cmd, void *buf,

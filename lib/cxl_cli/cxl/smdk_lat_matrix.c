@@ -20,14 +20,16 @@
 
 void alarm_handler(int sig);
 double get_read_lat_by_nodes(int node_cpu, int node_mem, unsigned long size,
-			     unsigned long stride, int random_access, int num_iter);
+			     unsigned long stride, int random_access,
+			     int num_iter);
 
 static volatile int stop = 0;
 
-static void *create_test_map(void *map, unsigned long size, unsigned long stride,
-			     int node_mem)
+static void *create_test_map(void *map, unsigned long size,
+			     unsigned long stride, int node_mem)
 {
-	unsigned int flag = MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE|MAP_POPULATE;
+	unsigned int flag =
+		MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_POPULATE;
 	unsigned long off;
 	unsigned int *lastpos;
 	struct bitmask *mem_mask_orig, *mem_mask;
@@ -37,7 +39,7 @@ static void *create_test_map(void *map, unsigned long size, unsigned long stride
 	numa_bitmask_setbit(mem_mask, node_mem);
 
 	numa_set_membind(mem_mask);
-	map = mmap(map, size, PROT_READ|PROT_WRITE, flag, -1, 0);
+	map = mmap(map, size, PROT_READ | PROT_WRITE, flag, -1, 0);
 	numa_set_membind(mem_mask_orig);
 	numa_free_nodemask(mem_mask);
 
@@ -47,7 +49,7 @@ static void *create_test_map(void *map, unsigned long size, unsigned long stride
 	madvise(map, size, MADV_NOHUGEPAGE);
 
 	lastpos = map;
-	for (off = 0; off < size; off +=stride) {
+	for (off = 0; off < size; off += stride) {
 		lastpos = map + off;
 		*lastpos = off + stride;
 	}
@@ -56,7 +58,8 @@ static void *create_test_map(void *map, unsigned long size, unsigned long stride
 	return map;
 }
 
-static void randomize_test_map(void *map, unsigned long size, unsigned long stride)
+static void randomize_test_map(void *map, unsigned long size,
+			       unsigned long stride)
 {
 	unsigned long off;
 	unsigned int *lastpos, *random_map;
@@ -83,7 +86,7 @@ static void randomize_test_map(void *map, unsigned long size, unsigned long stri
 	lastpos = map;
 	for (n = 0, off = 0; off < size; n++, off += stride) {
 		lastpos = map + random_map[n];
-		*lastpos = random_map[n+1];
+		*lastpos = random_map[n + 1];
 	}
 	*lastpos = random_map[0];
 
@@ -109,8 +112,8 @@ static double do_test(void *map, unsigned long testtime_sec)
 	unsigned long count = 0, off = 0, usec;
 	struct timeval start, end;
 	struct itimerval itval = {
-		.it_interval = {0, 0},
-		.it_value = {0, 0},
+		.it_interval = { 0, 0 },
+		.it_value = { 0, 0 },
 	};
 
 	usec = testtime_sec * 1000000;
@@ -135,7 +138,8 @@ static double do_test(void *map, unsigned long testtime_sec)
 }
 
 double get_read_lat_by_nodes(int node_cpu, int node_mem, unsigned long size,
-			     unsigned long stride, int random_access, int num_iter)
+			     unsigned long stride, int random_access,
+			     int num_iter)
 {
 	int i;
 	unsigned long testtime_sec = 5;

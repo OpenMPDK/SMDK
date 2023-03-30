@@ -52,8 +52,9 @@ static const struct option options[] = {
 		    "include memory device health information"),
 	OPT_BOOLEAN('I', "partition", &param.partition,
 		    "include memory device partition information"),
-	OPT_INCR('v', "verbose", &param.verbose,
-		 "increase output detail"),
+	OPT_BOOLEAN('A', "alert-config", &param.alert_config,
+		    "include alert configuration information"),
+	OPT_INCR('v', "verbose", &param.verbose, "increase output detail"),
 #ifdef ENABLE_DEBUG
 	OPT_BOOLEAN(0, "debug", &debug, "debug list walk"),
 #endif
@@ -72,6 +73,7 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 		"cxl list [<options>]",
 		NULL
 	};
+	struct json_object *jtopology;
 	int i;
 
 	argc = parse_options(argc, argv, options, u, 0);
@@ -113,6 +115,7 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 	case 3:
 		param.health = true;
 		param.partition = true;
+		param.alert_config = true;
 		/* fallthrough */
 	case 2:
 		param.idle = true;
@@ -120,6 +123,7 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 	case 1:
 		param.buses = true;
 		param.ports = true;
+		param.endpoints = true;
 		param.decoders = true;
 		param.targets = true;
 		/*fallthrough*/
@@ -140,5 +144,9 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 		param.endpoints = true;
 
 	dbg(&param, "walk topology\n");
-	return cxl_filter_walk(ctx, &param);
+	jtopology = cxl_filter_walk(ctx, &param);
+	if (!jtopology)
+		return -ENOMEM;
+	util_display_json_array(stdout, jtopology, cxl_filter_to_flags(&param));
+	return 0;
 }

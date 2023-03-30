@@ -31,6 +31,9 @@
 #define SYSFS_CXLSWAP_ENABLED "/sys/module/cxlswap/parameters/enabled"
 #define SYSFS_CXLSWAP_FLUSH "/sys/module/cxlswap/parameters/flush"
 
+#define SYSFS_CXLCACHE_ENABLED "/sys/module/cxlcache/parameters/enabled"
+#define SYSFS_CXLCACHE_FLUSH "/sys/module/cxlcache/parameters/flush"
+
 #define MAX_NUMA_NODES (64)
 #define MAX_CHAR_LEN (1024)
 #define PCI_INFO_LEN (16)
@@ -47,7 +50,6 @@
 
 #define OFFSET_MODEL (4)
 #define OFFSET_EXT_MODEL (16)
-
 
 struct cxl_dev_info {
 	int num;
@@ -83,13 +85,15 @@ int get_model_id(void)
 	model = (eax >> OFFSET_MODEL) & 0xf;
 	ext_model = (eax >> OFFSET_EXT_MODEL) & 0xf;
 
-	return ext_model << 4 | model; 
+	return ext_model << 4 | model;
 }
 
 static uint32_t get_msr_offset(void)
 {
 	unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
-	char vendor[13] = {0,};
+	char vendor[13] = {
+		0,
+	};
 	unsigned int model;
 	if (__get_cpuid(0, &eax, &ebx, &ecx, &edx) == 0) {
 		/* cpuid not supported */
@@ -101,7 +105,8 @@ static uint32_t get_msr_offset(void)
 
 	if (!strncmp(vendor, "GenuineIntel", 12)) {
 		model = get_model_id();
-		if (model == 0xf || model == 0x1d || model == 0x16 || model == 0x17 ) /* core 2 family */
+		if (model == 0xf || model == 0x1d || model == 0x16 ||
+		    model == 0x17) /* core 2 family */
 			return 0x1a0;
 		else
 			return 0x1a4;
@@ -134,15 +139,15 @@ static int get_system_max_node(void)
 {
 	int max_node_parse = 0;
 	char str[10];
-	FILE* fp;
+	FILE *fp;
 	fp = fopen(SYSFS_NODE_POSSIBLE, "r");
 	if (!fp) {
 		error("cannot open %s.\nAborting.", SYSFS_NODE_POSSIBLE);
 		exit(1);
 	}
 	if (fgets(str, 10, fp) == NULL) {
-		error("cannot get content of %s.\nAborting.", 
-			SYSFS_NODE_POSSIBLE);
+		error("cannot get content of %s.\nAborting.",
+		      SYSFS_NODE_POSSIBLE);
 		fclose(fp);
 		exit(1);
 	}
@@ -166,22 +171,22 @@ static int get_nr_socket(void)
 {
 	int nr_node_cpu = 0;
 	char str[10];
-	FILE* fp;
+	FILE *fp;
 	fp = fopen(SYSFS_NODE_HAS_CPU, "r");
 	if (!fp) {
 		error("cannot open %s.\nAborting.", SYSFS_NODE_HAS_CPU);
 		exit(1);
 	}
 	if (fgets(str, 10, fp) == NULL) {
-		error("cannot get content of %s.\nAborting.", 
-			SYSFS_NODE_HAS_CPU);
+		error("cannot get content of %s.\nAborting.",
+		      SYSFS_NODE_HAS_CPU);
 		fclose(fp);
 		exit(1);
 	}
 	if (!sscanf(str, "0-%d", &nr_node_cpu)) {
 		if (!sscanf(str, "%d", &nr_node_cpu) || nr_node_cpu != 0) {
-			error("cannot get content of %s.\nAborting.", 
-				SYSFS_NODE_HAS_CPU);
+			error("cannot get content of %s.\nAborting.",
+			      SYSFS_NODE_HAS_CPU);
 			fclose(fp);
 			exit(1);
 		}
@@ -195,7 +200,7 @@ static int get_dev_state(int dev)
 {
 	char path[MAX_CHAR_LEN];
 	char str[MAX_CHAR_LEN];
-	FILE* fp;
+	FILE *fp;
 
 	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/state", dev);
 	if (access(path, R_OK)) {
@@ -225,7 +230,7 @@ static int get_dev_node(int dev)
 {
 	char path[MAX_CHAR_LEN];
 	char str[MAX_CHAR_LEN];
-	FILE* fp;
+	FILE *fp;
 
 	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/node_id", dev);
 	if (access(path, R_OK)) {
@@ -250,7 +255,7 @@ static int get_dev_socket(int dev)
 {
 	char path[MAX_CHAR_LEN];
 	char str[MAX_CHAR_LEN];
-	FILE* fp;
+	FILE *fp;
 
 	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/socket_id", dev);
 	if (access(path, R_OK)) {
@@ -275,7 +280,7 @@ static size_t get_dev_start_addr(int dev)
 	char path[MAX_CHAR_LEN];
 	char str[MAX_CHAR_LEN];
 	size_t start_addr;
-	FILE* fp;
+	FILE *fp;
 
 	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/start_address", dev);
 	if (access(path, R_OK)) {
@@ -293,7 +298,7 @@ static size_t get_dev_start_addr(int dev)
 		exit(1);
 	}
 	fclose(fp);
-	start_addr = (size_t)strtol(str+2, NULL, 16);
+	start_addr = (size_t)strtol(str + 2, NULL, 16);
 	return start_addr;
 }
 
@@ -302,7 +307,7 @@ static size_t get_dev_size(int dev)
 	char path[MAX_CHAR_LEN];
 	char str[MAX_CHAR_LEN];
 	size_t size;
-	FILE* fp;
+	FILE *fp;
 
 	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/size", dev);
 	if (access(path, R_OK)) {
@@ -320,7 +325,7 @@ static size_t get_dev_size(int dev)
 		exit(1);
 	}
 	fclose(fp);
-	size = (size_t)strtol(str+2, NULL, 16);
+	size = (size_t)strtol(str + 2, NULL, 16);
 	return size;
 }
 
@@ -350,18 +355,26 @@ static int get_dev_memdev(int dev)
 
 static void get_dev_pci_info(struct cxl_dev_info *dev)
 {
-	char path_symlink[MAX_CHAR_LEN] = {0,};
-	char path_bus_addr[MAX_CHAR_LEN] = {0,};
-	char path_link_speed[MAX_CHAR_LEN] = {0,};
-	char path_link_width[MAX_CHAR_LEN] = {0,};
+	char path_symlink[MAX_CHAR_LEN] = {
+		0,
+	};
+	char path_bus_addr[MAX_CHAR_LEN] = {
+		0,
+	};
+	char path_link_speed[MAX_CHAR_LEN] = {
+		0,
+	};
+	char path_link_width[MAX_CHAR_LEN] = {
+		0,
+	};
 	char *tok;
 	FILE *fp;
 	size_t read_len, len = 0;
 	int sz_link;
 
 	/* get pci bus addr */
-	sprintf(path_symlink, "/sys/kernel/cxl/devices/cxl%d/mem%d",
-			      dev->num, dev->memdev);
+	sprintf(path_symlink, "/sys/kernel/cxl/devices/cxl%d/mem%d", dev->num,
+		dev->memdev);
 	sz_link = readlink(path_symlink, path_bus_addr, MAX_CHAR_LEN);
 	if (sz_link < 0)
 		return;
@@ -373,25 +386,29 @@ static void get_dev_pci_info(struct cxl_dev_info *dev)
 	strcpy(dev->pci_bus_addr, tok);
 
 	/* get link speed */
-	sprintf(path_link_speed, "%s/%s/current_link_speed",
-				 SYSFS_PCI_DEVICES, dev->pci_bus_addr);
+	sprintf(path_link_speed, "%s/%s/current_link_speed", SYSFS_PCI_DEVICES,
+		dev->pci_bus_addr);
 	if (!access(path_link_speed, R_OK)) {
 		fp = fopen(path_link_speed, "r");
 		if (fp) {
-			read_len = fread(dev->pci_cur_link_speed, 1, PCI_INFO_LEN, fp);
-			dev->pci_cur_link_speed[read_len - 1] = (char)0; //remove newline
+			read_len = fread(dev->pci_cur_link_speed, 1,
+					 PCI_INFO_LEN, fp);
+			dev->pci_cur_link_speed[read_len - 1] =
+				(char)0; //remove newline
 			fclose(fp);
 		}
 	}
 
 	/* get link width */
-	sprintf(path_link_width, "%s/%s/current_link_width",
-				 SYSFS_PCI_DEVICES, dev->pci_bus_addr);
+	sprintf(path_link_width, "%s/%s/current_link_width", SYSFS_PCI_DEVICES,
+		dev->pci_bus_addr);
 	if (!access(path_link_width, R_OK)) {
 		fp = fopen(path_link_width, "r");
 		if (fp) {
-			read_len = fread(dev->pci_cur_link_width, 1, PCI_INFO_LEN, fp);
-			dev->pci_cur_link_width[read_len - 1] = (char)0; //remove newline
+			read_len = fread(dev->pci_cur_link_width, 1,
+					 PCI_INFO_LEN, fp);
+			dev->pci_cur_link_width[read_len - 1] =
+				(char)0; //remove newline
 			if (strcmp(dev->pci_cur_link_width, "0") == 0)
 				sprintf(dev->pci_cur_link_width, "Unknown");
 			fclose(fp);
@@ -433,7 +450,7 @@ static bool is_dev_dax(int dev)
 		exit(1);
 	}
 	fp = fopen(IOMEM, "r");
-	while(1) {
+	while (1) {
 		if (fgets(str, MAX_CHAR_LEN, fp) == NULL) {
 			break;
 		}
@@ -451,7 +468,7 @@ static bool is_dev_dax(int dev)
 
 static int write_to_path(const char *path, const char *buf)
 {
-	int fd = open(path, O_WRONLY|O_CLOEXEC);
+	int fd = open(path, O_WRONLY | O_CLOEXEC);
 	int n, len = strlen(buf) + 1;
 
 	if (fd < 0) {
@@ -463,7 +480,7 @@ static int write_to_path(const char *path, const char *buf)
 	close(fd);
 	if (n < len) {
 		error("Failed to write %s to %s: %s\n", buf, path,
-				strerror(errno));
+		      strerror(errno));
 		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
@@ -531,7 +548,7 @@ static int dax_unbind(int dev)
 
 static int register_dev_dax(int dev)
 {
-	int ret = 0;;
+	int ret = 0;
 
 	ret = dev_change_node(dev, -1);
 	if (ret == EXIT_FAILURE)
@@ -556,7 +573,7 @@ static int unbind_all(void)
 	return EXIT_SUCCESS;
 }
 
-static int mode_dax(int* devs, int n_target_devs)
+static int mode_dax(int *devs, int n_target_devs)
 {
 	/* register devices in array devs to dax */
 	int i;
@@ -622,9 +639,12 @@ static void _print_cxl_info_dev(int dev_id)
 	printf("      \"node_id\":\"%d\",\n", cxl_info[dev_id].node_id);
 	printf("      \"socket_id\":\"%d\",\n", cxl_info[dev_id].socket_id);
 	printf("      \"memdev\":\"%d\",\n", cxl_info[dev_id].memdev);
-	printf("      \"pci_bus_addr\":\"%s\",\n", cxl_info[dev_id].pci_bus_addr);
-	printf("      \"pci_cur_link_speed\":\"%s\",\n", cxl_info[dev_id].pci_cur_link_speed);
-	printf("      \"pci_cur_link_width\":\"%s\",\n", cxl_info[dev_id].pci_cur_link_width);
+	printf("      \"pci_bus_addr\":\"%s\",\n",
+	       cxl_info[dev_id].pci_bus_addr);
+	printf("      \"pci_cur_link_speed\":\"%s\",\n",
+	       cxl_info[dev_id].pci_cur_link_speed);
+	printf("      \"pci_cur_link_width\":\"%s\",\n",
+	       cxl_info[dev_id].pci_cur_link_width);
 	if (cxl_info[dev_id].state == 1)
 		printf("      \"state\":\"online\",\n");
 	else if (cxl_info[dev_id].state == 0)
@@ -703,7 +723,7 @@ static int print_cxl_info_dev(int argc, const char **argv)
 		goto inval_option;
 	if (argc == 2) {
 		if ((!sscanf(argv[1], "cxl%d", &dev_id)) ||
-				(dev_id < 0 || dev_id >= nr_cxl_devs))
+		    (dev_id < 0 || dev_id >= nr_cxl_devs))
 			goto inval_option;
 	}
 
@@ -730,7 +750,7 @@ static int print_cxl_info_node(int target_node)
 	int i, j = 0;
 	int devs = 0;
 	if ((target_node != PRINT_EVERY_NODE) &&
-		(target_node < -1 || target_node > max_node))
+	    (target_node < -1 || target_node > max_node))
 		goto inval_option;
 
 	printf("[\n");
@@ -745,7 +765,7 @@ static int print_cxl_info_node(int target_node)
 		for (j = 0; j < nr_cxl_devs; j++) {
 			if (cxl_info[j].node_id == i) {
 				printf(" \"cxl%d\" ", j);
-				devs ++;
+				devs++;
 			}
 		}
 		printf(" ]\n");
@@ -783,7 +803,7 @@ static int group_dax(int argc, const char **argv)
 		n_target_devs = argc - 2;
 		target_devs = malloc(sizeof(int) * n_target_devs);
 		for (i = 0; i < n_target_devs; i++) {
-			if (!sscanf(argv[i+2], "cxl%d", &target_devs[i]))
+			if (!sscanf(argv[i + 2], "cxl%d", &target_devs[i]))
 				goto inval_option;
 			if (target_devs[i] >= nr_cxl_devs)
 				goto inval_option;
@@ -950,7 +970,8 @@ inval_option:
 }
 
 double get_read_lat_by_nodes(int node_cpu, int node_mem, unsigned long size,
-				unsigned long stride, int random_access, int num_iter);
+			     unsigned long stride, int random_access,
+			     int num_iter);
 
 static int is_msr_accessible(void)
 {
@@ -966,7 +987,7 @@ static int is_msr_accessible(void)
 		goto err;
 	}
 
-	if (pwrite(fd, &val, sizeof(val), offset)!= sizeof(val)) {
+	if (pwrite(fd, &val, sizeof(val), offset) != sizeof(val)) {
 		close(fd);
 		goto err;
 	}
@@ -990,8 +1011,8 @@ static int rw_cpus_prefetcher_states(uint64_t *list_val, int is_read)
 	d = opendir(PATH_MSR);
 	if (d) {
 		while ((de = readdir(d)) != NULL) {
-			if (strcmp(de->d_name, ".") == 0
-				|| strcmp(de->d_name, "..") == 0)
+			if (strcmp(de->d_name, ".") == 0 ||
+			    strcmp(de->d_name, "..") == 0)
 				continue;
 			sprintf(filename, "%s/%s", PATH_MSR, de->d_name);
 
@@ -1009,8 +1030,8 @@ static int rw_cpus_prefetcher_states(uint64_t *list_val, int is_read)
 					goto err;
 
 				if (is_read) {
-					if (pread(fd, &val, sizeof(val), offset)
-							!= sizeof(val)) {
+					if (pread(fd, &val, sizeof(val),
+						  offset) != sizeof(val)) {
 						close(fd);
 						goto err;
 					}
@@ -1022,8 +1043,8 @@ static int rw_cpus_prefetcher_states(uint64_t *list_val, int is_read)
 					}
 					val = list_val[cpuid];
 
-					if (pwrite(fd, &val, sizeof(val), offset)
-							!= sizeof(val)) {
+					if (pwrite(fd, &val, sizeof(val),
+						   offset) != sizeof(val)) {
 						close(fd);
 						goto err;
 					}
@@ -1060,7 +1081,7 @@ static int mod_prefetcher_state(int on)
 		orig_val[i] = UINT64_MAX;
 	if (rw_cpus_prefetcher_states(orig_val, 1))
 		goto err;
-	
+
 	if (on) {
 		for (int i = 0; i < num_cpus; i++)
 			mod_val[i] = orig_val[i] & (0x0ULL << 0);
@@ -1102,9 +1123,15 @@ int get_latency_matrix(int argc, const char **argv)
 	int num_cpunodes = 0;
 	int num_memnodes = 0;
 	DIR *d;
-	int nodes[MAX_NUMA_NODES] = {0,};
-	int nodes_cpu[MAX_NUMA_NODES] = {0,};
-	int nodes_mem[MAX_NUMA_NODES] = {0,};
+	int nodes[MAX_NUMA_NODES] = {
+		0,
+	};
+	int nodes_cpu[MAX_NUMA_NODES] = {
+		0,
+	};
+	int nodes_mem[MAX_NUMA_NODES] = {
+		0,
+	};
 	unsigned long size_mb = 2000;
 	unsigned long stride_b = 64;
 	int mod_hw_prefetcher = 1;
@@ -1134,7 +1161,7 @@ int get_latency_matrix(int argc, const char **argv)
 				goto inval_option;
 			num_iter = strtoul(argv[++i], NULL, 0);
 			if (!num_iter)
-				goto inval_option;			
+				goto inval_option;
 		} else {
 			goto inval_option;
 		}
@@ -1155,7 +1182,8 @@ int get_latency_matrix(int argc, const char **argv)
 			if (strncmp(de->d_name, "node", 4))
 				continue;
 			nd = strtol(de->d_name + 4, NULL, 0);
-			sprintf(path_cpulist, "%s/node%d/cpulist", SYSFS_NODE, nd);
+			sprintf(path_cpulist, "%s/node%d/cpulist", SYSFS_NODE,
+				nd);
 			fd = open(path_cpulist, O_RDONLY);
 			if (fd < 0) {
 				error("cannot open %s", path_cpulist);
@@ -1180,9 +1208,9 @@ int get_latency_matrix(int argc, const char **argv)
 	if (mod_hw_prefetcher) {
 		if (!is_msr_accessible()) {
 			printf("Can't modify prefetcher state. Do 'modprobe msr' with root privileges first,"
-					" then run CXL-CLI with root provileges.\n");
+			       " then run CXL-CLI with root provileges.\n");
 			printf("Enable random_acess to get latency matrix"
-					" without hw prefetcher state modification.\n");
+			       " without hw prefetcher state modification.\n");
 			random_access = 1;
 			mod_hw_prefetcher = 0;
 		} else {
@@ -1210,8 +1238,9 @@ int get_latency_matrix(int argc, const char **argv)
 		fflush(stdout);
 		for (int j = 0; j < num_memnodes; j++) {
 			perf = get_read_lat_by_nodes(nodes_cpu[i], nodes_mem[j],
-						size_mb * 1024 * 1024, stride_b,
-						random_access, num_iter);
+						     size_mb * 1024 * 1024,
+						     stride_b, random_access,
+						     num_iter);
 			printf("%.1f\t", perf);
 			fflush(stdout);
 		}
@@ -1230,7 +1259,7 @@ inval_option:
 
 static int read_from_path(const char *path, char *buf, int len)
 {
-	int fd = open(path, O_RDONLY|O_CLOEXEC);
+	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	int n;
 
 	if (fd < 0) {
@@ -1250,19 +1279,19 @@ static int read_from_path(const char *path, char *buf, int len)
 static void error_cxlswap_write(void)
 {
 	printf("\t1. Please check CXLSwap module is installed properly.\n");
-	printf("\t2. Root privilege is required to control CXLSwap.\n\n");
+	printf("\t2. You need root privileges to control CXLSwap.\n\n");
 }
 
 static void error_cxlswap_read(void)
 {
 	printf("\t1. Please check CXLSwap module is installed properly.\n");
-	printf("\t2. Check privilege to access CXLSwap parameter.\n\n");
+	printf("\t2. You need root privileges to access CXLSwap parameter.\n\n");
 }
 
 static void error_cxlswap_usage(void)
 {
 	printf("\t1. CXLSwap debugfs option must be enabled.\n");
-	printf("\t2. Root privilege is required to access CXLSwap usage.\n\n");
+	printf("\t2. You need root privileges to access CXLSwap usage.\n\n");
 }
 
 static int control_cxlswap(const char *action)
@@ -1280,7 +1309,7 @@ static int control_cxlswap(const char *action)
 		return EXIT_FAILURE;
 	}
 
-	/* control cxlswap status */	
+	/* control cxlswap status */
 	ret = write_to_path(SYSFS_CXLSWAP_ENABLED, status);
 	if (ret == EXIT_FAILURE) {
 		error_cxlswap_write();
@@ -1313,7 +1342,7 @@ static int check_cxlswap(void)
 	if (status[0] == 'Y') {
 		/* check zSwap status */
 		memset(status, 0, sizeof(char) * 2);
-		fd = open(zswap_enabled, O_RDONLY|O_CLOEXEC);
+		fd = open(zswap_enabled, O_RDONLY | O_CLOEXEC);
 		if (fd < 0) {
 			if (errno == EACCES) {
 				error("cannot open %s.\n", zswap_enabled);
@@ -1324,14 +1353,15 @@ static int check_cxlswap(void)
 			n = read(fd, status, 2);
 			close(fd);
 			if (n < 2) {
-				error("Failed to read %s: %s\n", zswap_enabled, strerror(errno));
+				error("Failed to read %s: %s\n", zswap_enabled,
+				      strerror(errno));
 				printf("\tIf zSwap is enabled, CXLSwap would not be used.\n\n");
-			} else if (status[0] == 'Y') 
+			} else if (status[0] == 'Y')
 				warning("zSwap: enabled, CXLSwap would not be used.");
 		}
-	
+
 		printf("CXLSwap: enabled\n");
-	
+
 		/* read CXLSwap used bytes */
 		ret = read_from_path(cxlswap_used, buf, MAX_ULLONG_LEN);
 		if (ret == EXIT_FAILURE) {
@@ -1348,9 +1378,9 @@ static int check_cxlswap(void)
 			return EXIT_FAILURE;
 		}
 		pages = strtoull(buf, &end, 10);
-		
+
 		printf("\n");
-		printf("CXLSwap Used      : %llu kB\n", used_bytes/1024);
+		printf("CXLSwap Used      : %llu kB\n", used_bytes / 1024);
 		printf("CXLSwap Pages     : %llu \n", pages);
 	} else if (status[0] == 'N') {
 		printf("CXLSwap: disabled\n");
@@ -1386,6 +1416,130 @@ static int flush_cxlswap(void)
 	}
 
 	printf("Success: CXLSwap is flushed.\n");
+
+	return EXIT_SUCCESS;
+}
+
+static void error_cxlcache_write(void)
+{
+	printf("\t1. Please check CXLCache module is installed properly.\n");
+	printf("\t2. You need root privileges to control CXLCache.\n\n");
+}
+
+static void error_cxlcache_read(void)
+{
+	printf("\t1. Please check CXLCache module is installed properly.\n");
+	printf("\t2. You need root privileges to access CXLCache parameter.\n\n");
+}
+
+static void error_cxlcache_usage(void)
+{
+	printf("\t1. CXLCache debugfs option must be enabled.\n");
+	printf("\t2. You need root privileges to access CXLCache usage.\n\n");
+}
+
+static int control_cxlcache(const char *action)
+{
+	int ret;
+	char status[2];
+
+	/* validate action */
+	if (!strcmp(action, "enable"))
+		status[0] = '1';
+	else if (!strcmp(action, "disable"))
+		status[0] = '0';
+	else {
+		error("  Error: Invalid control: %s\n", action);
+		return EXIT_FAILURE;
+	}
+
+	/* control cxlcache status */
+	ret = write_to_path(SYSFS_CXLCACHE_ENABLED, status);
+	if (ret == EXIT_FAILURE) {
+		error_cxlcache_write();
+		return EXIT_FAILURE;
+	}
+
+	printf("Success: CXLCache is %sd.\n", action);
+
+	return EXIT_SUCCESS;
+}
+
+static int check_cxlcache(void)
+{
+	int ret;
+	unsigned long long cache_used, cache_pages;
+	char cxlcache_used[] = "/sys/kernel/debug/cxlcache/pool_total_size";
+	char cxlcache_pages[] = "/sys/kernel/debug/cxlcache/put_pages";
+	char status[2];
+	char buf[MAX_ULLONG_LEN];
+	char *end;
+
+	/* check CXLcache status */
+	ret = read_from_path(SYSFS_CXLCACHE_ENABLED, status, 2);
+	if (ret == EXIT_FAILURE) {
+		error_cxlcache_read();
+		return EXIT_FAILURE;
+	}
+
+	if (status[0] == 'Y') {
+		printf("CXLCache: enabled\n");
+
+		/* read CXLcache Used */
+		ret = read_from_path(cxlcache_used, buf, MAX_ULLONG_LEN);
+		if (ret == EXIT_FAILURE)
+			goto err;
+		cache_used = strtoull(buf, &end, 10);
+
+		/* read CXLcache Num Pages */
+		memset(buf, 0, sizeof(char) * MAX_ULLONG_LEN);
+		ret = read_from_path(cxlcache_pages, buf, MAX_ULLONG_LEN);
+		if (ret == EXIT_FAILURE)
+			goto err;
+		cache_pages = strtoull(buf, &end, 10);
+
+		printf("\n");
+		printf("CXLCache Used      : %llu kB\n", cache_used / 1024);
+		printf("CXLCache Pages     : %llu \n", cache_pages);
+	} else if (status[0] == 'N') {
+		printf("CXLCache: disabled\n");
+	}
+
+	return EXIT_SUCCESS;
+
+err:
+	error_cxlcache_usage();
+	return EXIT_FAILURE;
+}
+
+static int flush_cxlcache(void)
+{
+	int ret;
+	char status[2];
+
+	/* check CXLCache status (must be disabled before flush) */
+	ret = read_from_path(SYSFS_CXLCACHE_ENABLED, status, 2);
+	if (ret == EXIT_FAILURE) {
+		error_cxlcache_read();
+		return EXIT_FAILURE;
+	}
+
+	if (status[0] == 'Y') {
+		error("CXLCache is enabled.\n");
+		printf("\tPlease disable CXLCache before flush.\n\n");
+		return EXIT_FAILURE;
+	}
+
+	/* flush CXLCache */
+	memset(status, 0, sizeof(char) * 2);
+	status[0] = '1';
+	ret = write_to_path(SYSFS_CXLCACHE_FLUSH, status);
+	if (ret == EXIT_FAILURE) {
+		error_cxlcache_write();
+		return EXIT_FAILURE;
+	}
+
+	printf("Success: CXLCache is flushed.\n");
 
 	return EXIT_SUCCESS;
 }
@@ -1518,3 +1672,46 @@ int cmd_flush_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx)
 	return ret;
 }
 
+int cmd_disable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int ret = 0;
+
+	if (argc > 1)
+		error("This CMD does not require additional param(s)");
+
+	ret = control_cxlcache("disable");
+	return ret;
+}
+
+int cmd_enable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int ret = 0;
+
+	if (argc > 1)
+		error("This CMD does not require additional param(s)");
+
+	ret = control_cxlcache("enable");
+	return ret;
+}
+
+int cmd_check_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int ret = 0;
+
+	if (argc > 1)
+		error("This CMD does not require additional param(s)");
+
+	ret = check_cxlcache();
+	return ret;
+}
+
+int cmd_flush_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int ret = 0;
+
+	if (argc > 1)
+		error("This CMD does not require additional param(s)");
+
+	ret = flush_cxlcache();
+	return ret;
+}

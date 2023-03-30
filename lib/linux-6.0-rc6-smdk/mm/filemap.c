@@ -35,6 +35,7 @@
 #include <linux/cpuset.h>
 #include <linux/hugetlb.h>
 #include <linux/memcontrol.h>
+#include <linux/cleancache.h>
 #include <linux/shmem_fs.h>
 #include <linux/rmap.h>
 #include <linux/delayacct.h>
@@ -150,6 +151,18 @@ static void filemap_unaccount_folio(struct address_space *mapping,
 {
 	long nr;
 
+	/*
+	 * if we're uptodate, flush out into the cleancache, otherwise
+	 * invalidate any existing cleancache entries.  We can't leave
+	 * stale data around in the cleancache once our page is gone
+	 */
+
+	if (folio_test_uptodate(folio) && folio_test_mappedtodisk(folio) &&
+			!PageHWPoison(&folio->page))
+		cleancache_put_page(&folio->page);
+	else
+		cleancache_invalidate_page(mapping, &folio->page);
+
 	VM_BUG_ON_FOLIO(folio_mapped(folio), folio);
 	if (!IS_ENABLED(CONFIG_DEBUG_VM) && unlikely(folio_mapped(folio))) {
 		pr_alert("BUG: Bad page cache in process %s  pfn:%05lx\n",
@@ -253,6 +266,7 @@ void filemap_remove_folio(struct folio *folio)
 	spin_lock(&mapping->host->i_lock);
 	xa_lock_irq(&mapping->i_pages);
 	__filemap_remove_folio(folio, NULL);
+	cleancache_invalidate_page(mapping, &folio->page);
 	xa_unlock_irq(&mapping->i_pages);
 	if (mapping_shrinkable(mapping))
 		inode_add_lru(mapping->host);
@@ -332,6 +346,7 @@ void delete_from_page_cache_batch(struct address_space *mapping,
 		filemap_unaccount_folio(mapping, folio);
 	}
 	page_cache_delete_batch(mapping, fbatch);
+	cleancache_invalidate_inode(mapping);
 	xa_unlock_irq(&mapping->i_pages);
 	if (mapping_shrinkable(mapping))
 		inode_add_lru(mapping->host);
@@ -3856,6 +3871,7 @@ ssize_t __generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			invalidate_mapping_pages(mapping,
 						 pos >> PAGE_SHIFT,
 						 endbyte >> PAGE_SHIFT);
+			cleancache_invalidate_inode(mapping);
 		} else {
 			/*
 			 * We don't know how much we wrote, so just return

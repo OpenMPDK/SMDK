@@ -1,14 +1,14 @@
 Appreciate all the people who participate and help SMDK development.
 
-### v1.3
+### v1.4
 SW development
 * Kyungsan Kim
 * Wonjae Lee
 * Junhyeok Im
-* Jongchan Lim
 * Seungjun Ha
-* Jehoon Park
 * Hojin Nam
+* Jehoon Park
+* Jongchan Lim
 * Daeyoung Kim
 * Donghwa Kang
 * Chanwoo Ryu

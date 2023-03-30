@@ -4,7 +4,7 @@
 
 . $(dirname $0)/common
 
-rc=1
+rc=77
 
 set -ex
 
@@ -14,7 +14,7 @@ check_prereq "jq"
 
 modprobe -r cxl_test
 modprobe cxl_test
-udevadm settle
+rc=1
 
 test_label_ops()
 {
@@ -65,5 +65,7 @@ readarray -t nmems < <("$NDCTL" list -b cxl_test -Di | jq -r '.[].dev')
 for nmem in ${nmems[@]}; do
 	test_label_ops "$nmem"
 done
+
+check_dmesg "$LINENO"
 
 modprobe -r cxl_test

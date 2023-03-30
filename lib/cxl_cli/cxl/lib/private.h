@@ -4,6 +4,7 @@
 #define _LIBCXL_PRIVATE_H_
 
 #include <libkmod.h>
+#include <libudev.h>
 #include <cxl/cxl_mem.h>
 #include <ccan/endian/endian.h>
 #include <ccan/short_types/short_types.h>
@@ -45,6 +46,7 @@ struct cxl_dport {
 	size_t buf_len;
 	char *dev_path;
 	char *phys_path;
+	char *fw_path;
 	struct cxl_port *port;
 	struct list_node list;
 };
@@ -93,6 +95,7 @@ struct cxl_target {
 	struct cxl_decoder *decoder;
 	char *dev_path;
 	char *phys_path;
+	char *fw_path;
 	int id, position;
 };
 
@@ -215,7 +218,7 @@ struct cxl_cmd_set_lsa {
 	le32 offset;
 	le32 rsvd;
 	unsigned char lsa_data[0];
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 /**************** smdk ****************/
 
@@ -223,12 +226,12 @@ struct media_error_record {
 	le64 dpa;
 	le32 len;
 	le32 rsvd;
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct cxl_cmd_poison_get_list_in {
 	le64 address;
 	le64 address_length;
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct cxl_cmd_poison_get_list {
 	u8 flags;
@@ -237,12 +240,12 @@ struct cxl_cmd_poison_get_list {
 	le16 count;
 	u8 rsvd2[0x14];
 	struct media_error_record rcd[];
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct cxl_cmd_clear_poison_in {
 	le64 address;
 	unsigned int clear_data[16];
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct cxl_cmd_clear_event_record_in {
 	u8 event_type;
@@ -250,7 +253,7 @@ struct cxl_cmd_clear_event_record_in {
 	u8 n_event_handle;
 	u8 rsvd[3];
 	le16 event_record_handle;
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct common_event_record {
 	unsigned short event_record_len : 8;
@@ -259,7 +262,7 @@ struct common_event_record {
 	le32 event_record_handle;
 	le64 timestamp;
 	u8 rsvd[0x10];
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct media_event {
 	unsigned int uuid[4];
@@ -274,7 +277,7 @@ struct media_event {
 	int device : 24;
 	le64 component_identifier[2];
 	u8 rsvd[0x2e];
-} __attribute__ ((packed));
+} __attribute__((packed));
 
 struct cxl_cmd_get_event_record_out {
 	u8 flags;
@@ -285,13 +288,70 @@ struct cxl_cmd_get_event_record_out {
 	le16 event_records_count;
 	u8 rsvd2[10];
 	struct media_event event[];
-} __attribute__ ((packed));
+} __attribute__((packed));
 #define POISON_ADDR_MASK 0xFFFFFFFFFFFFFFF8
 #define POISON_SOURCE_MASK 0x7
 #ifndef BIT
 #define BIT(_x) (1 << (_x))
 #endif
 
+/* CXL 3.0 8.2.9.8.1.1 Identify Memory Device Poison Handling Capabilities */
+#define CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_INJECTS_PERSISTENT_POISON_MASK \
+	BIT(0)
+#define CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_SCANS_FOR_POISON_MASK \
+	BIT(1)
+
+/* CXL 3.0 8.2.9.8.1.1 Identify Memory Device QoS Telemetry Capabilities */
+#define CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_EGRESS_PORT_CONGESTION_MASK \
+	BIT(0)
+#define CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_TEMPORARY_THROUGHPUT_REDUCTION_MASK \
+	BIT(1)
+
+/* CXL 3.0. 8.2.9.8.3.3 Set Alert Configuration */
+struct cxl_cmd_set_alert_config {
+	u8 valid_alert_actions;
+	u8 enable_alert_actions;
+	u8 life_used_prog_warn_threshold;
+	u8 rsvd;
+	le16 dev_over_temperature_prog_warn_threshold;
+	le16 dev_under_temperature_prog_warn_threshold;
+	le16 corrected_volatile_mem_err_prog_warn_threshold;
+	le16 corrected_pmem_err_prog_warn_threshold;
+} __attribute__((packed));
+
+/* CXL 3.0 8.2.9.3.1 Get FW Info */
+#define CXL_CMD_FW_INFO_FW_REV_LENGTH 0x10
+
+struct cxl_cmd_get_firmware_info {
+	u8 slots_supported;
+	u8 slot_info;
+	u8 activation_caps;
+	u8 rsvd[13];
+	char fw_revisions[4][CXL_CMD_FW_INFO_FW_REV_LENGTH];
+} __attribute__((packed));
+
+/* CXL 3.0 8.2.9.3.1 Get FW Info Byte 1 FW Slot Info */
+#define CXL_CMD_FW_INFO_SLOT_ACTIVE_MASK GENMASK(2, 0)
+#define CXL_CMD_FW_INFO_SLOT_STAGED_MASK GENMASK(5, 3)
+
+/* CXL 3.0 8.2.9.3.1 Get FW Info Byte 2 FW Activation Capabilities */
+#define CXL_CMD_FW_INFO_ACTIVATION_CAPABILITIES_ONLINE_FW_ACTIVATION_MASK BIT(0)
+
+/* CXL 3.0 8.2.9.3.2 Transfer FW */
+struct cxl_cmd_transfer_firmware {
+	u8 action;
+	u8 slot;
+	le16 rsvd;
+	le32 offset;
+	u8 rsvd2[0x78];
+	unsigned char fw_data[0];
+} __attribute__((packed));
+
+/* CXL 3.0 8.2.9.3.3 Activate FW */
+struct cxl_cmd_activate_firmware {
+	u8 action;
+	u8 slot;
+} __attribute__((packed));
 /**************** smdk ****************/
 
 struct cxl_cmd_get_health_info {
@@ -304,6 +364,43 @@ struct cxl_cmd_get_health_info {
 	le32 volatile_errors;
 	le32 pmem_errors;
 } __attribute__((packed));
+/* CXL 3.0 8.2.9.8.3.2 Get Alert Configuration */
+struct cxl_cmd_get_alert_config {
+	u8 valid_alerts;
+	u8 programmable_alerts;
+	u8 life_used_crit_alert_threshold;
+	u8 life_used_prog_warn_threshold;
+	le16 dev_over_temperature_crit_alert_threshold;
+	le16 dev_under_temperature_crit_alert_threshold;
+	le16 dev_over_temperature_prog_warn_threshold;
+	le16 dev_under_temperature_prog_warn_threshold;
+	le16 corrected_volatile_mem_err_prog_warn_threshold;
+	le16 corrected_pmem_err_prog_warn_threshold;
+} __attribute__((packed));
+
+/* CXL 3.0 8.2.9.8.3.2 Get Alert Configuration Byte 0 Valid Alerts */
+#define CXL_CMD_ALERT_CONFIG_VALID_ALERTS_LIFE_USED_PROG_WARN_THRESHOLD_MASK   \
+	BIT(0)
+#define CXL_CMD_ALERT_CONFIG_VALID_ALERTS_DEV_OVER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK \
+	BIT(1)
+#define CXL_CMD_ALERT_CONFIG_VALID_ALERTS_DEV_UNDER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK \
+	BIT(2)
+#define CXL_CMD_ALERT_CONFIG_VALID_ALERTS_CORRECTED_VOLATILE_MEM_ERR_PROG_WARN_THRESHOLD_MASK \
+	BIT(3)
+#define CXL_CMD_ALERT_CONFIG_VALID_ALERTS_CORRECTED_PMEM_ERR_PROG_WARN_THRESHOLD_MASK \
+	BIT(4)
+
+/* CXL 3.0 8.2.9.8.3.2 Get Alert Configuration Byte 1 Programmable Alerts */
+#define CXL_CMD_ALERT_CONFIG_PROG_ALERTS_LIFE_USED_PROG_WARN_THRESHOLD_MASK    \
+	BIT(0)
+#define CXL_CMD_ALERT_CONFIG_PROG_ALERTS_DEV_OVER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK \
+	BIT(1)
+#define CXL_CMD_ALERT_CONFIG_PROG_ALERTS_DEV_UNDER_TEMPERATURE_PROG_WARN_THRESHOLD_MASK \
+	BIT(2)
+#define CXL_CMD_ALERT_CONFIG_PROG_ALERTS_CORRECTED_VOLATILE_MEM_ERR_PROG_WARN_THRESHOLD_MASK \
+	BIT(3)
+#define CXL_CMD_ALERT_CONFIG_PROG_ALERTS_CORRECTED_PMEM_ERR_PROG_WARN_THRESHOLD_MASK \
+	BIT(4)
 
 struct cxl_cmd_get_partition {
 	le64 active_volatile;

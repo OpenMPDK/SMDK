@@ -1477,7 +1477,7 @@ static int memblock_in_dev(struct daxctl_memory *mem, const char *memblock)
 		err(ctx, "%s: Unable to determine resource\n", devname);
 		return -EACCES;
 	}
-	dev_end = dev_start + daxctl_dev_get_size(dev);
+	dev_end = dev_start + daxctl_dev_get_size(dev) - 1;
 
 	memblock_size = daxctl_memory_get_block_size(mem);
 	if (!memblock_size) {
@@ -1552,6 +1552,8 @@ static int daxctl_memory_op(struct daxctl_memory *mem, enum memory_op op)
 	errno = 0;
 	while ((de = readdir(node_dir)) != NULL) {
 		if (strncmp(de->d_name, "memory", 6) == 0) {
+			if (strncmp(de->d_name, "memory_", 7) == 0)
+				continue;
 			rc = memblock_in_dev(mem, de->d_name);
 			if (rc < 0)
 				goto out_dir;

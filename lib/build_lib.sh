@@ -24,7 +24,7 @@ VOLTDB=$BASEDIR/src/app/voltdb
 CXLCLI=cxl_cli
 
 SMDK_BIN=$BASEDIR/lib/SMDK_bin
-SMDK_VERSION=v1.3
+SMDK_VERSION=v1.4
 
 function build_voltdb() {
 	app=$VOLTDB

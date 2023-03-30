@@ -4,7 +4,7 @@
 
 . $(dirname $0)/common
 
-rc=1
+rc=77
 
 set -ex
 
@@ -14,7 +14,7 @@ check_prereq "jq"
 
 modprobe -r cxl_test
 modprobe cxl_test
-udevadm settle
+rc=1
 
 # THEORY OF OPERATION: Create a x8 interleave across the pmem capacity
 # of the 8 endpoints defined by cxl_test, commit the decoders (which
@@ -163,8 +163,6 @@ readarray -t endpoint < <($CXL free-dpa -t pmem ${mem[*]} |
 			  jq -r ".[] | .decoder.decoder")
 echo "$region released ${#endpoint[@]} targets: ${endpoint[@]}"
 
-# validate no WARN or lockdep report during the run
-log=$(journalctl -r -k --since "-$((SECONDS+1))s")
-grep -q "Call Trace" <<< $log && err "$LINENO"
+check_dmesg "$LINENO"
 
 modprobe -r cxl_test

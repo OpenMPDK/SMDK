@@ -11,20 +11,36 @@ cxl_src = [
   'filter.c',
 ]
 
+if get_option('systemd').enabled()
+  install_data('cxl-monitor.service', install_dir : systemdunitdir)
+endif
+
 numa_dep = cc.find_library('numa', required: false)
+deps = [
+  cxl_dep,
+  util_dep,
+  uuid,
+  kmod,
+  json,
+  versiondep,
+  numa_dep,
+]
+
+if get_option('libtracefs').enabled()
+  cxl_src += [
+    'event_trace.c',
+    'monitor.c',
+  ]
+  deps += [
+    traceevent,
+    tracefs,
+  ]
+endif
 
 cxl_tool = executable('cxl',
   cxl_src,
   include_directories : root_inc,
-  dependencies : [
-    cxl_dep,
-    util_dep,
-    uuid,
-    kmod,
-    json,
-    versiondep,
-    numa_dep,
-  ],
+  dependencies : deps,
   install : true,
   install_dir : rootbindir,
 )

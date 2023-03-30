@@ -44,4 +44,28 @@ int cmd_disable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_enable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_check_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_flush_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_disable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_enable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_check_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_flush_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+
+int cmd_identify(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_health_info(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_alert_config(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_set_alert_config(int argc, const char **argv, struct cxl_ctx *ctx);
+
+int cmd_get_firmware_info(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_transfer_firmware(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_activate_firmware(int argc, const char **argv, struct cxl_ctx *ctx);
+
+#ifdef ENABLE_LIBTRACEFS
+int cmd_monitor(int argc, const char **argv, struct cxl_ctx *ctx);
+#else
+static inline int cmd_monitor(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	fprintf(stderr,
+		"cxl monitor: unavailable, rebuild with '-Dlibtracefs=enabled'\n");
+	return EXIT_FAILURE;
+}
+#endif
 #endif /* _CXL_BUILTIN_H_ */

@@ -95,6 +95,18 @@ static struct cmd_struct commands[] = {
 	{ "enable-cxlswap", .c_fn = cmd_enable_cxlswap },
 	{ "check-cxlswap", .c_fn = cmd_check_cxlswap },
 	{ "flush-cxlswap", .c_fn = cmd_flush_cxlswap },
+	{ "disable-cxlcache", .c_fn = cmd_disable_cxlcache },
+	{ "enable-cxlcache", .c_fn = cmd_enable_cxlcache },
+	{ "check-cxlcache", .c_fn = cmd_check_cxlcache },
+	{ "flush-cxlcache", .c_fn = cmd_flush_cxlcache },
+	{ "identify", .c_fn = cmd_identify },
+	{ "get-health-info", .c_fn = cmd_get_health_info },
+	{ "get-alert-config", .c_fn = cmd_get_alert_config },
+	{ "set-alert-config", .c_fn = cmd_set_alert_config },
+	{ "monitor", .c_fn = cmd_monitor },
+	{ "get-firmware-info", .c_fn = cmd_get_firmware_info },
+	{ "transfer-firmware", .c_fn = cmd_transfer_firmware },
+	{ "activate-firmware", .c_fn = cmd_activate_firmware },
 };
 
 int main(int argc, const char **argv)

@@ -1,6 +1,6 @@
-## Announcing the Release of Scalable Memory Development Kit (SMDK) v1.3
+## Announcing the Release of Scalable Memory Development Kit (SMDK) v1.4
 
-We are pleased to announce the release of SMDK v1.3, which consists of a basic SMDK cli tool, allocator library, kernel, and a guide providing an example workload test.
+We are pleased to announce the release of SMDK v1.4, which consists of a basic SMDK cli tool, allocator library, kernel, and a guide providing an example workload test.
 
 We previously published pre-release articles introducing SMDK to the industry, as well as demonstrated SMDK functionality at 2022 SuperComputing, 2022 HPE Discover, 2021 OCP Global Summit, and so on.
 Right now, SMDK has been successfully integrated and tested with many industry partners on a variety of purposes and application workloads using Samsung’s CXL Memory Expander:
@@ -36,6 +36,8 @@ The toolkit thus reduces the burden of introducing new memory and allows users t
 • A pair of APIs: a Compatible API, which allows end user access to the Memory Expander without any changes to their applications, and an Optimization API that can be used to gain higher levels of performance through optimization of the applications.
 
 • Userspace Cli Tool: an unified tool is provided for users to control and acquire the function and information of a CXL device in a human-readable format, as well as control and manage SMDK features.
+
+• Memory Interfaces : provides 3 OS-level memory interfaces for logical use of CXL device: memory-node, swap, cache
 
 It is worth noting that transparent memory management through the Compatible API is accomplished by inheriting and extending the Linux Process/Virtual Memory Manager (VMM) design, borrowing the design and strengths of the Linux kernel and maintaining its compatibility with CXL memory.
 

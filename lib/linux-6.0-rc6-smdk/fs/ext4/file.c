@@ -30,6 +30,7 @@
 #include <linux/uio.h>
 #include <linux/mman.h>
 #include <linux/backing-dev.h>
+#include <linux/cleancache.h>
 #include "ext4.h"
 #include "ext4_jbd2.h"
 #include "xattr.h"
@@ -598,10 +599,12 @@ out:
 		endbyte = offset + err - 1;
 		err = filemap_write_and_wait_range(iocb->ki_filp->f_mapping,
 						   offset, endbyte);
-		if (!err)
+		if (!err) {
 			invalidate_mapping_pages(iocb->ki_filp->f_mapping,
 						 offset >> PAGE_SHIFT,
 						 endbyte >> PAGE_SHIFT);
+			cleancache_invalidate_inode(iocb->ki_filp->f_mapping);
+		}
 	}
 
 	return ret;

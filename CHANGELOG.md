@@ -1,6 +1,35 @@
 # Changelog
 
-## v1.3: CXL-Swap / CXL Composability / Userspace CLI Tool
+## v1.4: CXL-Cache / Userspace CLI Tool (update)
+
+### This update reflects the voices of Industry partners who cooperate with us.
+
+**1. CXL Cache**
+- In addition to the usecase that uses CXL device as **System RAM** and **Swap** interfaces, SMDK v1.4 allows another usecase that uses CXL device as **OS-Level Cache** interface. 
+- CXL Cache is the 2nd-level page cache with pluggable and page-granularity attributes that stores clean file-backed pages. 
+Upon CXL Cache, a file-backed page is traversed in following memory order - pagecache(near), cxlcache(far), disk(farthest).
+
+
+<br>
+
+**2. CXL-CLI**
+- CXL Spec commands added
+> identify, get-health-info, set-alert-config, get-alert-config, get-firmware-info, transfer-firmware, activate-firmware
+- CXL Cache control commands added
+> enable-cxlcache, disable-cxlcache, flush-cxlcache, check-cxlcache
+
+<br>
+
+**3. Documentation**
+- Update user guide documents
+> SMDK Architecture: CXL Cache - https://github.com/OpenMPDK/SMDK/wiki/2.-SMDK-Architecture <br>
+> Kernel Guide: CXL Cache usage - https://github.com/OpenMPDK/SMDK/wiki/4.-Kernel <br>
+> Plugin Guide: New CXL spec commands and CXL Cache control commands - https://github.com/OpenMPDK/SMDK/wiki/5.-Plugin
+
+<br>
+
+
+## v1.3: CXL-Swap / CXL Composability / Userspace CLI Tool (update)
 
 ### This update reflects the voices of Industry partners who cooperate with us.
 

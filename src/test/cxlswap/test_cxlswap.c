@@ -13,21 +13,21 @@ int store_load()
 	}
 
 	// Cold Access to buffer occurs Swap Out
-	for (u64 i=0;i<size;i++) 
+	for (u64 i=0;i<size;i++)
 		buf[i] = (i & 0x7f);
-		
+
 	// Read buffer occurs Swap In
-	for (u64 i=0;i<size;i++) 
+	for (u64 i=0;i<size;i++)
 		if (buf[i] != (i & 0x7f)) {
 			fprintf(stderr, "Value between stored and loaded is different\n");
 			return TEST_FAILURE;
 		}
 
 	get_stored_pages(&after);
-    if (after == 0) {
-        fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
-        return ENV_SET_FAIL;
-    }
+	if (after == 0) {
+		fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
+		return ENV_SET_FAIL;
+	}
 
 	printf("======= RESULT =======\n");
 	printf("CXL Swap Stored Pages Before Swap : %d \n", before);
@@ -51,23 +51,23 @@ int multi_thread()
 	start = omp_get_wtime();
 	// Cold Access to buffer occurs Swap Out
 #pragma omp parallel for num_threads(num_threads)
-	for (u64 i=0;i<size;i+=4096) 
+	for (u64 i=0;i<size;i+=4096)
 		for(int j=0;j<4096;j++)
 			buf[i+j] = ((i+j) & 0x7f);
 	end = omp_get_wtime();
 
 	// Read buffer occurs Swap In
-	for (u64 i=0;i<size;i++) 
+	for (u64 i=0;i<size;i++)
 		if (buf[i] != (i & 0x7f)) {
 			fprintf(stderr, "Value between stored and loaded is different\n");
 			return TEST_FAILURE;
 		}
 
 	get_stored_pages(&after);
-    if (after == 0) {
-        fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
-        return ENV_SET_FAIL;
-    }
+	if (after == 0) {
+		fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
+		return ENV_SET_FAIL;
+	}
 
 	printf("======= RESULT =======\n");
 	printf("Elapsed Time %lf using %d threads\n", end - start, num_threads);
@@ -97,64 +97,64 @@ int shared_memory()
 	}
 
 	printf("Process %d Initialize Data [Shmid %d]...\n", pid, shmid);
-	for (u64 i=0;i<size;i++) 
+	for (u64 i=0;i<size;i++)
 		p_shm[i] = (i & 0x7f);
-	
+
 	pid_t c_pid = fork();
 	if (c_pid < 0) {
 		perror("fork failed");
 		return ENV_SET_FAIL;
-	} 
+	}
 
 	if (c_pid == 0) {
-		unsigned char *shm; 
-		if ((shmid = shmget(key, size, 0644)) < 0) 
+		unsigned char *shm;
+		if ((shmid = shmget(key, size, 0644)) < 0)
 			exit(ENV_SET_FAIL);
 
-		if ((shm = shmat(shmid, NULL, 0)) == (void *) - 1) 
+		if ((shm = shmat(shmid, NULL, 0)) == (void *) - 1)
 			exit(ENV_SET_FAIL);
 
-		printf("Process %d Check Initialized Data [Shmid %d]...\n", 
-															getpid(), shmid);
+		printf("Process %d Check Initialized Data [Shmid %d]...\n",
+				getpid(), shmid);
 		for (u64 i=0;i<size;i++) {
-			if(shm[i] == (i & 0x7f)) 
+			if(shm[i] == (i & 0x7f))
 				continue;
 			fprintf(stderr, "Value between stored and loaded is different\n");
 			exit(TEST_FAILURE);
 		}
-		printf("Process %d Check Initialized Data [Shmid %d] Pass\n", 
-															getpid(), shmid);
+		printf("Process %d Check Initialized Data [Shmid %d] Pass\n",
+				getpid(), shmid);
 
 		printf("Process %d Modify Data [Shmid %d]...\n", getpid(), shmid);
-		for (u64 i=0;i<size;i++) 
+		for (u64 i=0;i<size;i++)
 			shm[i] = ((i & 0x1) ? (i & 0xf) : (i & 0x7f));
 
 		shmdt(shm);
 
 		exit(TEST_SUCCESS);
-	} 
-	
-	if(waitpid(c_pid, &status, 0) != c_pid) 
+	}
+
+	if(waitpid(c_pid, &status, 0) != c_pid)
 		return ENV_SET_FAIL;
-	
-	if (status != 0) 
+
+	if (status != 0)
 		return WEXITSTATUS(status);
-	
+
 	printf("Process %d Check Modified Data [Shmid %d]...\n", pid, shmid);
-	for (u64 i=0;i<size;i++) 
+	for (u64 i=0;i<size;i++)
 		if (p_shm[i] != ((i & 0x1) ? (i & 0xf) : (i & 0x7f))) {
 			fprintf(stderr, "Value between stored and loaded is different\n");
 			return TEST_FAILURE;
 		}
 	printf("Process %d Check Modified Data [Shmid %d] Pass\n", pid, shmid);
-		
+
 	shmdt(p_shm);
 
 	get_stored_pages(&after);
-    if (after == 0) {
-        fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
-        return ENV_SET_FAIL;
-    }
+	if (after == 0) {
+		fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
+		return ENV_SET_FAIL;
+	}
 
 	printf("======= RESULT =======\n");
 	printf("CXL Swap Stored Pages Before Swap : %d \n", before);
@@ -168,19 +168,20 @@ int main(int argc, char *argv[])
 	int ret;
 	int need;
 
-	if (argc == 1 || argc == 3) 
-		INPUT_ERR(argv[0]);	
+	if (argc == 1 || argc == 3)
+		INPUT_ERR(argv[0]);
 
-	if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))) 
-		INPUT_ERR(argv[0]);	
+	if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")))
+		INPUT_ERR(argv[0]);
 
 	need = !strcmp(argv[3], "multi_thread") ? 5 : 4;
 
-	if (argc != need) 
-		INPUT_ERR(argv[0])
+	if (argc != need)
+		INPUT_ERR(argv[0]);
 
 	if (parse(argv[1], argv[2], argv[3]))
-		INPUT_ERR(argv[0])
+		INPUT_ERR(argv[0]);
+
 	num_threads = need == 5 ? atoi(argv[4]) : 0;
 
 	pid = getpid();
@@ -243,7 +244,7 @@ int main(int argc, char *argv[])
 		ret = -1;
 		goto clean;
 	}
-	
+
 	// Test Body
 	print_test_info();
 	ret = test_func();

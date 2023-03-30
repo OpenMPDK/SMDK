@@ -154,6 +154,7 @@ cxl_topo = find_program('cxl-topology.sh')
 cxl_sysfs = find_program('cxl-region-sysfs.sh')
 cxl_labels = find_program('cxl-labels.sh')
 cxl_create_region = find_program('cxl-create-region.sh')
+cxl_xor_region = find_program('cxl-xor-region.sh')
 
 tests = [
   [ 'libndctl',               libndctl,		  'ndctl' ],
@@ -170,7 +171,6 @@ tests = [
   [ 'btt-errors.sh',          btt_errors,	  'ndctl' ],
   [ 'hugetlb',                hugetlb,		  'ndctl' ],
   [ 'btt-pad-compat.sh',      btt_pad_compat,	  'ndctl' ],
-  [ 'firmware-update.sh',     firmware_update,	  'ndctl' ],
   [ 'ack-shutdown-count-set', ack_shutdown_count, 'ndctl' ],
   [ 'rescan-partitions.sh',   rescan_partitions,  'ndctl' ],
   [ 'inject-smart.sh',        inject_smart,	  'ndctl' ],
@@ -182,6 +182,7 @@ tests = [
   [ 'cxl-region-sysfs.sh',    cxl_sysfs,	  'cxl'   ],
   [ 'cxl-labels.sh',          cxl_labels,	  'cxl'   ],
   [ 'cxl-create-region.sh',   cxl_create_region,  'cxl'   ],
+  [ 'cxl-xor-region.sh',      cxl_xor_region,     'cxl'   ],
 ]
 
 if get_option('destructive').enabled()
@@ -196,6 +197,7 @@ if get_option('destructive').enabled()
   mmap_test = find_program('mmap.sh')
 
   tests += [
+    [ 'firmware-update.sh',     firmware_update,	  'ndctl' ],
     [ 'pmem-ns',           pmem_ns,	   'ndctl' ],
     [ 'sub-section.sh',    sub_section,	   'dax'   ],
     [ 'dax-dev',           dax_dev,	   'dax'   ],
@@ -213,9 +215,11 @@ if get_option('destructive').enabled()
 endif
 
 if get_option('keyutils').enabled()
-  security = find_program('security.sh')
+  nfit_security = find_program('nfit-security.sh')
+  cxl_security = find_program('cxl-security.sh')
   tests += [
-    [ 'security.sh', security, 'ndctl' ]
+    [ 'nfit-security.sh', nfit_security, 'ndctl' ],
+    [ 'cxl-security.sh', cxl_security, 'cxl' ],
   ]
 endif
 

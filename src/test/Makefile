@@ -1,4 +1,4 @@
-SUBDIRS=driver heap_allocator mmap numactl subzone syscall cxl_cli cxlswap
+SUBDIRS=driver heap_allocator mmap numactl subzone syscall cxl_cli cxlswap cxlcache
 
 .PHONY:subdirs $SUBDIRS)
 
