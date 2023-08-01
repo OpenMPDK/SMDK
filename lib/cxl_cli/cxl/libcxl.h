@@ -18,8 +18,6 @@ typedef unsigned char uuid_t[16];
 extern "C" {
 #endif
 
-#define nano_scale 1000000000
-
 struct cxl_ctx;
 struct cxl_ctx *cxl_ref(struct cxl_ctx *ctx);
 void cxl_unref(struct cxl_ctx *ctx);
@@ -50,11 +48,10 @@ struct cxl_ctx *cxl_memdev_get_ctx(struct cxl_memdev *memdev);
 unsigned long long cxl_memdev_get_pmem_size(struct cxl_memdev *memdev);
 unsigned long long cxl_memdev_get_ram_size(struct cxl_memdev *memdev);
 const char *cxl_memdev_get_firmware_verison(struct cxl_memdev *memdev);
-int cxl_memdev_get_payload_max(struct cxl_memdev *memdev);
 
 /* ABI spelling mistakes are forever */
-static inline const char *
-cxl_memdev_get_firmware_version(struct cxl_memdev *memdev)
+static inline const char *cxl_memdev_get_firmware_version(
+		struct cxl_memdev *memdev)
 {
 	return cxl_memdev_get_firmware_verison(memdev);
 }
@@ -71,108 +68,6 @@ int cxl_memdev_read_label(struct cxl_memdev *memdev, void *buf, size_t length,
 		size_t offset);
 int cxl_memdev_write_label(struct cxl_memdev *memdev, void *buf, size_t length,
 		size_t offset);
-
-/**************** smdk ****************/
-enum poison_op {
-	POISON_GET,
-	POISON_INJECT,
-	POISON_CLEAR,
-};
-
-enum get_poison_out_flag {
-	POISON_MORE_RECORD = 1,
-	POISON_OVERFLOW = 2,
-	SCANNING_MEDIA = 3,
-};
-
-enum get_event_record_out_flag {
-	EVENT_OVERFLOW = 1,
-	EVENT_MORE_RECORD = 2,
-};
-
-int cxl_memdev_inject_poison(struct cxl_memdev *memdev, unsigned long address);
-int cxl_memdev_clear_poison(struct cxl_memdev *memdev, void *buf,
-			    unsigned long address);
-int cxl_memdev_get_poison(struct cxl_memdev *memdev, unsigned long address,
-			  unsigned long length);
-struct cxl_cmd *cxl_cmd_new_get_poison(struct cxl_memdev *memdev,
-				       unsigned long address,
-				       unsigned long length);
-struct cxl_cmd *cxl_cmd_new_inject_poison(struct cxl_memdev *memdev,
-					  unsigned long address);
-struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev, void *buf,
-					 unsigned long address);
-ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
-				       struct cxl_cmd *cmd,
-				       unsigned long address,
-				       unsigned long length);
-
-struct cxl_cmd *cxl_cmd_new_get_event_record(struct cxl_memdev *memdev,
-					     int event_type);
-ssize_t cxl_cmd_get_event_record_get_payload(struct cxl_cmd *cmd,
-					     struct cxl_memdev *memdev,
-					     int event_type);
-struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev,
-					       int type, bool clear_all,
-					       int handle);
-int cxl_memdev_get_event_record(struct cxl_memdev *memdev, int event_type);
-int cxl_memdev_clear_event_record(struct cxl_memdev *memdev, int type,
-				  bool clear_all, int handle);
-
-int cxl_cmd_get_timestamp_get_payload(struct cxl_cmd *cmd);
-int cxl_memdev_set_timestamp(struct cxl_memdev *memdev, unsigned long time);
-int cxl_memdev_get_timestamp(struct cxl_memdev *memdev);
-
-enum cxl_identify_event {
-	CXL_IDENTIFY_INFO,
-	CXL_IDENTIFY_WARN,
-	CXL_IDENTIFY_FAIL,
-	CXL_IDENTIFY_FATAL,
-};
-
-int cxl_cmd_identify_get_event_log_size(struct cxl_cmd *cmd,
-					enum cxl_identify_event event);
-int cxl_cmd_identify_get_poison_list_max(struct cxl_cmd *cmd);
-int cxl_cmd_identify_get_inject_poison_limit(struct cxl_cmd *cmd);
-int cxl_cmd_identify_injects_persistent_poison(struct cxl_cmd *cmd);
-int cxl_cmd_identify_scans_for_poison(struct cxl_cmd *cmd);
-int cxl_cmd_identify_egress_port_congestion(struct cxl_cmd *cmd);
-int cxl_cmd_identify_temporary_throughput_reduction(struct cxl_cmd *cmd);
-
-enum cxl_setalert_event {
-	CXL_SETALERT_LIFE,
-	CXL_SETALERT_OVER_TEMP,
-	CXL_SETALERT_UNDER_TEMP,
-	CXL_SETALERT_VOLATILE_ERROR,
-	CXL_SETALERT_PMEM_ERROR
-};
-
-struct cxl_cmd *cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev,
-					     enum cxl_setalert_event event,
-					     int enable, int threshold);
-
-struct cxl_cmd *cxl_cmd_new_get_firmware_info(struct cxl_memdev *memdev);
-int cxl_cmd_firmware_info_get_slots_supported(struct cxl_cmd *cmd);
-int cxl_cmd_firmware_info_get_active_slot(struct cxl_cmd *cmd);
-int cxl_cmd_firmware_info_get_staged_slot(struct cxl_cmd *cmd);
-int cxl_cmd_firmware_info_online_activation_capable(struct cxl_cmd *cmd);
-int cxl_cmd_firmware_info_get_fw_rev(struct cxl_cmd *cmd, char *fw_rev,
-				     int fw_len, int slot);
-
-enum cxl_transfer_fw_action {
-	CXL_TRANSFER_FW_FULL,
-	CXL_TRANSFER_FW_INIT,
-	CXL_TRANSFER_FW_CONT,
-	CXL_TRANSFER_FW_END,
-	CXL_TRANSFER_FW_ABORT,
-};
-
-struct cxl_cmd *cxl_cmd_new_transfer_firmware(
-	struct cxl_memdev *memdev, enum cxl_transfer_fw_action action, int slot,
-	unsigned int offset, void *fw_buf, unsigned int length);
-struct cxl_cmd *cxl_cmd_new_activate_firmware(struct cxl_memdev *memdev,
-					      bool online, int slot);
-/**************** smdk ****************/
 
 #define cxl_memdev_foreach(ctx, memdev) \
         for (memdev = cxl_memdev_get_first(ctx); \
@@ -209,6 +104,7 @@ bool cxl_port_is_endpoint(struct cxl_port *port);
 struct cxl_endpoint *cxl_port_to_endpoint(struct cxl_port *port);
 struct cxl_bus *cxl_port_get_bus(struct cxl_port *port);
 const char *cxl_port_get_host(struct cxl_port *port);
+struct cxl_dport *cxl_port_get_parent_dport(struct cxl_port *port);
 bool cxl_port_hosts_memdev(struct cxl_port *port, struct cxl_memdev *memdev);
 int cxl_port_get_nr_dports(struct cxl_port *port);
 int cxl_port_disable_invalidate(struct cxl_port *port);
@@ -318,6 +214,7 @@ cxl_decoder_get_interleave_granularity(struct cxl_decoder *decoder);
 unsigned int cxl_decoder_get_interleave_ways(struct cxl_decoder *decoder);
 struct cxl_region *cxl_decoder_get_region(struct cxl_decoder *decoder);
 struct cxl_region *cxl_decoder_create_pmem_region(struct cxl_decoder *decoder);
+struct cxl_region *cxl_decoder_create_ram_region(struct cxl_decoder *decoder);
 struct cxl_decoder *cxl_decoder_get_by_name(struct cxl_ctx *ctx,
 					    const char *ident);
 struct cxl_memdev *cxl_decoder_get_memdev(struct cxl_decoder *decoder);
@@ -378,10 +275,12 @@ const char *cxl_region_get_devname(struct cxl_region *region);
 void cxl_region_get_uuid(struct cxl_region *region, uuid_t uu);
 unsigned long long cxl_region_get_size(struct cxl_region *region);
 unsigned long long cxl_region_get_resource(struct cxl_region *region);
+enum cxl_decoder_mode cxl_region_get_mode(struct cxl_region *region);
 unsigned int cxl_region_get_interleave_ways(struct cxl_region *region);
 unsigned int cxl_region_get_interleave_granularity(struct cxl_region *region);
 struct cxl_decoder *cxl_region_get_target_decoder(struct cxl_region *region,
 						  int position);
+struct daxctl_region *cxl_region_get_daxctl_region(struct cxl_region *region);
 int cxl_region_set_size(struct cxl_region *region, unsigned long long size);
 int cxl_region_set_uuid(struct cxl_region *region, uuid_t uu);
 int cxl_region_set_interleave_ways(struct cxl_region *region,
@@ -525,6 +424,121 @@ enum cxl_setpartition_mode {
 
 int cxl_cmd_partition_set_mode(struct cxl_cmd *cmd,
 		enum cxl_setpartition_mode mode);
+
+#ifdef ENABLE_SMDK_PLUGIN
+#define nano_scale 1000000000
+
+enum poison_op {
+	POISON_GET_SCAN_MEDIA_CAPS,
+	POISON_SCAN_MEDIA,
+	POISON_GET_SCAN_MEDIA,
+};
+
+enum get_poison_out_flag {
+	POISON_MORE_RECORD = 1,
+	POISON_OVERFLOW = 2,
+	SCANNING_MEDIA = 3,
+};
+
+enum get_event_record_out_flag {
+	EVENT_OVERFLOW = 1,
+	EVENT_MORE_RECORD = 2,
+};
+
+int cxl_memdev_get_payload_max(struct cxl_memdev *memdev);
+int cxl_memdev_get_poison(struct cxl_memdev *memdev, unsigned long address,
+			  unsigned long length);
+
+struct cxl_cmd *cxl_cmd_new_get_event_record(struct cxl_memdev *memdev,
+					     int event_type);
+ssize_t cxl_cmd_get_event_record_get_payload(struct cxl_cmd *cmd,
+					     struct cxl_memdev *memdev,
+					     int event_type);
+struct cxl_cmd *cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev,
+					       int type, bool clear_all,
+					       int handle);
+struct cxl_cmd *cxl_cmd_new_get_scan_media_caps(struct cxl_memdev *memdev,
+						unsigned long address,
+						unsigned long length);
+struct cxl_cmd *cxl_cmd_new_scan_media(struct cxl_memdev *memdev,
+				       unsigned char flag,
+				       unsigned long address,
+				       unsigned long length);
+struct cxl_cmd *cxl_cmd_new_get_scan_media(struct cxl_memdev *memdev);
+
+int cxl_memdev_get_event_record(struct cxl_memdev *memdev, int event_type);
+int cxl_memdev_clear_event_record(struct cxl_memdev *memdev, int type,
+				  bool clear_all, int handle);
+
+int cxl_cmd_get_timestamp_get_payload(struct cxl_cmd *cmd);
+int cxl_memdev_set_timestamp(struct cxl_memdev *memdev, unsigned long time);
+int cxl_memdev_get_timestamp(struct cxl_memdev *memdev);
+
+struct cxl_cmd *cxl_cmd_new_set_shutdown_state(struct cxl_memdev *memdev,
+					       bool is_clean);
+int cxl_memdev_set_shutdown_state(struct cxl_memdev *memdev, bool is_clean);
+int cxl_memdev_get_shutdown_state(struct cxl_memdev *memdev);
+
+enum cxl_identify_event {
+	CXL_IDENTIFY_INFO,
+	CXL_IDENTIFY_WARN,
+	CXL_IDENTIFY_FAIL,
+	CXL_IDENTIFY_FATAL,
+};
+
+int cxl_cmd_identify_get_event_log_size(struct cxl_cmd *cmd,
+					enum cxl_identify_event event);
+int cxl_cmd_identify_get_poison_list_max(struct cxl_cmd *cmd);
+int cxl_cmd_identify_get_inject_poison_limit(struct cxl_cmd *cmd);
+int cxl_cmd_identify_injects_persistent_poison(struct cxl_cmd *cmd);
+int cxl_cmd_identify_scans_for_poison(struct cxl_cmd *cmd);
+int cxl_cmd_identify_egress_port_congestion(struct cxl_cmd *cmd);
+int cxl_cmd_identify_temporary_throughput_reduction(struct cxl_cmd *cmd);
+
+enum cxl_setalert_event {
+	CXL_SETALERT_LIFE,
+	CXL_SETALERT_OVER_TEMP,
+	CXL_SETALERT_UNDER_TEMP,
+	CXL_SETALERT_VOLATILE_ERROR,
+	CXL_SETALERT_PMEM_ERROR
+};
+
+struct cxl_cmd *cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev,
+					     enum cxl_setalert_event event,
+					     int enable, int threshold);
+
+struct cxl_cmd *cxl_cmd_new_get_firmware_info(struct cxl_memdev *memdev);
+int cxl_cmd_firmware_info_get_slots_supported(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_get_active_slot(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_get_staged_slot(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_online_activation_capable(struct cxl_cmd *cmd);
+int cxl_cmd_firmware_info_get_fw_rev(struct cxl_cmd *cmd, char *fw_rev,
+				     int fw_len, int slot);
+
+enum cxl_transfer_fw_action {
+	CXL_TRANSFER_FW_FULL,
+	CXL_TRANSFER_FW_INIT,
+	CXL_TRANSFER_FW_CONT,
+	CXL_TRANSFER_FW_END,
+	CXL_TRANSFER_FW_ABORT,
+};
+
+struct cxl_cmd *cxl_cmd_new_transfer_firmware(
+	struct cxl_memdev *memdev, enum cxl_transfer_fw_action action, int slot,
+	unsigned int offset, void *fw_buf, unsigned int length);
+struct cxl_cmd *cxl_cmd_new_activate_firmware(struct cxl_memdev *memdev,
+					      bool online, int slot);
+int cxl_memdev_get_scan_media_caps(struct cxl_memdev *memdev,
+				   unsigned long address, unsigned long length);
+int cxl_memdev_scan_media(struct cxl_memdev *memdev, unsigned long address,
+			  unsigned long length, unsigned char flag);
+int cxl_memdev_get_scan_media(struct cxl_memdev *memdev);
+void cxl_memdev_print_get_health_info(struct cxl_memdev *memdev,
+				      struct cxl_cmd *cmd);
+int cxl_memdev_sanitize(struct cxl_memdev *memdev, const char *op);
+int cxl_memdev_inject_poison(struct cxl_memdev *memdev, const char *address);
+int cxl_memdev_clear_poison(struct cxl_memdev *memdev, const char *address);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

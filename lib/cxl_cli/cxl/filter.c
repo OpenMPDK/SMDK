@@ -288,13 +288,17 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 					  const char *serials)
 {
 	char *ident, *save;
-	char path[128];
 	const char *name;
-	int memdev_id = -1;
+	int memdev_id;
+#ifdef ENABLE_SMDK_PLUGIN
+	char path[128];
 	int id = 0;
 	DIR *d;
 	struct dirent *de;
 
+	memdev_id = -1;
+#endif
+	
 	if (!__ident)
 		return util_cxl_memdev_serial_filter(memdev, serials);
 
@@ -307,6 +311,7 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 		if (strcmp(name, "all") == 0)
 			break;
 
+#ifdef ENABLE_SMDK_PLUGIN
 		if (sscanf(name, "cxl%d", &id) == 1) {
 			sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", id);
 			d = opendir(path);
@@ -326,6 +331,7 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 				break;
 			}
 		}
+#endif
 
 		if ((sscanf(name, "%d", &memdev_id) == 1 ||
 		     sscanf(name, "mem%d", &memdev_id) == 1) &&
@@ -686,6 +692,12 @@ util_cxl_decoder_filter_by_region(struct cxl_decoder *decoder,
 	if (!__ident)
 		return decoder;
 
+	/* root decoders filter by children */
+	cxl_region_foreach(decoder, region)
+		if (util_cxl_region_filter(region, __ident))
+			return decoder;
+
+	/* switch and endpoint decoders have a 1:1 association with a region */
 	region = cxl_decoder_get_region(decoder);
 	if (!region)
 		return NULL;

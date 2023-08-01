@@ -58,6 +58,7 @@ template <bool IsNoExcept>
 SMDK_INLINE
 void *
 newImpl(std::size_t size) noexcept(IsNoExcept) {
+    CXLMALLOC_PRECONDITION(malloc(size));
     mem_zone_t type = get_cur_prioritized_memtype();
     void *ret = s_malloc_internal(type, size, false);
     if (likely(ret)) {
@@ -88,19 +89,19 @@ operator new[](std::size_t size, const std::nothrow_t &) noexcept {
 
 void
 operator delete(void *ptr) noexcept {
-    return s_free_internal(ptr);
+    return free(ptr);
 }
 
 void
 operator delete[](void *ptr) noexcept {
-    return s_free_internal(ptr);
+    return free(ptr);
 }
 
 void
 operator delete(void *ptr, const std::nothrow_t &) noexcept {
-    return s_free_internal(ptr);
+    return free(ptr);
 }
 
 void operator delete[](void *ptr, const std::nothrow_t &) noexcept {
-    return s_free_internal(ptr);
+    return free(ptr);
 }

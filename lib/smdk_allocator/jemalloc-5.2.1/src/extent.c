@@ -1203,15 +1203,15 @@ extent_recycle(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 
 void
 set_interleave_policy(int flag){
-        int mmap_exmem = flag & MAP_EXMEM;
-        if(cpu_node_config.nodemask != numa_no_nodes_ptr){
-                if(mmap_exmem){
-                        if(tsd_is_mem_policy_enabled(false)==false){
+        bool is_exmem = flag & MAP_EXMEM;
+        if (cpu_node_config.nodemask != numa_no_nodes_ptr) {
+                if (is_exmem) {
+                        if (tsd_is_mem_policy_enabled(false) == false) {
                                 numa_set_interleave_mask(cpu_node_config.nodemask);
                                 tsd_set_mem_policy_info(true);
                         }
                 } else {
-                        if(tsd_is_mem_policy_enabled(false)==true){
+                        if (tsd_is_mem_policy_enabled(false) == true) {
                                 numa_set_interleave_mask(numa_no_nodes_ptr);
                                 tsd_set_mem_policy_info(false);
                         }

@@ -6,7 +6,7 @@ source "${BASEDIR}/script/common.sh"
 
 QEMU_PATH=${BASEDIR}/lib/qemu/
 QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
-SMDK_KERNEL_PATH=${BASEDIR}/lib/linux-6.0-rc6-smdk
+SMDK_KERNEL_PATH=${BASEDIR}/lib/linux-6.4-smdk
 ROOTFS_PATH=${QEMU_PATH}
 
 QEMU_SYSTEM_BINARY=${QEMU_BUILD_PATH}/qemu-system-x86_64

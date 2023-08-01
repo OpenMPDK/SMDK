@@ -155,3 +155,6 @@
 #mesondefine DAXCTL_MODPROBE_DATA
 #mesondefine DAXCTL_MODPROBE_INSTALL
 #mesondefine PREFIX
+
+/* smdk plugin support */
+#mesondefine ENABLE_SMDK_PLUGIN

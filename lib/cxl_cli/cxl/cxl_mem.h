@@ -52,6 +52,7 @@
 	___C(CLEAR_EVENT, "Clear event log"),                             \
 	___C(TRANSFER_FW, "Transfer FW Package"),                         \
 	___C(ACTIVATE_FW, "Activate FW"),                                 \
+	___C(SANITIZE, "Sanitize Memdev"),                                \
 	___C(MAX, "invalid / last command")
 
 #define ___C(a, b) CXL_MEM_COMMAND_ID_##a

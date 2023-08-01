@@ -26,6 +26,7 @@
 #include <util/bitmap.h>
 #include <cxl/cxl_mem.h>
 #include <cxl/libcxl.h>
+#include <daxctl/libdaxctl.h>
 #include "private.h"
 
 /**
@@ -49,6 +50,7 @@ struct cxl_ctx {
 	struct list_head memdevs;
 	struct list_head buses;
 	struct kmod_ctx *kmod_ctx;
+	struct daxctl_ctx *daxctl_ctx;
 	void *private_data;
 };
 
@@ -165,6 +167,7 @@ static void __free_port(struct cxl_port *port, struct list_head *head)
 	free(port->dev_buf);
 	free(port->dev_path);
 	free(port->uport);
+	free(port->parent_dport_path);
 }
 
 static void free_port(struct cxl_port *port, struct list_head *head)
@@ -231,6 +234,7 @@ CXL_EXPORT void *cxl_get_private_data(struct cxl_ctx *ctx)
  */
 CXL_EXPORT int cxl_new(struct cxl_ctx **ctx)
 {
+	struct daxctl_ctx *daxctl_ctx;
 	struct udev_queue *udev_queue;
 	struct kmod_ctx *kmod_ctx;
 	struct udev *udev;
@@ -240,6 +244,10 @@ CXL_EXPORT int cxl_new(struct cxl_ctx **ctx)
 	c = calloc(1, sizeof(struct cxl_ctx));
 	if (!c)
 		return -ENOMEM;
+
+	rc = daxctl_new(&daxctl_ctx);
+	if (rc)
+		goto err_daxctl;
 
 	kmod_ctx = kmod_new(NULL, NULL);
 	if (check_kmod(kmod_ctx) != 0) {
@@ -267,6 +275,7 @@ CXL_EXPORT int cxl_new(struct cxl_ctx **ctx)
 	list_head_init(&c->memdevs);
 	list_head_init(&c->buses);
 	c->kmod_ctx = kmod_ctx;
+	c->daxctl_ctx = daxctl_ctx;
 	c->udev = udev;
 	c->udev_queue = udev_queue;
 	c->timeout = 5000;
@@ -278,6 +287,8 @@ err_udev_queue:
 err_udev:
 	kmod_unref(kmod_ctx);
 err_kmod:
+	daxctl_unref(daxctl_ctx);
+err_daxctl:
 	free(c);
 	return rc;
 }
@@ -321,6 +332,7 @@ CXL_EXPORT void cxl_unref(struct cxl_ctx *ctx)
 	udev_queue_unref(ctx->udev_queue);
 	udev_unref(ctx->udev);
 	kmod_unref(ctx->kmod_ctx);
+	daxctl_unref(ctx->daxctl_ctx);
 	info(ctx, "context %p released\n", ctx);
 	free(ctx);
 }
@@ -561,6 +573,12 @@ static void *add_cxl_region(void *parent, int id, const char *cxlregion_base)
 	else
 		region->decode_state = strtoul(buf, NULL, 0);
 
+	sprintf(path, "%s/mode", cxlregion_base);
+	if (sysfs_read_attr(ctx, path, buf) < 0)
+		region->mode = CXL_DECODER_MODE_NONE;
+	else
+		region->mode = cxl_decoder_mode_from_ident(buf);
+
 	sprintf(path, "%s/modalias", cxlregion_base);
 	if (sysfs_read_attr(ctx, path, buf) == 0)
 		region->module = util_modalias_to_module(ctx, buf);
@@ -686,6 +704,11 @@ CXL_EXPORT unsigned long long cxl_region_get_resource(struct cxl_region *region)
 	return region->start;
 }
 
+CXL_EXPORT enum cxl_decoder_mode cxl_region_get_mode(struct cxl_region *region)
+{
+	return region->mode;
+}
+
 CXL_EXPORT unsigned int
 cxl_region_get_interleave_ways(struct cxl_region *region)
 {
@@ -733,6 +756,34 @@ cxl_region_get_target_decoder(struct cxl_region *region, int position)
 		return NULL;
 	}
 	return decoder;
+}
+
+CXL_EXPORT struct daxctl_region *
+cxl_region_get_daxctl_region(struct cxl_region *region)
+{
+	const char *devname = cxl_region_get_devname(region);
+	struct cxl_ctx *ctx = cxl_region_get_ctx(region);
+	char *path = region->dev_buf;
+	int len = region->buf_len;
+	uuid_t uuid = { 0 };
+	struct stat st;
+
+	if (region->dax_region)
+		return region->dax_region;
+
+	if (snprintf(region->dev_buf, len, "%s/dax_region%d", region->dev_path,
+		     region->id) >= len) {
+		err(ctx, "%s: buffer too small!\n", devname);
+		return NULL;
+	}
+
+	if (stat(path, &st) < 0)
+		return NULL;
+
+	region->dax_region =
+		daxctl_new_region(ctx->daxctl_ctx, region->id, uuid, path);
+
+	return region->dax_region;
 }
 
 CXL_EXPORT int cxl_region_set_size(struct cxl_region *region,
@@ -1323,11 +1374,6 @@ CXL_EXPORT const char *cxl_memdev_get_firmware_verison(struct cxl_memdev *memdev
 	return memdev->firmware_version;
 }
 
-CXL_EXPORT int cxl_memdev_get_payload_max(struct cxl_memdev *memdev)
-{
-	return memdev->payload_max;
-}
-
 static void bus_invalidate(struct cxl_bus *bus)
 {
 	struct cxl_ctx *ctx = cxl_bus_get_ctx(bus);
@@ -1412,8 +1458,9 @@ CXL_EXPORT int cxl_memdev_enable(struct cxl_memdev *memdev)
 	return 0;
 }
 
-static struct cxl_endpoint *cxl_port_find_endpoint(struct cxl_port *parent_port,
-						   struct cxl_memdev *memdev)
+static struct cxl_endpoint *
+cxl_port_recurse_endpoint(struct cxl_port *parent_port,
+			  struct cxl_memdev *memdev)
 {
 	struct cxl_endpoint *endpoint;
 	struct cxl_port *port;
@@ -1423,12 +1470,24 @@ static struct cxl_endpoint *cxl_port_find_endpoint(struct cxl_port *parent_port,
 			if (strcmp(cxl_endpoint_get_host(endpoint),
 				   cxl_memdev_get_devname(memdev)) == 0)
 				return endpoint;
-		endpoint = cxl_port_find_endpoint(port, memdev);
+		endpoint = cxl_port_recurse_endpoint(port, memdev);
 		if (endpoint)
 			return endpoint;
 	}
 
 	return NULL;
+}
+
+static struct cxl_endpoint *cxl_port_find_endpoint(struct cxl_port *parent_port,
+						   struct cxl_memdev *memdev)
+{
+	struct cxl_endpoint *endpoint;
+
+	cxl_endpoint_foreach(parent_port, endpoint)
+		if (strcmp(cxl_endpoint_get_host(endpoint),
+			   cxl_memdev_get_devname(memdev)) == 0)
+			return endpoint;
+	return cxl_port_recurse_endpoint(parent_port, memdev);
 }
 
 CXL_EXPORT struct cxl_endpoint *
@@ -1546,6 +1605,20 @@ static int cxl_port_init(struct cxl_port *port, struct cxl_port *parent_port,
 	port->uport = realpath(port->dev_buf, NULL);
 	if (!port->uport)
 		goto err;
+
+	/*
+	 * CXL root devices have no parents and level 1 ports are both
+	 * CXL root targets and hosts of the next level, so:
+	 *     parent_dport == uport
+	 * ...at depth == 1
+	 */
+	if (port->depth > 1) {
+		rc = snprintf(port->dev_buf, port->buf_len, "%s/parent_dport",
+			      cxlport_base);
+		if (rc >= port->buf_len)
+			goto err;
+		port->parent_dport_path = realpath(port->dev_buf, NULL);
+	}
 
 	sprintf(path, "%s/modalias", cxlport_base);
 	if (sysfs_read_attr(ctx, path, buf) == 0)
@@ -1917,8 +1990,7 @@ static void *add_cxl_decoder(void *parent, int id, const char *cxldecoder_base)
 		    target->dev_path,
 		    target->phys_path ? target->phys_path : "none");
 
-		sprintf(port->dev_buf, "%s/dport%d/firmware_node",
-			port->dev_path, did);
+		sprintf(port->dev_buf, "%s/dport%d/firmware_node", port->dev_path, did);
 		target->fw_path = realpath(port->dev_buf, NULL);
 		dbg(ctx, "%s: target%ld %s fw_path: %s\n", devname, i,
 		    target->dev_path,
@@ -2229,8 +2301,8 @@ cxl_decoder_get_region(struct cxl_decoder *decoder)
 	return NULL;
 }
 
-CXL_EXPORT struct cxl_region *
-cxl_decoder_create_pmem_region(struct cxl_decoder *decoder)
+static struct cxl_region *cxl_decoder_create_region(struct cxl_decoder *decoder,
+						    enum cxl_decoder_mode mode)
 {
 	struct cxl_ctx *ctx = cxl_decoder_get_ctx(decoder);
 	char *path = decoder->dev_buf;
@@ -2238,7 +2310,11 @@ cxl_decoder_create_pmem_region(struct cxl_decoder *decoder)
 	struct cxl_region *region;
 	int rc;
 
-	sprintf(path, "%s/create_pmem_region", decoder->dev_path);
+	if (mode == CXL_DECODER_MODE_PMEM)
+		sprintf(path, "%s/create_pmem_region", decoder->dev_path);
+	else if (mode == CXL_DECODER_MODE_RAM)
+		sprintf(path, "%s/create_ram_region", decoder->dev_path);
+
 	rc = sysfs_read_attr(ctx, path, buf);
 	if (rc < 0) {
 		err(ctx, "failed to read new region name: %s\n",
@@ -2275,6 +2351,18 @@ cxl_decoder_create_pmem_region(struct cxl_decoder *decoder)
 
  found:
 	return region;
+}
+
+CXL_EXPORT struct cxl_region *
+cxl_decoder_create_pmem_region(struct cxl_decoder *decoder)
+{
+	return cxl_decoder_create_region(decoder, CXL_DECODER_MODE_PMEM);
+}
+
+CXL_EXPORT struct cxl_region *
+cxl_decoder_create_ram_region(struct cxl_decoder *decoder)
+{
+	return cxl_decoder_create_region(decoder, CXL_DECODER_MODE_RAM);
 }
 
 CXL_EXPORT int cxl_decoder_get_nr_targets(struct cxl_decoder *decoder)
@@ -2523,6 +2611,29 @@ CXL_EXPORT const char *cxl_port_get_host(struct cxl_port *port)
 	return devpath_to_devname(port->uport);
 }
 
+CXL_EXPORT struct cxl_dport *cxl_port_get_parent_dport(struct cxl_port *port)
+{
+	struct cxl_port *parent;
+	struct cxl_dport *dport;
+	const char *name;
+
+	if (port->parent_dport)
+		return port->parent_dport;
+
+	if (!port->parent_dport_path)
+		return NULL;
+
+	parent = cxl_port_get_parent(port);
+	name = devpath_to_devname(port->parent_dport_path);
+	cxl_dport_foreach(parent, dport)
+		if (strcmp(cxl_dport_get_devname(dport), name) == 0) {
+			port->parent_dport = dport;
+			return dport;
+		}
+
+	return NULL;
+}
+
 CXL_EXPORT bool cxl_port_hosts_memdev(struct cxl_port *port,
 				      struct cxl_memdev *memdev)
 {
@@ -2644,7 +2755,7 @@ static void *add_cxl_dport(void *parent, int id, const char *cxldport_base)
 
 	sprintf(dport->dev_buf, "%s/physical_node", cxldport_base);
 	dport->phys_path = realpath(dport->dev_buf, NULL);
-	
+
 	sprintf(dport->dev_buf, "%s/firmware_node", cxldport_base);
 	dport->fw_path = realpath(dport->dev_buf, NULL);
 
@@ -3715,229 +3826,6 @@ cxl_cmd_identify_get_persistent_only_size(struct cxl_cmd *cmd)
 	return cxl_capacity_to_bytes(c->persistent_capacity);
 }
 
-CXL_EXPORT int
-cxl_cmd_identify_get_event_log_size(struct cxl_cmd *cmd,
-				    enum cxl_identify_event event)
-{
-	struct cxl_cmd_identify *id =
-		(struct cxl_cmd_identify *)cmd->send_cmd->out.payload;
-	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_IDENTIFY);
-	if (rc)
-		return rc;
-
-	switch (event) {
-	case CXL_IDENTIFY_INFO:
-		return le16_to_cpu(id->info_event_log_size);
-	case CXL_IDENTIFY_WARN:
-		return le16_to_cpu(id->warning_event_log_size);
-	case CXL_IDENTIFY_FAIL:
-		return le16_to_cpu(id->failure_event_log_size);
-	case CXL_IDENTIFY_FATAL:
-		return le16_to_cpu(id->fatal_event_log_size);
-	default:
-		return -EINVAL;
-	}
-}
-
-CXL_EXPORT int cxl_cmd_identify_get_poison_list_max(struct cxl_cmd *cmd)
-{
-	unsigned int max_records = 0;
-	struct cxl_cmd_identify *id =
-		(struct cxl_cmd_identify *)cmd->send_cmd->out.payload;
-	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_IDENTIFY);
-	if (rc)
-		return rc;
-
-	for (int i = 0; i < 3; i++)
-		max_records += id->poison_list_max_mer[i] << (8 * i);
-
-	return max_records;
-}
-
-CXL_EXPORT int cxl_cmd_identify_get_inject_poison_limit(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u16(cmd, identify, IDENTIFY, inject_poison_limit);
-}
-
-CXL_EXPORT int cxl_cmd_identify_injects_persistent_poison(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u8_mask(
-		cmd, identify, IDENTIFY, poison_caps,
-		CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_INJECTS_PERSISTENT_POISON_MASK);
-}
-
-CXL_EXPORT int cxl_cmd_identify_scans_for_poison(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u8_mask(
-		cmd, identify, IDENTIFY, poison_caps,
-		CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_SCANS_FOR_POISON_MASK);
-}
-
-CXL_EXPORT int cxl_cmd_identify_egress_port_congestion(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u8_mask(
-		cmd, identify, IDENTIFY, qos_telemetry_caps,
-		CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_EGRESS_PORT_CONGESTION_MASK);
-}
-
-CXL_EXPORT int
-cxl_cmd_identify_temporary_throughput_reduction(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u8_mask(
-		cmd, identify, IDENTIFY, qos_telemetry_caps,
-		CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_TEMPORARY_THROUGHPUT_REDUCTION_MASK);
-}
-
-CXL_EXPORT struct cxl_cmd *
-cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev,
-			     enum cxl_setalert_event event, int enable,
-			     int threshold)
-{
-	struct cxl_cmd_set_alert_config *setalert;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_SET_ALERT_CONFIG);
-	if (!cmd)
-		return NULL;
-
-	setalert = cmd->input_payload;
-
-	setalert->valid_alert_actions = 1 << event;
-	if (enable) {
-		setalert->enable_alert_actions = 1 << event;
-		if (event == CXL_SETALERT_LIFE)
-			setalert->life_used_prog_warn_threshold = (u8)threshold;
-		else if (event == CXL_SETALERT_OVER_TEMP)
-			setalert->dev_over_temperature_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else if (event == CXL_SETALERT_UNDER_TEMP)
-			setalert->dev_under_temperature_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else if (event == CXL_SETALERT_VOLATILE_ERROR)
-			setalert->corrected_volatile_mem_err_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else if (event == CXL_SETALERT_PMEM_ERROR)
-			setalert->corrected_pmem_err_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else {
-			cxl_cmd_unref(cmd);
-			return NULL;
-		}
-	}
-
-	return cmd;
-}
-
-CXL_EXPORT struct cxl_cmd *
-cxl_cmd_new_get_firmware_info(struct cxl_memdev *memdev)
-{
-	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_FW_INFO);
-}
-
-CXL_EXPORT int cxl_cmd_firmware_info_get_slots_supported(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u8(cmd, get_firmware_info, GET_FW_INFO, slots_supported);
-}
-
-CXL_EXPORT int cxl_cmd_firmware_info_get_active_slot(struct cxl_cmd *cmd)
-{
-	struct cxl_cmd_get_firmware_info *fw =
-		(struct cxl_cmd_get_firmware_info *)cmd->send_cmd->out.payload;
-	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_FW_INFO);
-	if (rc)
-		return rc;
-
-	return FIELD_GET(CXL_CMD_FW_INFO_SLOT_ACTIVE_MASK, fw->slot_info);
-}
-
-CXL_EXPORT int cxl_cmd_firmware_info_get_staged_slot(struct cxl_cmd *cmd)
-{
-	struct cxl_cmd_get_firmware_info *fw =
-		(struct cxl_cmd_get_firmware_info *)cmd->send_cmd->out.payload;
-	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_FW_INFO);
-	if (rc)
-		return rc;
-
-	return FIELD_GET(CXL_CMD_FW_INFO_SLOT_STAGED_MASK, fw->slot_info);
-}
-
-CXL_EXPORT int
-cxl_cmd_firmware_info_online_activation_capable(struct cxl_cmd *cmd)
-{
-	cmd_get_field_u8_mask(
-		cmd, get_firmware_info, GET_FW_INFO, activation_caps,
-		CXL_CMD_FW_INFO_ACTIVATION_CAPABILITIES_ONLINE_FW_ACTIVATION_MASK);
-}
-
-CXL_EXPORT int cxl_cmd_firmware_info_get_fw_rev(struct cxl_cmd *cmd,
-						char *fw_rev, int fw_len,
-						int slot)
-{
-	struct cxl_cmd_get_firmware_info *fw =
-		(struct cxl_cmd_get_firmware_info *)cmd->send_cmd->out.payload;
-	int rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_FW_INFO);
-	if (rc)
-		return rc;
-
-	if (slot <= 0 || slot > fw->slots_supported)
-		return -EINVAL;
-	if (fw_len > 0)
-		memcpy(fw_rev, fw->fw_revisions[slot - 1],
-		       min(fw_len, CXL_CMD_FW_INFO_FW_REV_LENGTH));
-	return 0;
-}
-
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_transfer_firmware(
-	struct cxl_memdev *memdev, enum cxl_transfer_fw_action action, int slot,
-	unsigned int offset, void *fw_buf, unsigned int length)
-{
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd_transfer_firmware *transfer_fw;
-	struct cxl_cmd *cmd;
-	int rc;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_TRANSFER_FW);
-	if (!cmd)
-		return NULL;
-
-	rc = cxl_cmd_set_input_payload(cmd, NULL,
-				       sizeof(*transfer_fw) + length);
-	if (rc) {
-		err(ctx, "%s: cmd setup failed: %s\n",
-		    cxl_memdev_get_devname(memdev), strerror(-rc));
-		cxl_cmd_unref(cmd);
-		return NULL;
-	}
-	transfer_fw =
-		(struct cxl_cmd_transfer_firmware *)cmd->send_cmd->in.payload;
-	transfer_fw->action = (u8)action;
-	if (length > 0) {
-		transfer_fw->slot = (u8)slot;
-		transfer_fw->offset = cpu_to_le32(offset);
-		memcpy(transfer_fw->fw_data, fw_buf, length);
-	}
-
-	return cmd;
-}
-
-CXL_EXPORT struct cxl_cmd *
-cxl_cmd_new_activate_firmware(struct cxl_memdev *memdev, bool online, int slot)
-{
-	struct cxl_cmd_activate_firmware *activate_fw;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_ACTIVATE_FW);
-	if (!cmd)
-		return NULL;
-
-	activate_fw =
-		(struct cxl_cmd_activate_firmware *)cmd->send_cmd->in.payload;
-	activate_fw->action = !online;
-	activate_fw->slot = (u8)slot;
-
-	return cmd;
-}
-
 CXL_EXPORT struct cxl_cmd *cxl_cmd_new_raw(struct cxl_memdev *memdev,
 		int opcode)
 {
@@ -4277,611 +4165,4 @@ CXL_EXPORT int cxl_memdev_read_label(struct cxl_memdev *memdev, void *buf,
 		size_t length, size_t offset)
 {
 	return lsa_op(memdev, LSA_OP_GET, buf, length, offset);
-}
-
-/************************************ smdk ***********************************/
-
-static void print_timestamp(unsigned long timestamp)
-{
-	time_t t;
-	struct tm tm;
-
-	timestamp = timestamp / nano_scale;
-	t = (time_t)timestamp;
-	tm = *localtime(&t);
-	printf("%d/%d/%d %d:%d:%d\n", tm.tm_mon + 1, tm.tm_mday,
-	       tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
-}
-
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_poison(struct cxl_memdev *memdev,
-						  unsigned long address,
-						  unsigned long length)
-{
-	struct cxl_cmd_poison_get_list_in *get_poison;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_POISON);
-	if (!cmd)
-		return NULL;
-
-	get_poison =
-		(struct cxl_cmd_poison_get_list_in *)cmd->send_cmd->in.payload;
-	get_poison->address = cpu_to_le64(address);
-	get_poison->address_length = cpu_to_le64(length);
-	return cmd;
-}
-
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_inject_poison(struct cxl_memdev *memdev,
-						     unsigned long address)
-{
-	unsigned long *inject_poison_addr;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_INJECT_POISON);
-	if (!cmd)
-		return NULL;
-
-	inject_poison_addr = (unsigned long *)cmd->send_cmd->in.payload;
-	*inject_poison_addr = cpu_to_le64(address);
-	return cmd;
-}
-
-CXL_EXPORT struct cxl_cmd *cxl_cmd_new_clear_poison(struct cxl_memdev *memdev,
-						    void *buf,
-						    unsigned long address)
-{
-	struct cxl_cmd_clear_poison_in *clear_poison;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_CLEAR_POISON);
-	if (!cmd)
-		return NULL;
-
-	clear_poison =
-		(struct cxl_cmd_clear_poison_in *)cmd->send_cmd->in.payload;
-	clear_poison->address = cpu_to_le64(address);
-	memcpy(&(clear_poison->clear_data[0]), buf,
-	       sizeof(clear_poison->clear_data));
-	return cmd;
-}
-
-char *poison_source_type(unsigned long source_flag)
-{
-	char *source = "";
-	switch (source_flag) {
-	case 1:
-		source = "External";
-		break;
-	case 2:
-		source = "Internal";
-		break;
-	case 3:
-		source = "Injected";
-		break;
-	case 7:
-		source = "Vendor Specific";
-		break;
-	default:
-		source = "Unknown";
-	}
-
-	return source;
-}
-
-static void print_poison_list(struct cxl_cmd_poison_get_list *ret)
-{
-	int i;
-	unsigned long address;
-	unsigned long source;
-
-	for (i = 0; i < ret->count; i++) {
-		source = ret->rcd[i].dpa & POISON_SOURCE_MASK;
-		address = ret->rcd[i].dpa & POISON_ADDR_MASK;
-		printf("%d. Physical Address : 0x%-18lx, Source : %s\n", i + 1,
-		       address, poison_source_type(source));
-	}
-}
-
-CXL_EXPORT ssize_t cxl_cmd_get_poison_get_payload(struct cxl_memdev *memdev,
-						  struct cxl_cmd *cmd,
-						  unsigned long address,
-						  unsigned long length)
-{
-	struct cxl_cmd_poison_get_list *ret;
-	int rc;
-
-	rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_POISON);
-	if (rc)
-		return rc;
-
-	ret = (struct cxl_cmd_poison_get_list *)cmd->send_cmd->out.payload;
-	if (!ret)
-		return -ENXIO;
-	if (ret->flags & SCANNING_MEDIA) {
-		printf("Scan Media in Progress.\n");
-		printf("Scan Media in Progress. List might be incomplete\n");
-	}
-	if (ret->count == 0) {
-		printf("No poison address\n");
-		return 0;
-	}
-	print_poison_list(ret);
-	if (ret->flags & POISON_OVERFLOW) {
-		printf("Poison List Overflowed.\n");
-		printf("Poison List Overflow Timestamp : ");
-		print_timestamp(ret->overflow_timestamp);
-	}
-	if (ret->flags & POISON_MORE_RECORD) {
-		printf("More Media Error Records. Sending cmd again.\n");
-		cxl_memdev_get_poison(memdev, address, length);
-	}
-
-	return sizeof(ret);
-}
-
-static int poison_op(struct cxl_memdev *memdev, int op, void *buf,
-		     unsigned long address, unsigned long length)
-{
-	const char *devname = cxl_memdev_get_devname(memdev);
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd *cmd;
-	int rc = 0;
-	ssize_t ret_len;
-	unsigned long residue;
-
-	if (memdev->pmem_size + memdev->ram_size < address)
-		return -EINVAL;
-
-	if (op == POISON_CLEAR && buf == NULL) {
-		err(ctx, "%s: Poison clear buffer cannot be NULL\n", devname);
-		return -EINVAL;
-	}
-
-	residue = address % 64;
-	address -= residue;
-
-	switch (op) {
-	case POISON_GET:
-		if (length == 0)
-			length = memdev->pmem_size + memdev->ram_size;
-		cmd = cxl_cmd_new_get_poison(memdev, address, length);
-		if (!cmd)
-			return -ENOMEM;
-		rc = cxl_cmd_set_output_payload(cmd, NULL, memdev->payload_max);
-		if (rc) {
-			err(ctx, "%s: cmd setup failed: %s\n",
-			    cxl_memdev_get_devname(memdev), strerror(-rc));
-			goto out;
-		}
-		break;
-	case POISON_INJECT:
-		cmd = cxl_cmd_new_inject_poison(memdev, address);
-		if (!cmd)
-			return -ENOMEM;
-		break;
-	case POISON_CLEAR:
-		cmd = cxl_cmd_new_clear_poison(memdev, buf, address);
-		if (!cmd)
-			return -ENOMEM;
-		break;
-	default:
-		return -EOPNOTSUPP;
-	}
-
-	rc = cxl_cmd_submit(cmd);
-	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n", devname,
-		    strerror(-rc));
-		goto out;
-	}
-
-	rc = cxl_cmd_get_mbox_status(cmd);
-	if (rc != 0) {
-		err(ctx, "%s: firmware status: %d\n", devname, rc);
-		rc = -ENXIO;
-		goto out;
-	}
-
-	if (op == POISON_GET) {
-		ret_len = cxl_cmd_get_poison_get_payload(memdev, cmd, address,
-							 length);
-		if (ret_len < 0) {
-			rc = ret_len;
-			goto out;
-		}
-	}
-out:
-	cxl_cmd_unref(cmd);
-	return rc;
-}
-
-CXL_EXPORT int cxl_memdev_inject_poison(struct cxl_memdev *memdev,
-					unsigned long address)
-{
-	return poison_op(memdev, POISON_INJECT, NULL, address, 0);
-}
-
-CXL_EXPORT int cxl_memdev_clear_poison(struct cxl_memdev *memdev, void *buf,
-				       unsigned long address)
-{
-	return poison_op(memdev, POISON_CLEAR, buf, address, 0);
-}
-
-CXL_EXPORT int cxl_memdev_get_poison(struct cxl_memdev *memdev,
-				     unsigned long address,
-				     unsigned long length)
-{
-	return poison_op(memdev, POISON_GET, NULL, address, length);
-}
-
-CXL_EXPORT int cxl_memdev_set_timestamp(struct cxl_memdev *memdev,
-					unsigned long curr_time)
-{
-	const char *devname = cxl_memdev_get_devname(memdev);
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd *cmd;
-	int rc = 0;
-
-	unsigned long *set_time;
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_SET_TIME);
-	if (!cmd)
-		return -ENOMEM;
-	set_time = (unsigned long *)cmd->send_cmd->in.payload;
-	*set_time = cpu_to_le64(curr_time);
-	rc = cxl_cmd_submit(cmd);
-	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n", devname,
-		    strerror(-rc));
-		goto out;
-	}
-
-	rc = cxl_cmd_get_mbox_status(cmd);
-	if (rc != 0) {
-		err(ctx, "%s: firmware status: %d\n", devname, rc);
-		rc = -ENXIO;
-	}
-out:
-	cxl_cmd_unref(cmd);
-	return rc;
-}
-
-CXL_EXPORT int cxl_cmd_get_timestamp_get_payload(struct cxl_cmd *cmd)
-{
-	unsigned long *ret;
-	int rc = 0;
-
-	rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_TIME);
-	if (rc)
-		return rc;
-	ret = (unsigned long *)cmd->send_cmd->out.payload;
-	if (!ret)
-		return -ENXIO;
-	print_timestamp(*ret);
-	return 1;
-}
-
-CXL_EXPORT int cxl_memdev_get_timestamp(struct cxl_memdev *memdev)
-{
-	const char *devname = cxl_memdev_get_devname(memdev);
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd *cmd;
-	int rc = 0;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_TIME);
-	if (!cmd)
-		return -ENOMEM;
-	rc = cxl_cmd_set_output_payload(cmd, NULL, sizeof(unsigned long));
-	if (rc) {
-		err(ctx, "%s: cmd setup failed: %s\n",
-		    cxl_memdev_get_devname(memdev), strerror(-rc));
-		goto out;
-	}
-
-	rc = cxl_cmd_submit(cmd);
-	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n", devname,
-		    strerror(-rc));
-		goto out;
-	}
-	rc = cxl_cmd_get_mbox_status(cmd);
-	if (rc != 0) {
-		err(ctx, "%s: firmware status: %d\n", devname, rc);
-		rc = -ENXIO;
-		goto out;
-	}
-	rc = cxl_cmd_get_timestamp_get_payload(cmd);
-out:
-	cxl_cmd_unref(cmd);
-	return rc;
-}
-
-static char *event_flag_type(unsigned int flag)
-{
-	char *type = "";
-
-	switch (flag) {
-	case 0:
-		type = "Informational Event";
-		break;
-	case 1:
-		type = "Warning Event";
-		break;
-	case 2:
-		type = "Failure Event";
-		break;
-	case 3:
-		type = "Fatal Event";
-		break;
-	case 4:
-		type = "Permanent Condition";
-		break;
-	case 8:
-		type = "Maintenance Needed";
-		break;
-	case 16:
-		type = "Performance Degraded";
-		break;
-	case 32:
-		type = "Hardware Replacement Needed ";
-		break;
-	default:
-		type = "Unknown";
-	}
-
-	return type;
-}
-
-static char *mevent_desc(unsigned int flag)
-{
-	char *type = "";
-
-	switch (flag) {
-	case 1:
-		type = "Uncorrectable Event";
-		break;
-	case 2:
-		type = "Threshold Event";
-		break;
-	case 4:
-		type = "Poison List Overflow Event";
-		break;
-	default:
-		type = "Unknown";
-	}
-
-	return type;
-}
-
-static char *mevent_type(unsigned int flag)
-{
-	char *type = "";
-
-	switch (flag) {
-	case 0:
-		type = "Media ECC Error";
-		break;
-	case 1:
-		type = "Invalid Address";
-		break;
-	case 2:
-		type = "Data Path Error";
-		break;
-	default:
-		type = "Unknown";
-	}
-
-	return type;
-}
-
-static char *trans_type(unsigned int flag)
-{
-	char *type = "";
-
-	switch (flag) {
-	case 1:
-		type = "Host Read";
-		break;
-	case 2:
-		type = "Host Write";
-		break;
-	case 3:
-		type = "Host Scan Media";
-		break;
-	case 4:
-		type = "Host Inject Poison";
-		break;
-	case 5:
-		type = "Internal Media Scrub";
-		break;
-	case 6:
-		type = "Internal Media Management";
-		break;
-	default:
-		type = "Unknown / Unreported";
-	}
-
-	return type;
-}
-
-static void print_eventlog(struct cxl_cmd_get_event_record_out *ret)
-{
-	unsigned int count = ret->event_records_count;
-	unsigned int handle = 0;
-	unsigned int i;
-	printf("\n Received %u event records from device\n", count);
-
-	for (i = 0; i < count; i++) {
-		printf("No. %u\n", i);
-		printf("\tUUID               : %x-%x-%x-%x\n",
-		       ret->event[i].uuid[0], ret->event[i].uuid[1],
-		       ret->event[i].uuid[2], ret->event[i].uuid[3]);
-		printf("\tEvent Record Flags : %s \n",
-		       event_flag_type(ret->event[i].rcd.event_record_flags));
-		printf("\tPhysical address   : 0x%lx\n",
-		       ret->event[i].physical_address);
-		if (ret->event[i].memory_event_desc == 4)
-			printf("\tMemory Event Desc  : %s \n", mevent_desc(2));
-		else
-			printf("\tMemory Event Desc  : %s \n",
-			       mevent_desc(ret->event[i].memory_event_desc));
-		printf("\tMemory Event Type  : %s \n",
-		       mevent_type(ret->event[i].memory_event_type));
-		printf("\tTransaction Type   : %s \n",
-		       trans_type(ret->event[i].transaction_type));
-		printf("\tEvent Timestamp    : ");
-		print_timestamp(ret->event[i].rcd.timestamp);
-
-		handle = ret->event[i].rcd.event_record_handle;
-		printf("\tHandle             : %u\n", handle);
-	}
-}
-
-static void handle_eventlog(struct cxl_memdev *memdev,
-			    struct cxl_cmd_get_event_record_out *ret,
-			    int event_type)
-{
-	u8 more = ret->flags & EVENT_MORE_RECORD;
-
-	print_eventlog(ret);
-	if (more)
-		cxl_memdev_get_event_record(memdev, event_type);
-}
-
-CXL_EXPORT ssize_t cxl_cmd_get_event_record_get_payload(
-	struct cxl_cmd *cmd, struct cxl_memdev *memdev, int event_type)
-{
-	int rc = 0;
-	struct cxl_cmd_get_event_record_out *ret;
-	rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_EVENT_LOG);
-	if (rc)
-		return rc;
-
-	ret = (struct cxl_cmd_get_event_record_out *)cmd->send_cmd->out.payload;
-	if (!ret)
-		return -ENXIO;
-	handle_eventlog(memdev, ret, event_type);
-	return 1;
-}
-
-CXL_EXPORT struct cxl_cmd *
-cxl_cmd_new_get_event_record(struct cxl_memdev *memdev, int event_type)
-{
-	u8 *get_event;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_EVENT_LOG);
-	if (!cmd)
-		return NULL;
-
-	get_event = (u8 *)cmd->send_cmd->in.payload;
-	*get_event = (u8)event_type;
-	return cmd;
-}
-
-CXL_EXPORT int cxl_memdev_get_event_record(struct cxl_memdev *memdev,
-					   int event_type)
-{
-	const char *devname = cxl_memdev_get_devname(memdev);
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd *cmd;
-	int rc = 0;
-	ssize_t ret_len;
-
-	cmd = cxl_cmd_new_get_event_record(memdev, event_type);
-	if (!cmd)
-		return -ENOMEM;
-	rc = cxl_cmd_set_output_payload(cmd, NULL, memdev->payload_max);
-	if (rc) {
-		err(ctx, "%s: cmd setup failed: %s\n",
-		    cxl_memdev_get_devname(memdev), strerror(-rc));
-		goto out;
-	}
-
-	rc = cxl_cmd_submit(cmd);
-	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n", devname,
-		    strerror(-rc));
-		goto out;
-	}
-
-	rc = cxl_cmd_get_mbox_status(cmd);
-	if (rc != 0) {
-		err(ctx, "%s: firmware status: %d\n", devname, rc);
-		rc = -ENXIO;
-		goto out;
-	}
-
-	ret_len = cxl_cmd_get_event_record_get_payload(cmd, memdev, event_type);
-	if (ret_len < 0) {
-		rc = ret_len;
-		goto out;
-	}
-out:
-	cxl_cmd_unref(cmd);
-	return rc;
-}
-
-CXL_EXPORT struct cxl_cmd *
-cxl_cmd_new_clear_event_record(struct cxl_memdev *memdev, int type,
-			       bool clear_all, int handle)
-{
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd_clear_event_record_in *clear_event;
-	struct cxl_cmd *cmd;
-	int rc;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_CLEAR_EVENT);
-	if (!cmd)
-		return NULL;
-
-	rc = cxl_cmd_set_input_payload(cmd, NULL, sizeof(*clear_event));
-	if (rc) {
-		err(ctx, "%s: cmd setup failed: %s\n",
-		    cxl_memdev_get_devname(memdev), strerror(-rc));
-		goto out_fail;
-	}
-
-	clear_event = (struct cxl_cmd_clear_event_record_in *)
-			      cmd->send_cmd->in.payload;
-	clear_event->event_type = (u8)type;
-	if (clear_all) {
-		clear_event->flags = (u8)1;
-		return cmd;
-	}
-	clear_event->n_event_handle = 1;
-	clear_event->event_record_handle = cpu_to_le16(handle);
-	return cmd;
-
-out_fail:
-	cxl_cmd_unref(cmd);
-	return NULL;
-}
-
-CXL_EXPORT int cxl_memdev_clear_event_record(struct cxl_memdev *memdev,
-					     int type, bool clear_all,
-					     int handle)
-{
-	const char *devname = cxl_memdev_get_devname(memdev);
-	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
-	struct cxl_cmd *cmd;
-	int rc = 0;
-
-	cmd = cxl_cmd_new_clear_event_record(memdev, type, clear_all, handle);
-	if (!cmd)
-		return -ENOMEM;
-
-	rc = cxl_cmd_submit(cmd);
-	if (rc < 0) {
-		err(ctx, "%s: cmd submission failed: %s\n", devname,
-		    strerror(-rc));
-		goto out;
-	}
-	rc = cxl_cmd_get_mbox_status(cmd);
-	if (rc != 0) {
-		err(ctx, "%s: firmware status: %d\n", devname, rc);
-		rc = -ENXIO;
-	}
-out:
-	cxl_cmd_unref(cmd);
-	return rc;
 }

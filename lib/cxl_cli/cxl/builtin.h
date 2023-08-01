@@ -22,42 +22,6 @@ int cmd_create_region(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_enable_region(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_disable_region(int argc, const char **argv, struct cxl_ctx *ctx);
 int cmd_destroy_region(int argc, const char **argv, struct cxl_ctx *ctx);
-
-int cmd_get_poison(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_inject_poison(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_clear_poison(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_get_timestamp(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_set_timestamp(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_get_event_record(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_clear_event_record(int argc, const char **argv, struct cxl_ctx *ctx);
-
-int cmd_group_zone(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_group_node(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_group_noop(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_group_dax(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_group_list(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_group_add(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_group_remove(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_get_latency_matrix(int argc, const char **argv, struct cxl_ctx *ctx);
-
-int cmd_disable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_enable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_check_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_flush_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_disable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_enable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_check_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_flush_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
-
-int cmd_identify(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_get_health_info(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_get_alert_config(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_set_alert_config(int argc, const char **argv, struct cxl_ctx *ctx);
-
-int cmd_get_firmware_info(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_transfer_firmware(int argc, const char **argv, struct cxl_ctx *ctx);
-int cmd_activate_firmware(int argc, const char **argv, struct cxl_ctx *ctx);
-
 #ifdef ENABLE_LIBTRACEFS
 int cmd_monitor(int argc, const char **argv, struct cxl_ctx *ctx);
 #else
@@ -67,5 +31,43 @@ static inline int cmd_monitor(int argc, const char **argv, struct cxl_ctx *ctx)
 		"cxl monitor: unavailable, rebuild with '-Dlibtracefs=enabled'\n");
 	return EXIT_FAILURE;
 }
+#endif
+#ifdef ENABLE_SMDK_PLUGIN
+int cmd_get_poison(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_inject_poison(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_clear_poison(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_timestamp(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_set_timestamp(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_event_record(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_clear_event_record(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_zone(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_node(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_noop(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_dax(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_list(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_add(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_group_remove(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_latency_matrix(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_disable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_enable_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_check_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_flush_cxlswap(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_disable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_enable_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_check_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_flush_cxlcache(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_identify(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_health_info(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_alert_config(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_set_alert_config(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_firmware_info(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_transfer_firmware(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_activate_firmware(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_shutdown_state(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_set_shutdown_state(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_scan_media_caps(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_scan_media(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_get_scan_media(int argc, const char **argv, struct cxl_ctx *ctx);
+int cmd_sanitize_memdev(int argc, const char **argv, struct cxl_ctx *ctx);
 #endif
 #endif /* _CXL_BUILTIN_H_ */

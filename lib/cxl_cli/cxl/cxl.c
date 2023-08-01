@@ -76,7 +76,8 @@ static struct cmd_struct commands[] = {
 	{ "enable-region", .c_fn = cmd_enable_region },
 	{ "disable-region", .c_fn = cmd_disable_region },
 	{ "destroy-region", .c_fn = cmd_destroy_region },
-	{ "get-poison", .c_fn = cmd_get_poison },
+	{ "monitor", .c_fn = cmd_monitor },
+#ifdef ENABLE_SMDK_PLUGIN
 	{ "inject-poison", .c_fn = cmd_inject_poison },
 	{ "clear-poison", .c_fn = cmd_clear_poison },
 	{ "set-timestamp", .c_fn = cmd_set_timestamp },
@@ -103,10 +104,16 @@ static struct cmd_struct commands[] = {
 	{ "get-health-info", .c_fn = cmd_get_health_info },
 	{ "get-alert-config", .c_fn = cmd_get_alert_config },
 	{ "set-alert-config", .c_fn = cmd_set_alert_config },
-	{ "monitor", .c_fn = cmd_monitor },
 	{ "get-firmware-info", .c_fn = cmd_get_firmware_info },
 	{ "transfer-firmware", .c_fn = cmd_transfer_firmware },
 	{ "activate-firmware", .c_fn = cmd_activate_firmware },
+	{ "get-shutdown-state", .c_fn = cmd_get_shutdown_state },
+	{ "set-shutdown-state", .c_fn = cmd_set_shutdown_state },
+	{ "get-scan-media-caps", .c_fn = cmd_get_scan_media_caps },
+	{ "scan-media", .c_fn = cmd_scan_media },
+	{ "get-scan-media", .c_fn = cmd_get_scan_media },
+	{ "sanitize-memdev", .c_fn = cmd_sanitize_memdev },
+#endif
 };
 
 int main(int argc, const char **argv)

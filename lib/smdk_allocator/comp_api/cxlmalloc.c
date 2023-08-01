@@ -1,4 +1,5 @@
 #include "internal/cxlmalloc.h"
+#include "internal/monitor.h"
 #include "jemalloc/jemalloc.h"
 #include <dlfcn.h>
 #include <numa.h>
@@ -92,6 +93,9 @@ int init_cxlmalloc(void) {
     set_exmem_partition_range_mask();
 
     smdk_info.smdk_initialized = true;
+
+    init_monitor_thread();
+
     return ret;
 }
 
@@ -163,7 +167,9 @@ inline int update_arena_pool(int prio, size_t allocated){
     */
 
     pthread_rwlock_rdlock(&pool->rwlock_zone_allocated);
-    if (pool->zone_allocated > (pool->zone_limit)*MB) { /* zone_limit: MB */
+    if (opt_smdk.use_adaptive_interleaving) {
+        pthread_rwlock_unlock(&pool->rwlock_zone_allocated);
+    } else if (pool->zone_allocated > (pool->zone_limit)*MB) { /* zone_limit: MB */
         pthread_rwlock_unlock(&pool->rwlock_zone_allocated);
         if(get_current_prio() != prio){
             return 0;
@@ -187,7 +193,8 @@ inline int update_arena_pool(int prio, size_t allocated){
 }
 
 tr_syscall_config opt_syscall = {
-    .orig_mmap = NULL,
+    .mmap = NULL,
+    .mmap64 = NULL,
     .is_initialized = false,
 };
 
@@ -200,14 +207,24 @@ inline int init_mmap_ptr(void){
         return SMDK_RET_SUCCESS;
     }
 
-    opt_syscall.orig_mmap = (mmap_ptr_t)dlsym(RTLD_NEXT, "mmap");
-    if (opt_syscall.orig_mmap == NULL) {
+    opt_syscall.mmap = (mmap_ptr_t)dlsym(RTLD_NEXT, "mmap");
+    if (opt_syscall.mmap == NULL) {
         fprintf(stderr, "Error in dlsym(RTLD_NEXT,\"mmap\")\n");
         return SMDK_RET_INIT_MMAP_PTR_FAIL;
-    } else {
-        opt_syscall.is_initialized = true;
-        return SMDK_RET_SUCCESS;
     }
+
+    opt_syscall.mmap64 = (mmap_ptr_t)dlsym(RTLD_NEXT, "mmap64");
+    if (opt_syscall.mmap64 == NULL) {
+        fprintf(stderr, "Error in dlsym(RTLD_NEXT,\"mmap64\")\n");
+        return SMDK_RET_INIT_MMAP_PTR_FAIL;
+    }
+
+    opt_syscall.is_initialized = true;
+    return SMDK_RET_SUCCESS;
+}
+
+inline void change_mmap_ptr_mmap64(void){
+    opt_syscall.mmap = opt_syscall.mmap64;
 }
 
 inline bool is_cur_prio_exmem(int *prio) {

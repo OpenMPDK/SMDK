@@ -96,6 +96,10 @@ typedef enum {
     policy_remain,          /* priority : 1->0->0->0->... */
 } maxmemory_policy_t;
 
+typedef enum {
+    policy_bw_saturation = 0,
+} adaptive_interleaving_policy_t;
+
 extern bool conf_next(char const **opts_p, char const **k_p, size_t *klen_p, char const **v_p, size_t *vlen_p);
 extern void smdk_init_helper(const char *envname, bool is_opt_api);
 extern char *str_priority(mem_zone_t prio);

@@ -5,25 +5,24 @@ cxl_src = [
   'bus.c',
   'region.c',
   'memdev.c',
-  'smdk.c',
-  'smdk_lat_matrix.c',
   'json.c',
   'filter.c',
+  '../daxctl/json.c',
+  '../daxctl/filter.c',
 ]
 
 if get_option('systemd').enabled()
   install_data('cxl-monitor.service', install_dir : systemdunitdir)
 endif
 
-numa_dep = cc.find_library('numa', required: false)
 deps = [
   cxl_dep,
+  daxctl_dep,
   util_dep,
   uuid,
   kmod,
   json,
   versiondep,
-  numa_dep,
 ]
 
 if get_option('libtracefs').enabled()
@@ -34,6 +33,18 @@ if get_option('libtracefs').enabled()
   deps += [
     traceevent,
     tracefs,
+  ]
+endif
+
+if get_option('smdkplugin').enabled()
+  cxl_src += [
+    'smdk/smdk_memdev.c',
+    'smdk/smdk_control.c',
+    'smdk/smdk_lat_matrix.c',
+  ]
+  numa_dep = cc.find_library('numa', required: false)
+  deps += [
+    numa_dep,
   ]
 endif
 

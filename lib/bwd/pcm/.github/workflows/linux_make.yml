@@ -1,0 +1,64 @@
+name: Linux make
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: cmake
+      run: |
+        rm -rf ${{ github.workspace }}/build
+        cmake -B ${{ github.workspace }}/build -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}
+    - name: make
+      run: |
+        cd ${{ github.workspace }}/build
+        make install -j
+  build-systemd-unit:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: cmake
+      run: |
+        rm -rf ${{ github.workspace }}/build
+        cmake -B ${{ github.workspace }}/build -DCMAKE_INSTALL_PREFIX=${{ github.workspace }} -DLINUX_SYSTEMD=TRUE -DLINUX_SYSTEMD_UNITDIR=${{ github.workspace }}/build/systemd
+    - name: make
+      run: |
+        cd ${{ github.workspace }}/build
+        make install -j
+  build-system-simdjson:
+    runs-on: ubuntu-20.04
+    container: ubuntu:22.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: install dependencies
+      run: |
+        apt update
+        apt -y --no-install-recommends install build-essential cmake libsimdjson-dev
+    - name: cmake
+      run: |
+        rm -rf ${{ github.workspace }}/build
+        cmake -B ${{ github.workspace }}/build -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}
+    - name: make
+      run: |
+        cd ${{ github.workspace }}/build
+        make install -j
+  build-source-simdjson:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: cmake
+      run: |
+        rm -rf ${{ github.workspace }}/build
+        cmake -B ${{ github.workspace }}/build -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}
+    - name: make
+      run: |
+        cd ${{ github.workspace }}/build
+        make install -j

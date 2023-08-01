@@ -7,6 +7,7 @@
 
 extern mem_zone_t get_cur_prioritized_memtype(void);
 extern bool is_tr_syscall_initialized(void);
+extern void change_mmap_ptr_mmap64(void);
 extern int update_arena_pool(int prio, size_t allocated);
 extern int init_mmap_ptr(void);
 extern int get_prio_by_type(mem_zone_t type);
@@ -30,7 +31,8 @@ extern int get_current_prio(void);
 typedef void *(*mmap_ptr_t)(void *, size_t, int, int, int, off_t);
 
 typedef struct {
-    mmap_ptr_t orig_mmap;
+    mmap_ptr_t mmap;
+    mmap_ptr_t mmap64;
     bool is_initialized;
     unsigned char calloc_buf[4096];
 } tr_syscall_config;

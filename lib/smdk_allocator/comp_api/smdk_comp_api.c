@@ -78,16 +78,22 @@ void *mmap(void *start, size_t len, int prot, int flags, int fd, off_t off) {
             }
         }
         set_interleave_policy(flags);
-        ret = opt_syscall.orig_mmap(start, len, prot, flags, fd, off);
+        ret = opt_syscall.mmap(start, len, prot, flags, fd, off);
         if (likely(ret)) {
             /* update_arena_pool only after smdk has been initialized */
             update_arena_pool(prio, len);
         }
     } else {
-        ret = opt_syscall.orig_mmap(start, len, prot, flags, fd, off);
+        ret = opt_syscall.mmap(start, len, prot, flags, fd, off);
     }
 
     return ret;
+}
+
+SMDK_EXPORT
+void *mmap64(void *start, size_t len, int prot, int flags, int fd, off_t off) {
+    change_mmap_ptr_mmap64();
+    return mmap(start, len, prot, flags, fd, off);
 }
 
 SMDK_EXPORT

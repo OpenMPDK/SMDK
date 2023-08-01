@@ -7,7 +7,7 @@ MLC=$BASEDIR/lib/mlc/Linux/mlc
 CLI=$BASEDIR/lib/cxl_cli/build/cxl/cxl
 GROUP=group-noop # group-zone, group-node
 
-if [ ! -e $CXL_CLI ]; then
+if [ ! -e $CLI ]; then
 	echo "cxl-cli does not exist. Run './build_lib.sh cxl_cli' at /path/to/SMDK/lib/"
 	exit
 fi

@@ -41,26 +41,19 @@ echo "$ cxl get-timestamp mem0"
 $CLI get-timestamp mem0
 
 # poison cmds
+# [Manual] Check poison list with cxl monitor
 log_normal "[inject-poison]"
-echo "$ cxl inject-poison mem0 -a $ADDRESS"
-$CLI inject-poison mem0 -a $ADDRESS
-
-log_normal "[get-poison]"
-echo "$ cxl get-poison mem0"
-$CLI get-poison mem0
+echo "$ cxl inject-poison mem0 -a 0x$ADDRESS"
+$CLI inject-poison mem0 -a 0x$ADDRESS
 
 log_normal "[clear-poison]"
-echo "$ cxl clear-poison mem0 -a $ADDRESS"
-$CLI clear-poison mem0 -a $ADDRESS
-
-log_normal "[get-poison]"
-echo "$ cxl get-poison mem0"
-$CLI get-poison mem0
+echo "$ cxl clear-poison mem0 -a 0x$ADDRESS"
+$CLI clear-poison mem0 -a 0x$ADDRESS
 
 # accessing poisoned address to generate event
 log_normal "[inject-poison]"
-echo "$ cxl inject-poison mem0 -a $ADDRESS"
-$CLI inject-poison mem0 -a $ADDRESS
+echo "$ cxl inject-poison mem0 -a 0x$ADDRESS"
+$CLI inject-poison mem0 -a 0x$ADDRESS
 
 log_normal "Accessing poison injected address"
 $CLI group-dax
@@ -80,6 +73,10 @@ log_normal "[get-event-record]"
 echo "$ cxl get-event-record mem0 -t 3"
 $CLI get-event-record mem0 -t 3
 
+log_normal "[clear-poison]"
+echo "$ cxl clear-poison mem0 -a 0x$ADDRESS"
+$CLI clear-poison mem0 -a 0x$ADDRESS
+
 # identify cmd
 log_normal "[identify]"
 echo "$ cxl identify mem0"
@@ -97,5 +94,32 @@ $CLI get-alert-config mem0
 log_normal "[set-alert-config]"
 echo "$ cxl set-alert-config mem0 -e life_used -a enable -t 50"
 $CLI set-alert-config mem0 -e life_used -a enable -t 50
+
+echo "$ cxl set-alert-config mem0 -e over_temperature -a enable -t 60"
+$CLI set-alert-config mem0 -e over_temperature -a enable -t 60
+
+echo "$ cxl set-alert-config mem0 -e under_temperature -a disable"
+$CLI set-alert-config mem0 -e under_temperature -a disable
+
+log_normal "[get-alert-config]"
+echo "$ cxl get-alert-config mem0"
+$CLI get-alert-config mem0
+
+# Shutdown State cmds
+log_normal "[set-shutdown-state]"
+echo "$ cxl set-shutdown-state mem0"
+$CLI set-shutdown-state mem0
+
+log_normal "[get-shutdown-state]"
+echo "$ cxl get-shutdown-state mem0"
+$CLI get-shutdown-state mem0
+
+log_normal "[set-shutdown-state]"
+echo "$ cxl set-shutdown-state mem0 --clean"
+$CLI set-shutdown-state mem0 --clean
+
+log_normal "[get-shutdown-state]"
+echo "$ cxl get-shutdown-state mem0"
+$CLI get-shutdown-state mem0
 
 exit 0

@@ -63,6 +63,8 @@ struct cxl_port {
 	size_t buf_len;
 	char *dev_path;
 	char *uport;
+	char *parent_dport_path;
+	struct cxl_dport *parent_dport;
 	int ports_init;
 	int endpoints_init;
 	int decoders_init;
@@ -149,6 +151,8 @@ struct cxl_region {
 	unsigned int interleave_ways;
 	unsigned int interleave_granularity;
 	enum cxl_decode_state decode_state;
+	enum cxl_decoder_mode mode;
+	struct daxctl_region *dax_region;
 	struct kmod_module *module;
 	struct list_head mappings;
 };
@@ -218,141 +222,7 @@ struct cxl_cmd_set_lsa {
 	le32 offset;
 	le32 rsvd;
 	unsigned char lsa_data[0];
-} __attribute__((packed));
-
-/**************** smdk ****************/
-
-struct media_error_record {
-	le64 dpa;
-	le32 len;
-	le32 rsvd;
-} __attribute__((packed));
-
-struct cxl_cmd_poison_get_list_in {
-	le64 address;
-	le64 address_length;
-} __attribute__((packed));
-
-struct cxl_cmd_poison_get_list {
-	u8 flags;
-	u8 rsvd;
-	le64 overflow_timestamp;
-	le16 count;
-	u8 rsvd2[0x14];
-	struct media_error_record rcd[];
-} __attribute__((packed));
-
-struct cxl_cmd_clear_poison_in {
-	le64 address;
-	unsigned int clear_data[16];
-} __attribute__((packed));
-
-struct cxl_cmd_clear_event_record_in {
-	u8 event_type;
-	u8 flags;
-	u8 n_event_handle;
-	u8 rsvd[3];
-	le16 event_record_handle;
-} __attribute__((packed));
-
-struct common_event_record {
-	unsigned short event_record_len : 8;
-	unsigned short event_record_flags : 6;
-	unsigned int flag_rsvd : 18;
-	le32 event_record_handle;
-	le64 timestamp;
-	u8 rsvd[0x10];
-} __attribute__((packed));
-
-struct media_event {
-	unsigned int uuid[4];
-	struct common_event_record rcd;
-	le64 physical_address;
-	u8 memory_event_desc;
-	u8 memory_event_type;
-	u8 transaction_type;
-	le16 validity_flags;
-	u8 channel;
-	u8 rank;
-	int device : 24;
-	le64 component_identifier[2];
-	u8 rsvd[0x2e];
-} __attribute__((packed));
-
-struct cxl_cmd_get_event_record_out {
-	u8 flags;
-	u8 rsvd;
-	le16 overflow_count;
-	le64 first_overflow_timestamp;
-	le64 last_overflow_timestamp;
-	le16 event_records_count;
-	u8 rsvd2[10];
-	struct media_event event[];
-} __attribute__((packed));
-#define POISON_ADDR_MASK 0xFFFFFFFFFFFFFFF8
-#define POISON_SOURCE_MASK 0x7
-#ifndef BIT
-#define BIT(_x) (1 << (_x))
-#endif
-
-/* CXL 3.0 8.2.9.8.1.1 Identify Memory Device Poison Handling Capabilities */
-#define CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_INJECTS_PERSISTENT_POISON_MASK \
-	BIT(0)
-#define CXL_CMD_IDENTIFY_POISON_HANDLING_CAPABILITIES_SCANS_FOR_POISON_MASK \
-	BIT(1)
-
-/* CXL 3.0 8.2.9.8.1.1 Identify Memory Device QoS Telemetry Capabilities */
-#define CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_EGRESS_PORT_CONGESTION_MASK \
-	BIT(0)
-#define CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_TEMPORARY_THROUGHPUT_REDUCTION_MASK \
-	BIT(1)
-
-/* CXL 3.0. 8.2.9.8.3.3 Set Alert Configuration */
-struct cxl_cmd_set_alert_config {
-	u8 valid_alert_actions;
-	u8 enable_alert_actions;
-	u8 life_used_prog_warn_threshold;
-	u8 rsvd;
-	le16 dev_over_temperature_prog_warn_threshold;
-	le16 dev_under_temperature_prog_warn_threshold;
-	le16 corrected_volatile_mem_err_prog_warn_threshold;
-	le16 corrected_pmem_err_prog_warn_threshold;
-} __attribute__((packed));
-
-/* CXL 3.0 8.2.9.3.1 Get FW Info */
-#define CXL_CMD_FW_INFO_FW_REV_LENGTH 0x10
-
-struct cxl_cmd_get_firmware_info {
-	u8 slots_supported;
-	u8 slot_info;
-	u8 activation_caps;
-	u8 rsvd[13];
-	char fw_revisions[4][CXL_CMD_FW_INFO_FW_REV_LENGTH];
-} __attribute__((packed));
-
-/* CXL 3.0 8.2.9.3.1 Get FW Info Byte 1 FW Slot Info */
-#define CXL_CMD_FW_INFO_SLOT_ACTIVE_MASK GENMASK(2, 0)
-#define CXL_CMD_FW_INFO_SLOT_STAGED_MASK GENMASK(5, 3)
-
-/* CXL 3.0 8.2.9.3.1 Get FW Info Byte 2 FW Activation Capabilities */
-#define CXL_CMD_FW_INFO_ACTIVATION_CAPABILITIES_ONLINE_FW_ACTIVATION_MASK BIT(0)
-
-/* CXL 3.0 8.2.9.3.2 Transfer FW */
-struct cxl_cmd_transfer_firmware {
-	u8 action;
-	u8 slot;
-	le16 rsvd;
-	le32 offset;
-	u8 rsvd2[0x78];
-	unsigned char fw_data[0];
-} __attribute__((packed));
-
-/* CXL 3.0 8.2.9.3.3 Activate FW */
-struct cxl_cmd_activate_firmware {
-	u8 action;
-	u8 slot;
-} __attribute__((packed));
-/**************** smdk ****************/
+} __attribute__ ((packed));
 
 struct cxl_cmd_get_health_info {
 	u8 health_status;
@@ -364,6 +234,7 @@ struct cxl_cmd_get_health_info {
 	le32 volatile_errors;
 	le32 pmem_errors;
 } __attribute__((packed));
+
 /* CXL 3.0 8.2.9.8.3.2 Get Alert Configuration */
 struct cxl_cmd_get_alert_config {
 	u8 valid_alerts;

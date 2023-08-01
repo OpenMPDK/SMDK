@@ -43,6 +43,8 @@ smdk_config opt_smdk = {
     .exmem_zone_size = MAX_MEMZONE_LIMIT_MB, /* MB in size */
     .normal_zone_size = MAX_MEMZONE_LIMIT_MB, /* MB in size */
     .use_auto_arena_scaling = true, /* when enabled, create cpu*2 arenas overriding nr_normal_arena/nr_exmem_arena*/
+    .use_adaptive_interleaving = false,
+    .adaptive_interleaving_policy = 0, /* adaptive_interleaving_policy : bw_saturation */
     .nr_normal_arena = 1, /* the number of arena in arena pool */
     .nr_exmem_arena = 1, /* the number of arena in arena pool */
     .maxmemory_policy = 0, /* maxmemory_policy : oom, interleave, remain */
@@ -199,6 +201,7 @@ int init_smdk(void){
 
         init_arena_pool();
         smdk_info.smdk_initialized = true;
+
         return SMDK_RET_SUCCESS;
     } else {
         return SMDK_RET_USE_EXMEM_FALSE;

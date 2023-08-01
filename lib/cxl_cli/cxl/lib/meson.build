@@ -6,16 +6,27 @@ libcxl_version = '@0@.@1@.@2@'.format(
 mapfile = files('libcxl.sym')
 vflag = '-Wl,--version-script,@0@/@1@'.format(project_source_root, mapfile[0])
 
-cxl = library('cxl',
+libcxl_src = [
   '../../util/sysfs.c',
   '../../util/log.c',
   '../../util/log.h',
   'libcxl.c',
+]
+
+if get_option('smdkplugin').enabled()
+  libcxl_src += [
+    'smdk/smdk_libcxl.c',
+  ]
+endif
+
+cxl = library('cxl',
+  libcxl_src,
   include_directories : root_inc,
   dependencies : [
     uuid,
     kmod,
     libudev,
+    daxctl_dep,
   ],
   version : libcxl_version,
   install : true,

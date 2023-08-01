@@ -5,3 +5,11 @@
 *.files
 *.out
 lib
+
+# ctags files
+tags
+TAGS
+
+# cscope files
+cscope.*
+ncscope.*

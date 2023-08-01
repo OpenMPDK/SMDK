@@ -89,6 +89,8 @@ typedef struct smdk_config{
     size_t exmem_zone_size;        /* byte in size */
     size_t normal_zone_size;    /* byte in size */
     bool use_auto_arena_scaling;
+    bool use_adaptive_interleaving;
+    int adaptive_interleaving_policy;
     uint32_t nr_normal_arena;        /* the number of normal arena in arena pool */
     uint32_t nr_exmem_arena;        /* the number of exmem arena in arena pool */
     int maxmemory_policy;            /* what will you do on 2nd pool goes to maxmemory */

@@ -70,21 +70,6 @@ global:
 	cxl_memdev_zero_label;
 	cxl_memdev_write_label;
 	cxl_memdev_read_label;
-	cxl_memdev_inject_poison;
-	cxl_memdev_clear_poison;
-	cxl_memdev_get_poison;
-	cxl_memdev_set_timestamp;
-	cxl_memdev_get_timestamp;
-	cxl_memdev_get_event_record;
-	cxl_memdev_clear_event_record;
-	cxl_cmd_get_poison_get_payload;
-	cxl_cmd_get_timestamp_get_payload;
-	cxl_cmd_get_event_record_get_payload;
-	cxl_cmd_new_get_poison;
-	cxl_cmd_new_inject_poison;
-	cxl_cmd_new_clear_poison;
-	cxl_cmd_new_get_event_record;
-	cxl_cmd_new_clear_event_record;
 local:
         *;
 };
@@ -260,6 +245,25 @@ global:
 
 LIBCXL_5 {
 global:
+	cxl_region_get_mode;
+	cxl_decoder_create_ram_region;
+	cxl_region_get_daxctl_region;
+	cxl_port_get_parent_dport;
+} LIBCXL_4;
+
+/* smdk lib */
+LIBCXL_6 {
+global:
+	cxl_memdev_inject_poison;
+	cxl_memdev_clear_poison;
+	cxl_memdev_set_timestamp;
+	cxl_memdev_get_timestamp;
+	cxl_memdev_get_event_record;
+	cxl_memdev_clear_event_record;
+	cxl_cmd_get_timestamp_get_payload;
+	cxl_cmd_get_event_record_get_payload;
+	cxl_cmd_new_get_event_record;
+	cxl_cmd_new_clear_event_record;
 	cxl_cmd_identify_get_event_log_size;
 	cxl_cmd_identify_get_poison_list_max;
 	cxl_cmd_identify_get_inject_poison_limit;
@@ -277,4 +281,13 @@ global:
 	cxl_cmd_firmware_info_get_fw_rev;
 	cxl_cmd_new_transfer_firmware;
 	cxl_cmd_new_activate_firmware;
-} LIBCXL_4;
+	cxl_memdev_print_get_health_info;
+	cxl_cmd_new_set_shutdown_state;
+	cxl_cmd_new_get_scan_media_caps;
+	cxl_memdev_set_shutdown_state;
+	cxl_memdev_get_shutdown_state;
+	cxl_memdev_get_scan_media_caps;
+	cxl_memdev_scan_media;
+	cxl_memdev_get_scan_media;
+	cxl_memdev_sanitize;
+} LIBCXL_5;

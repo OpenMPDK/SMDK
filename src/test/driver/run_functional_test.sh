@@ -97,16 +97,19 @@ echo
 echo [KOBJECT RELEASE TEST]
 SYSFS_PATH=/sys/kernel/cxl
 KERNEL_NAME=`uname -r`
+rmmod cxl_acpi
 rmmod cxl_pci
 if [ $? == "0" ]; then
     if [ ! -d "$SYSFS_PATH" ]; then
         echo "kobject is released"
         echo "PASS"
         insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
+        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_acpi.ko
     else
         echo "koject release is failed"
         echo "FAIL"
         insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
+        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_acpi.ko
         exit 1
     fi
 else

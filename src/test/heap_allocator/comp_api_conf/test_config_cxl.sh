@@ -11,7 +11,7 @@ SCRIPT_PATH=$(readlink -f $(dirname $0))/
 CXLMALLOCDIR=$BASEDIR/lib/smdk_allocator/lib
 export LD_PRELOAD=$CXLMALLOCDIR/libcxlmalloc.so
 
-testcase=( t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17)
+testcase=( t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13 t14 t15 t16 t17 t18 t19 t20 t21 t22 t23)
 
 function t1(){
     CXLMALLOC_CONF=use_exmem:true
@@ -105,6 +105,36 @@ function t16(){
 function t17(){
     # exmem_partition_range: N-N
     CXLMALLOC_CONF=use_exmem:true,priority:exmem,exmem_partition_range:1-3
+    run_test $CXLMALLOC_CONF
+}
+
+function t18(){
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:false
+    run_test $CXLMALLOC_CONF
+}
+
+function t19(){
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true
+    run_test $CXLMALLOC_CONF
+}
+
+function t20(){
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true,adaptive_interleaving_policy:bw_saturation
+    run_test $CXLMALLOC_CONF
+}
+
+function t21(){
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true,adaptive_interleaving_policy:bw_saturation,priority:exmem
+    run_test $CXLMALLOC_CONF
+}
+
+function t22(){
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true,adaptive_interleaving_policy:bw_saturation,maxmemory_policy:interleave
+    run_test $CXLMALLOC_CONF
+}
+
+function t23(){
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true,adaptive_interleaving_policy:bw_saturation,exmem_zone_size:2g,normal_zone_size:4G
     run_test $CXLMALLOC_CONF
 }
 

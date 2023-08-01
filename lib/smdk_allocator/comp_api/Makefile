@@ -13,6 +13,7 @@ CORE_DIR=$(SMDK_ROOT_DIR)/core
 C_SRC := smdk_comp_api.c \
 	 cxlmalloc.c \
 	 cxlmalloc_cpp.cpp \
+	 monitor.c \
 	 $(CORE_DIR)/init.c \
 	 $(CORE_DIR)/alloc.c \
 	 $(CORE_DIR)/config.c
