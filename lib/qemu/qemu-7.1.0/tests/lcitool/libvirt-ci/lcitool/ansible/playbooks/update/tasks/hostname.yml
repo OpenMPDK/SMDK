@@ -1,4 +1,0 @@
----
-- name: Configure hostname
-  hostname:
-    name: '{{ inventory_hostname }}'

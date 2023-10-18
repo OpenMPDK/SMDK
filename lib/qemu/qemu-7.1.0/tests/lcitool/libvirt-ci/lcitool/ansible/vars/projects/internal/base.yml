@@ -1,5 +1,0 @@
----
-packages:
-  - ca-certificates
-  - git
-  - locales

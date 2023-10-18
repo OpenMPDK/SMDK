@@ -1,6 +1,31 @@
 # Changelog
 
-## v1.5: Adaptive Interleaving / Userspace CLI Tool (update)
+## v1.5.1: SMDK on QEMU
+
+**Support SMDK on QEMU**
+
+- QEMU supports CXL type3 volatile device since about v8.1.0.
+Reflecting the requirement out of CXL industry researchers, SMDK supports QEMU emulation since v1.5.1.
+The version allows using userspace plugins(library, cli, BM, testcases) and OS interfaces(swap and cache) on the QEMU v8.1.50 included.
+Please refer to https://github.com/OpenMPDK/SMDK/wiki/4.-Kernel#427-qemu to understand how to emulate CXL memory and SMDK on top of the QEMU.
+
+- Limitation
+group-noop is only supported on QEMU among three grouping functions - group-zone, group-node, and group-noop.
+MLC BW tool and PMU related SW are not working on QEMU due to the CPU emulation.
+
+
+**1. Kernel**
+- Patch on v6.4
+
+**2. QEMU**
+- QEMU v8.1.50 and launcher scripts
+
+**3. Documentation**
+- Kernel Guide (updated) : https://github.com/OpenMPDK/SMDK/wiki/4.-Kernel#427-qemu <br>
+
+<br>
+
+## v1.5: Adaptive Interleaving / Userspace CLI Tool / Kernel (update)
 
 **1. Adaptive Interleaving**
 
@@ -18,14 +43,21 @@ This is geared to mitigate imbalanced memory utilization of DDR/CXL memory witho
 > Deprecated: get poison list
 
 
+**3. Kernel**
 
-**3. Documentation**
+- Baseline v6.0-rc6 -> v6.4
+
+
+
+**4. Documentation**
 
 - Updated
-> SMDK Architecture: Intelligent Tiering Engine - https://github.com/OpenMPDK/SMDK/wiki/2.-SMDK-Architecture <br>
-> Installation Guide: Adaptive Interleaving - https://github.com/OpenMPDK/SMDK/wiki/3.-Installation <br> 
-> Plugin Guide: Adaptive Interleaving and New CXL spec commands - https://github.com/OpenMPDK/SMDK/wiki/5.-Plugin<br>
-> Experiment Result : Adaptive Interleaving - https://github.com/OpenMPDK/SMDK/wiki/7.-Experiment-Results<br>
+> SMDK Architecture: Intelligent Tiering Engine - https://github.com/OpenMPDK/SMDK/wiki/2.-SMDK-Architecture
+> Installation Guide: Adaptive Interleaving - https://github.com/OpenMPDK/SMDK/wiki/3.-Installation
+> Plugin Guide: Adaptive Interleaving and New CXL spec commands - https://github.com/OpenMPDK/SMDK/wiki/5.-Plugin
+> Experiment Result : Adaptive Interleaving - https://github.com/OpenMPDK/SMDK/wiki/7.-Experiment-Results
+
+<br>
 
 ## v1.4: CXL-Cache / Userspace CLI Tool (update)
 

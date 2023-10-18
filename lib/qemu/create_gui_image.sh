@@ -10,7 +10,7 @@ readonly BASEDIR=$(readlink -f $(dirname $0))/../../
 source "${BASEDIR}/script/common.sh"
 
 QEMU_PATH=${BASEDIR}/lib/qemu/
-QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
+QEMU_BUILD_PATH=${QEMU_PATH}/qemu-8.1.50/build/
 IMAGE_FILENAME=qemu-image-gui.img
 IMAGE_PATH=${QEMU_PATH}/${IMAGE_FILENAME}
 UBUNTU_ISO=/path/to/ubuntu.iso
@@ -32,7 +32,7 @@ if [ -f ${IMAGE_PATH} ]; then
 	exit 2
 fi
 
-${QEMU_BUILD_PATH}/qemu-img create -f qcow2 ${IMAGE_PATH} 32g
+${QEMU_BUILD_PATH}/qemu-img create -f qcow2 ${IMAGE_PATH} 64g
 
 sudo ${QEMU_SYSTEM_BINARY} \
     -smp 6 \

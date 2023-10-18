@@ -136,16 +136,36 @@ static int dev_dax_kmem_probe(struct dev_dax *dev_dax)
 		 */
 		res->flags = IORESOURCE_SYSTEM_RAM;
 
+#ifdef CONFIG_EXMEM
+		rc = add_subzone(numa_node, range.start, range.end);
+		if (rc) {
+			dev_warn(dev, "mapping%d: %#llx-%#llx subzone add failed\n",
+					i, range.start, range.end);
+			remove_resource(res);
+			kfree(res);
+			data->res[i] = NULL;
+			if (mapped)
+				continue;
+			goto err_request_mem;
+		}
+
 		/*
 		 * Ensure that future kexec'd kernels will not treat
 		 * this as RAM automatically.
 		 */
 		rc = add_memory_driver_managed(data->mgid, range.start,
+				range_len(&range), kmem_name, MHP_NID_IS_MGID | MHP_EXMEM);
+#else
+		rc = add_memory_driver_managed(data->mgid, range.start,
 				range_len(&range), kmem_name, MHP_NID_IS_MGID);
+#endif
 
 		if (rc) {
 			dev_warn(dev, "mapping%d: %#llx-%#llx memory add failed\n",
 					i, range.start, range.end);
+#ifdef CONFIG_EXMEM
+			remove_subzone(numa_node, range.start, range.end);
+#endif
 			remove_resource(res);
 			kfree(res);
 			data->res[i] = NULL;
@@ -195,6 +215,13 @@ static void dev_dax_kmem_remove(struct dev_dax *dev_dax)
 
 		rc = remove_memory(range.start, range_len(&range));
 		if (rc == 0) {
+#ifdef CONFIG_EXMEM
+			rc = remove_subzone(dev_dax->target_node, range.start, range.end);
+			if (rc)
+				dev_warn(dev, "mapping%d: %#llx-%#llx remove subzone failed\n",
+						i, range.start, range.end);
+#endif
+
 			remove_resource(data->res[i]);
 			kfree(data->res[i]);
 			data->res[i] = NULL;

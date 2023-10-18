@@ -5,7 +5,7 @@ readonly BASEDIR=$(readlink -f $(dirname $0))/../../
 source "${BASEDIR}/script/common.sh"
 
 QEMU_PATH=${BASEDIR}/lib/qemu/
-QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
+QEMU_BUILD_PATH=${QEMU_PATH}/qemu-8.1.50/build/
 SMDK_KERNEL_PATH=${BASEDIR}/lib/linux-6.4-smdk
 ROOTFS_PATH=${QEMU_PATH}
 MONITOR_PORT=45454
@@ -87,7 +87,6 @@ sudo ${QEMU_SYSTEM_BINARY} \
     -M cxl-fmw.0.targets.0=cxl.1,cxl-fmw.0.size=4G \
     -device pxb-cxl,bus_nr=12,bus=pcie.0,id=cxl.1 \
     -device cxl-rp,port=0,bus=cxl.1,id=root_port13,chassis=0,slot=2 \
-    -object memory-backend-file,id=cxl-mem1,share=on,mem-path=/tmp/cxltest.raw,size=256M \
-    -object memory-backend-file,id=cxl-lsa1,share=on,mem-path=/tmp/lsa.raw,size=256M \
-    -device cxl-type3,bus=root_port13,memdev=cxl-mem1,lsa=cxl-lsa1,id=cxl-mem0 \
+    -object memory-backend-ram,id=vmem0,share=on,size=1G \
+    -device cxl-type3,bus=root_port13,volatile-memdev=vmem0,id=cxl-vmem0
     ${NET_OPTION}

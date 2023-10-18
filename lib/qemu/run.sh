@@ -5,7 +5,7 @@ readonly BASEDIR=$(readlink -f $(dirname $0))/../../
 source "${BASEDIR}/script/common.sh"
 
 QEMU_PATH=${BASEDIR}/lib/qemu/
-QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
+QEMU_BUILD_PATH=${QEMU_PATH}/qemu-8.1.50/build/
 SMDK_KERNEL_PATH=${BASEDIR}/lib/linux-6.4-smdk
 ROOTFS_PATH=${QEMU_PATH}
 MONITOR_PORT=45454

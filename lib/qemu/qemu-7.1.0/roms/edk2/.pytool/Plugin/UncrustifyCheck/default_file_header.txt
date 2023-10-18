@@ -1,9 +1,0 @@
-/** @file
-  Brief description of the file's purpose.
-
-  Detailed description of the file's contents and other useful
-  information for a person viewing the file for the first time.
-
-  <<Copyright>>
-  SPDX-License-Identifier: BSD-2-Clause-Patent
-**/

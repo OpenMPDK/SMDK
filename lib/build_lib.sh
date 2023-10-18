@@ -20,7 +20,7 @@ UPROF=AMDuProf_Linux_x64_4.0.341
 NUMACTL=numactl-2.0.14
 CXL_KERNEL=linux-6.4-smdk
 CXL_KERNEL_CONFIG=config-linux-6.4-smdk
-QEMU=qemu-7.1.0
+QEMU=qemu-8.1.50
 MLC=mlc
 VOLTDB=$BASEDIR/src/app/voltdb
 CXLCLI=cxl_cli
@@ -83,7 +83,7 @@ function build_qemu(){
 	mkdir -p qemu/$app/build
 	cd qemu/$app/build
 	if [ ! -f "qemu-system-x86_64" ]; then
-		../configure --target-list=x86_64-softmmu --enable-debug
+		../configure --target-list=x86_64-softmmu --enable-debug --enable-slirp
 		make -j
 	fi
 	ret=$?

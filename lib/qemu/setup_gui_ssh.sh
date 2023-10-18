@@ -11,7 +11,7 @@ readonly BASEDIR=$(readlink -f $(dirname $0))/../../
 source "${BASEDIR}/script/common.sh"
 
 QEMU_PATH=${BASEDIR}/lib/qemu/
-QEMU_BUILD_PATH=${QEMU_PATH}/qemu-7.1.0/build/
+QEMU_BUILD_PATH=${QEMU_PATH}/qemu-8.1.50/build/
 IMAGE_PATH=${QEMU_PATH}/qemu-image-gui.img
 
 QEMU_SYSTEM_BINARY=${QEMU_BUILD_PATH}/qemu-system-x86_64

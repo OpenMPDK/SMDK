@@ -1,1 +1,0 @@
-../../examples/standalone/stubs.c

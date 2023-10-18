@@ -16,6 +16,7 @@ SW development
 * Woobin Lee
 * Changyoung Lee
 * Sangyoon Ji
+* Youngshin Park
 
 Product planning
 * Chonyong Lee

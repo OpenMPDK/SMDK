@@ -9,9 +9,6 @@
 #include <asm/div64.h>
 #include "cxlpci.h"
 #include "cxl.h"
-#ifdef CONFIG_EXMEM
-#include "cxlgroup.h"
-#endif
 
 #define CXL_RCRB_SIZE	SZ_8K
 
@@ -696,15 +693,6 @@ static int cxl_acpi_probe(struct platform_device *pdev)
 					   add_root_nvdimm_bridge);
 	if (rc < 0)
 		return rc;
-
-#ifdef CONFIG_EXMEM
-	rc = device_for_each_child(&root_port->dev, root_port,
-			add_cxl_info_cfmws);
-	if (rc < 0) {
-		pr_err("CXL: Failed to add cxl info with cedt.cfmws\n");
-		return rc;
-	}
-#endif
 
 	/* In case PCI is scanned before ACPI re-trigger memdev attach */
 	cxl_bus_rescan();

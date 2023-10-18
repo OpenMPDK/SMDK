@@ -39,6 +39,7 @@ apt-get install -y libevent-dev
 apt-get install -y libpixman-1-dev cgdb
 apt-get install -y openvpn
 apt-get install -y pkg-config libglib2.0-dev
+apt-get install -y libslirp-dev
 
 # dax
 apt-get install -y libpmem-dev

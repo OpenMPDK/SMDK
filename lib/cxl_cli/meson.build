@@ -318,11 +318,11 @@ ccan = static_library('ccan',
 ccan_dep = declare_dependency(link_with : ccan)
 
 subdir('daxctl/lib')
-#subdir('ndctl/lib')
+subdir('ndctl/lib')
 subdir('cxl/lib')
 subdir('util')
 #subdir('ndctl')
-#subdir('daxctl')
+subdir('daxctl')
 subdir('cxl')
 if get_option('docs').enabled()
 #  subdir('Documentation/ndctl')
