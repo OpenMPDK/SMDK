@@ -251,8 +251,22 @@ global:
 	cxl_port_get_parent_dport;
 } LIBCXL_4;
 
-/* smdk lib */
 LIBCXL_6 {
+global:
+	cxl_cmd_new_get_fw_info;
+	cxl_cmd_fw_info_get_num_slots;
+	cxl_cmd_fw_info_get_active_slot;
+	cxl_cmd_fw_info_get_staged_slot;
+	cxl_cmd_fw_info_get_online_activate_capable;
+	cxl_cmd_fw_info_get_fw_ver;
+	cxl_memdev_fw_update_in_progress;
+	cxl_memdev_fw_update_get_remaining;
+	cxl_memdev_update_fw;
+	cxl_memdev_cancel_fw_update;
+} LIBCXL_5;
+
+/* smdk lib */
+LIBCXL_7 {
 global:
 	cxl_memdev_inject_poison;
 	cxl_memdev_clear_poison;
@@ -290,4 +304,17 @@ global:
 	cxl_memdev_scan_media;
 	cxl_memdev_get_scan_media;
 	cxl_memdev_sanitize;
-} LIBCXL_5;
+	cxl_cmd_sld_qos_control_get_qos_telemetry_control;
+	cxl_cmd_sld_qos_control_get_egress_moderate_percentage;
+	cxl_cmd_sld_qos_control_get_egress_severe_percentage;
+	cxl_cmd_sld_qos_control_get_backpressure_sample_interval;
+	cxl_cmd_sld_qos_control_set_qos_telemetry_control;
+	cxl_cmd_sld_qos_control_set_egress_moderate_percentage;
+	cxl_cmd_sld_qos_control_set_egress_severe_percentage;
+	cxl_cmd_sld_qos_control_set_backpressure_sample_interval;
+	cxl_cmd_get_sld_qos_control;
+	cxl_cmd_get_sld_qos_status;
+	cxl_cmd_new_get_sld_qos_control;
+	cxl_cmd_new_set_sld_qos_control;
+	cxl_cmd_new_get_sld_qos_status;
+} LIBCXL_6;

@@ -18,6 +18,10 @@
 #include "filter.h"
 #include "json.h"
 
+#ifdef ENABLE_SMDK_PLUGIN
+#include "smdk/smdk_control.h"
+#endif
+
 static struct region_params {
 	const char *bus;
 	const char *size;
@@ -31,9 +35,17 @@ static struct region_params {
 	bool force;
 	bool human;
 	bool debug;
+#ifdef ENABLE_SMDK_PLUGIN
+	bool soft_interleaving;
+	const char *group_preset;
+	int target_node;
+#endif
 } param = {
 	.ways = INT_MAX,
 	.granularity = INT_MAX,
+#ifdef ENABLE_SMDK_PLUGIN
+	.target_node = -1,
+#endif
 };
 
 struct parsed_params {
@@ -48,6 +60,11 @@ struct parsed_params {
 	const char **argv;
 	struct cxl_decoder *root_decoder;
 	enum cxl_decoder_mode mode;
+#ifdef ENABLE_SMDK_PLUGIN
+	bool soft_interleaving;
+	const char *group_preset;
+	int target_node;
+#endif
 };
 
 enum region_actions {
@@ -82,9 +99,30 @@ OPT_BOOLEAN('m', "memdevs", &param.memdevs, \
 	    "non-option arguments are memdevs"), \
 OPT_BOOLEAN('u', "human", &param.human, "use human friendly number formats")
 
+#ifdef ENABLE_SMDK_PLUGIN
+#define CREATE_GROUP_OPTIONS() \
+OPT_BOOLEAN('V', "soft_interleaving", &param.soft_interleaving, \
+           "create soft-interelaving node(s)"), \
+OPT_STRING('G', "group", &param.group_preset, \
+          "group preset", "preset soft interleaving nodes configuration type (node or noop)"), \
+OPT_INTEGER('N', "target_node", &param.target_node, \
+           "soft-interleaving node id to add cxl devices followed")
+
+#define DESTROY_GROUP_OPTIONS() \
+OPT_BOOLEAN('V', "soft_interleaving", &param.soft_interleaving, \
+	    "destory(remove) soft-interelaving node(s)"), \
+OPT_INTEGER('N', "target_node", &param.target_node, \
+	    "soft-interleaving node id to remove cxl devices followed"), \
+OPT_INTEGER('w', "ways", &param.ways, \
+	    "number of cxldevs participating in the soft-interleaving node")
+#endif
+
 static const struct option create_options[] = {
 	BASE_OPTIONS(),
 	CREATE_OPTIONS(),
+#ifdef ENABLE_SMDK_PLUGIN
+	CREATE_GROUP_OPTIONS(),
+#endif
 	OPT_END(),
 };
 
@@ -102,6 +140,9 @@ static const struct option destroy_options[] = {
 	BASE_OPTIONS(),
 	OPT_BOOLEAN('f', "force", &param.force,
 		    "destroy region even if currently active"),
+#ifdef ENABLE_SMDK_PLUGIN
+	DESTROY_GROUP_OPTIONS(),
+#endif
 	OPT_END(),
 };
 
@@ -267,9 +308,77 @@ static bool validate_ways(struct parsed_params *p, int count)
 	return true;
 }
 
+#ifdef ENABLE_SMDK_PLUGIN
+static int parse_destory_options(struct cxl_ctx *ctx, int count,
+				 const char **mems, struct parsed_params *p)
+{
+	if (param.soft_interleaving) {
+		if (param.target_node != -1 && (count)) {
+			log_err(&rl, "must not specify cxl devices or ways\n");
+			return -EINVAL;
+		}
+		if (param.target_node == -1 && !count) {
+			log_err(&rl,
+				"must specify cxl devices e.g. cxl0, cxl1, ...\n");
+			return -EINVAL;
+		}
+		if (param.target_node == -1 && param.ways != count) {
+			log_err(&rl,
+				"number of cxl devices should be the same with the value 'ways(-w)'\n");
+			return -EINVAL;
+		}
+
+		p->soft_interleaving = true;
+		p->ways = (count) ? count : 0;
+		p->target_node = param.target_node;
+	}
+
+	return 0;
+}
+#endif
+
 static int parse_create_options(struct cxl_ctx *ctx, int count,
 				const char **mems, struct parsed_params *p)
 {
+#ifdef ENABLE_SMDK_PLUGIN
+	if (param.soft_interleaving) {
+		if (param.target_node == -1 && param.group_preset == NULL) {
+			log_err(&rl,
+				"no target node / group preset specified\n");
+			return -EINVAL;
+		}
+		if (param.group_preset != NULL) {
+			if (strncmp(param.group_preset, "node", 4) &&
+			    strncmp(param.group_preset, "noop", 4)) {
+				log_err(&rl,
+					"group preset should be 'node' or 'noop'\n");
+				return -EINVAL;
+			}
+			if (count) {
+				log_err(&rl,
+					"must not specify cxl devices or ways\n");
+				return -EINVAL;
+			}
+		}
+		if (param.target_node != -1 && !count) {
+			log_err(&rl,
+				"must specify cxl devices e.g. cxl0, cxl1, ...\n");
+			return -EINVAL;
+		}
+		if (param.target_node != -1 && (param.ways != count)) {
+			log_err(&rl,
+				"number of cxl devices should be the same with the value 'ways(-w)'\n");
+			return -EINVAL;
+		}
+
+		p->soft_interleaving = true;
+		p->ways = (count) ? count : 0;
+		p->group_preset = param.group_preset;
+		p->target_node = param.target_node;
+
+		return 0;
+	}
+#endif
 	if (!param.root_decoder) {
 		log_err(&rl, "no root decoder specified\n");
 		return -EINVAL;
@@ -300,11 +409,11 @@ static int parse_create_options(struct cxl_ctx *ctx, int count,
 		if (p->mode == CXL_DECODER_MODE_RAM && param.uuid) {
 			log_err(&rl,
 				"can't set UUID for ram / volatile regions");
-			return -EINVAL;
+			goto err;
 		}
 		if (p->mode == CXL_DECODER_MODE_NONE) {
 			log_err(&rl, "unsupported type: %s\n", param.type);
-			return -EINVAL;
+			goto err;
 		}
 	} else {
 		p->mode = CXL_DECODER_MODE_PMEM;
@@ -314,21 +423,21 @@ static int parse_create_options(struct cxl_ctx *ctx, int count,
 		p->size = parse_size64(param.size);
 		if (p->size == ULLONG_MAX) {
 			log_err(&rl, "Invalid size: %s\n", param.size);
-			return -EINVAL;
+			goto err;
 		}
 	}
 
 	if (param.ways <= 0) {
 		log_err(&rl, "Invalid interleave ways: %d\n", param.ways);
-		return -EINVAL;
+		goto err;
 	} else if (param.ways < INT_MAX) {
 		p->ways = param.ways;
 		if (!validate_ways(p, count))
-			return -EINVAL;
+			goto err;
 	} else if (count) {
 		p->ways = count;
 		if (!validate_ways(p, count))
-			return -EINVAL;
+			goto err;
 	} else
 		p->ways = p->num_memdevs;
 
@@ -336,7 +445,7 @@ static int parse_create_options(struct cxl_ctx *ctx, int count,
 		if (param.granularity <= 0) {
 			log_err(&rl, "Invalid interleave granularity: %d\n",
 				param.granularity);
-			return -EINVAL;
+			goto err;
 		}
 		p->granularity = param.granularity;
 	}
@@ -346,18 +455,22 @@ static int parse_create_options(struct cxl_ctx *ctx, int count,
 			log_err(&rl,
 				"size (%lu) is not an integral multiple of interleave-ways (%u)\n",
 				p->size, p->ways);
-			return -EINVAL;
+			goto err;
 		}
 	}
 
 	if (param.uuid) {
 		if (uuid_parse(param.uuid, p->uuid)) {
 			error("failed to parse uuid: '%s'\n", param.uuid);
-			return -EINVAL;
+			goto err;
 		}
 	}
 
 	return 0;
+
+err:
+	json_object_put(p->memdevs);
+	return -EINVAL;
 }
 
 static int parse_region_options(int argc, const char **argv,
@@ -383,6 +496,10 @@ static int parse_region_options(int argc, const char **argv,
 	switch(action) {
 	case ACTION_CREATE:
 		return parse_create_options(ctx, argc, argv, p);
+#ifdef ENABLE_SMDK_PLUGIN
+	case ACTION_DESTROY:
+		return parse_destory_options(ctx, argc, argv, p);
+#endif
 	default:
 		return 0;
 	}
@@ -607,7 +724,8 @@ static int create_region(struct cxl_ctx *ctx, int *count,
 	} else if (p->ep_min_size) {
 		size = p->ep_min_size * p->ways;
 	} else {
-		log_err(&rl, "%s: unable to determine region size\n", __func__);
+		log_err(&rl, "unable to determine region size\n");
+
 		return -ENXIO;
 	}
 	max_extent = cxl_decoder_get_max_available_extent(p->root_decoder);
@@ -675,7 +793,7 @@ static int create_region(struct cxl_ctx *ctx, int *count,
 		}
 		if (cxl_decoder_get_mode(ep_decoder) != p->mode) {
 			/*
-			 * The memdev_target_find_decoder() helper returns a free
+			 * The cxl_memdev_find_decoder() helper returns a free
 			 * decoder whose size has been checked for 0.
 			 * Thus it is safe to change the mode here if needed.
 			 */
@@ -829,6 +947,32 @@ static int decoder_region_action(struct parsed_params *p,
 	return err_rc ? err_rc : rc;
 }
 
+#ifdef ENABLE_SMDK_PLUGIN
+static int region_action_soft_interleaving(enum region_actions action,
+					   struct parsed_params *p, int *count)
+{
+	switch (action) {
+	case ACTION_CREATE:
+		if (p->group_preset == NULL) {
+			return soft_interleaving_group_add(
+				p->ways, p->argv, p->target_node, count);
+		} else {
+			if (!strncmp(p->group_preset, "node", 4)) {
+				return soft_interleaving_group_node(count);
+			} else { /* noop */
+				return soft_interleaving_group_noop(count);
+			}
+		}
+	case ACTION_DESTROY:
+		return soft_interleaving_group_remove(p->ways, p->argv,
+						      p->target_node, count);
+	default:
+		break;
+	}
+	return 0;
+}
+#endif
+
 static int region_action(int argc, const char **argv, struct cxl_ctx *ctx,
 			 enum region_actions action,
 			 const struct option *options, struct parsed_params *p,
@@ -841,6 +985,11 @@ static int region_action(int argc, const char **argv, struct cxl_ctx *ctx,
 	rc = parse_region_options(argc, argv, ctx, action, options, p, u);
 	if (rc)
 		return rc;
+
+#ifdef ENABLE_SMDK_PLUGIN
+	if (p->soft_interleaving)
+		return region_action_soft_interleaving(action, p, count);
+#endif
 
 	if (action == ACTION_CREATE)
 		return create_region(ctx, count, p);

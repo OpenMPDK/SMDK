@@ -1,10 +1,35 @@
 #!/usr/bin/env bash
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../../
+source "$BASEDIR/script/common.sh"
 
-ARGS=""
+ARGS=$@
+if [ ! -z $RUN_ON_QEMU ]; then
+	ARGS+=" size 33554432"
+fi
 
 SCRIPT_PATH=$(readlink -f $(dirname $0))/
 APP=$SCRIPT_PATH/test_alloc_onnode
+
+get_cxl_node() {
+    MOVABLES=`cat /proc/buddyinfo | grep Movable | awk '{ printf $2 }' | sed 's/.$//'`
+    IFS=',' read -ra tokens <<< "$MOVABLES"
+    for nid in "${tokens[@]}"; do
+        dirs=($(find /sys/devices/system/node/node$nid -maxdepth 1 -type l -name "cpu*"))
+        if [ ${#dirs[@]} -eq 0 ]; then
+            if [ -z "$CXLNODE" ]; then
+                CXLNODE=$nid
+                break
+            fi
+        fi
+    done
+
+    if [ -z "$CXLNODE" ]; then
+        log_error "cxl node doesn't exist."
+        exit 2
+    fi
+
+    ARGS+=" node $CXLNODE"
+}
 
 function run_app(){
 ## dynamic link
@@ -17,7 +42,7 @@ function run_app(){
         $APP $ARGS
 }
 
-ARGS=$@
+get_cxl_node
 run_app
 ret=$?
 

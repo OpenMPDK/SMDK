@@ -15,7 +15,7 @@ void s_stats_node_print(char unit);
 size_t s_get_memsize_total(smdk_memtype_t type);
 size_t s_get_memsize_used(smdk_memtype_t type);
 size_t s_get_memsize_available(smdk_memtype_t type);
-void *s_malloc_node(smdk_memtype_t type, size_t size, char* nodes);
+void *s_malloc_node(smdk_memtype_t type, size_t size, char* node);
 void s_free_node(smdk_memtype_t type, void* mem, size_t size);
 void s_enable_node_interleave(char* nodes);
 void s_disable_node_interleave(void);

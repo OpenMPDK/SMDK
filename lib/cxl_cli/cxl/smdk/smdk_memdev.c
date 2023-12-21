@@ -38,6 +38,12 @@ static struct parameters {
 	bool secure_erase;
 	const char *poison_address;
 	const char *poison_len;
+	bool egress;
+	bool no_egress;
+	bool throughput;
+	unsigned egress_moderate_percentage;
+	unsigned egress_severe_percentage;
+	unsigned backpressure_sample_interval;
 } param;
 
 static struct log_ctx ml;
@@ -107,6 +113,20 @@ OPT_BOOLEAN('e', "secure-erase", &param.secure_erase, \
 	    "secure erase a memdev"),		      \
 OPT_BOOLEAN('s', "sanitize", &param.sanitize,	      \
 	    "sanitize a memdev")
+
+#define SET_QOS_CONTROL_OPTION()				\
+OPT_BOOLEAN('e', "egress_port_congestion", &param.egress,	\
+	    "enable egress port congestion"),			\
+OPT_BOOLEAN('d', "no_egress_port_congestion", &param.no_egress,	\
+	    "disable egress port congestion"),			\
+OPT_BOOLEAN('t', "throughput_reduction", &param.throughput,	\
+	    "enable temporary throughput reduction"),		\
+OPT_UINTEGER('m', "egress_moderate_percent", &param.egress_moderate_percentage,	\
+	    "Threshold in percent for Egress Port Congestion mechanism to indicate moderate congestion (1-100)"), \
+OPT_UINTEGER('s', "egress_severe_percent", &param.egress_severe_percentage,	\
+	    "Threshold in percent for Egress Port Congestion mechanism to indicate severe congestion (1-100)"), \
+OPT_UINTEGER('i', "backpressure_sample_interval", &param.backpressure_sample_interval,	\
+	    "Interval in ns for Egress Port Congestion mechanism to take sample(1-15)")
 
 static const struct option get_timestamp_options[] = {
 	BASE_OPTIONS(),
@@ -207,6 +227,17 @@ static const struct option sanitize_options[] = {
 static const struct option poison_options[] = {
 	BASE_OPTIONS(),
 	POISON_OPTIONS(),
+	OPT_END(),
+};
+
+static const struct option get_qos_options[] = {
+	BASE_OPTIONS(),
+	OPT_END(),
+};
+
+static const struct option set_qos_control_options[] = {
+	BASE_OPTIONS(),
+	SET_QOS_CONTROL_OPTION(),
 	OPT_END(),
 };
 
@@ -1213,6 +1244,151 @@ static int action_sanitize_memdev(struct cxl_memdev *memdev,
 	return rc;
 }
 
+static int action_get_sld_qos_control(struct cxl_memdev *memdev,
+				      struct action_context *actx)
+{
+	const char *devname = cxl_memdev_get_devname(memdev);
+	struct cxl_cmd *cmd;
+	int rc = 0;
+
+	cmd = cxl_cmd_new_get_sld_qos_control(memdev);
+	if (!cmd) {
+		rc = -ENXIO;
+		log_err(&ml, "%s: cmd alloc failed: %s\n", devname,
+			strerror(-rc));
+		return rc;
+	}
+
+	rc = cxl_cmd_set_output_payload(cmd, NULL, sizeof(u32));
+	if (rc) {
+		log_err(&ml, "%s: cmd setup failed: %s\n", devname,
+			strerror(-rc));
+		goto out;
+	}
+
+	rc = cxl_cmd_submit(cmd);
+	if (rc < 0) {
+		log_err(&ml, "%s: cmd submission failed: %s\n", devname,
+			strerror(-rc));
+		goto out;
+	}
+
+	rc = cxl_cmd_get_mbox_status(cmd);
+	if (rc != 0) {
+		log_err(&ml, "%s: firmware status: %d\n", devname, rc);
+		rc = -ENXIO;
+		goto out;
+	}
+
+	rc = cxl_cmd_get_sld_qos_control(cmd);
+out:
+	cxl_cmd_unref(cmd);
+	return rc;
+}
+
+static int action_set_sld_qos_control(struct cxl_memdev *memdev,
+				      struct action_context *actx)
+{
+	const char *devname = cxl_memdev_get_devname(memdev);
+	struct cxl_cmd *cmd;
+	int qos_telemetry_control = 0;
+	int rc = 0;
+
+	if ((param.egress && param.no_egress) ||
+	    (param.egress_moderate_percentage > 100) ||
+	    (param.egress_severe_percentage > 100) ||
+	    (param.backpressure_sample_interval > 15) ||
+	    (param.no_egress && param.backpressure_sample_interval)) {
+		rc = -EINVAL;
+		log_err(&ml, "%s: invalid option(s) failed: %s\n", devname,
+			strerror(-rc));
+		return rc;
+	}
+
+#define BIT_EGRESS_PORT_CONGESTION_ENABLE	(0)
+#define BIT_TEMPORARY_THROUGHPUT_REDUCTION_ENABLE (1)
+	if (param.egress)
+		qos_telemetry_control |=
+			(1 << BIT_EGRESS_PORT_CONGESTION_ENABLE);
+	if (param.throughput)
+		qos_telemetry_control |=
+			(1 << BIT_TEMPORARY_THROUGHPUT_REDUCTION_ENABLE);
+	if (!param.no_egress && !param.backpressure_sample_interval)
+		/* Set invalid value when user set nothing */
+		param.backpressure_sample_interval = 16;
+
+	cmd = cxl_cmd_new_set_sld_qos_control(
+		memdev, qos_telemetry_control, param.egress_moderate_percentage,
+		param.egress_severe_percentage,
+		param.backpressure_sample_interval);
+	if (!cmd) {
+		rc = -ENXIO;
+		log_err(&ml, "%s: cmd alloc failed: %s\n", devname,
+			strerror(-rc));
+		return rc;
+	}
+
+	rc = cxl_cmd_submit(cmd);
+	if (rc < 0) {
+		log_err(&ml, "%s: cmd submission failed: %s\n", devname,
+			strerror(-rc));
+		goto out;
+	}
+
+	rc = cxl_cmd_get_mbox_status(cmd);
+	if (rc != 0) {
+		log_err(&ml, "%s: firmware status: %d\n", devname, rc);
+		rc = -ENXIO;
+		goto out;
+	}
+
+out:
+	cxl_cmd_unref(cmd);
+	return rc;
+}
+
+static int action_get_sld_qos_status(struct cxl_memdev *memdev,
+				     struct action_context *actx)
+{
+	const char *devname = cxl_memdev_get_devname(memdev);
+	struct cxl_cmd *cmd;
+	int rc = 0;
+
+	cmd = cxl_cmd_new_get_sld_qos_status(memdev);
+	if (!cmd) {
+		rc = -ENXIO;
+		log_err(&ml, "%s: cmd alloc failed: %s\n", devname,
+			strerror(-rc));
+		return rc;
+	}
+
+	rc = cxl_cmd_set_output_payload(cmd, NULL, sizeof(u32));
+	if (rc) {
+		log_err(&ml, "%s: cmd setup failed: %s\n", devname,
+			strerror(-rc));
+		goto out;
+	}
+
+	rc = cxl_cmd_submit(cmd);
+	if (rc < 0) {
+		log_err(&ml, "%s: cmd submission failed: %s\n", devname,
+			strerror(-rc));
+		goto out;
+	}
+
+	rc = cxl_cmd_get_mbox_status(cmd);
+	if (rc != 0) {
+		log_err(&ml, "%s: firmware status: %d\n", devname, rc);
+		rc = -ENXIO;
+		goto out;
+	}
+
+	rc = cxl_cmd_get_sld_qos_status(cmd);
+out:
+	cxl_cmd_unref(cmd);
+	return rc;
+}
+
 static int memdev_action(int argc, const char **argv, struct cxl_ctx *ctx,
 			 int (*action)(struct cxl_memdev *memdev,
 				       struct action_context *actx),
@@ -1244,8 +1420,6 @@ static int memdev_action(int argc, const char **argv, struct cxl_ctx *ctx,
 				argc = 1;
 				break;
 			}
-			if (sscanf(argv[i], "cxl%lu", &id) == 1)
-				continue;
 			if (sscanf(argv[i], "mem%lu", &id) == 1)
 				continue;
 			if (sscanf(argv[i], "%lu", &id) == 1)
@@ -1571,6 +1745,40 @@ int cmd_sanitize_memdev(int argc, const char **argv, struct cxl_ctx *ctx)
 		"cxl sanitize-memdev <mem0> [<mem1>..<memn>] [<options>]");
 	log_info(&ml, "sanitation started on %d mem device%s\n",
 		 count >= 0 ? count : 0, count > 1 ? "s" : "");
+
+	return count >= 0 ? 0 : EXIT_FAILURE;
+}
+
+int cmd_get_sld_qos_control(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int count = memdev_action(
+		argc, argv, ctx, action_get_sld_qos_control, get_qos_options,
+		"cxl get-sld-qos-control <mem0> [<mem1>..<memn>] [<options>]");
+	log_info(&ml, "get-sld-qos-control %d mem%s\n", count >= 0 ? count : 0,
+		 count > 1 ? "s" : "");
+
+	return count >= 0 ? 0 : EXIT_FAILURE;
+}
+
+int cmd_set_sld_qos_control(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int count = memdev_action(
+		argc, argv, ctx, action_set_sld_qos_control,
+		set_qos_control_options,
+		"cxl set-sld-qos-control <mem0> [<mem1>..<memn>] [<options>]");
+	log_info(&ml, "set-sld-qos-control %d mem%s\n", count >= 0 ? count : 0,
+		 count > 1 ? "s" : "");
+
+	return count >= 0 ? 0 : EXIT_FAILURE;
+}
+
+int cmd_get_sld_qos_status(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int count = memdev_action(
+		argc, argv, ctx, action_get_sld_qos_status, get_qos_options,
+		"cxl get-sld-qos-status <mem0> [<mem1>..<memn>] [<options>]");
+	log_info(&ml, "get-sld-qos-status %d mem%s\n", count >= 0 ? count : 0,
+		 count > 1 ? "s" : "");
 
 	return count >= 0 ? 0 : EXIT_FAILURE;
 }

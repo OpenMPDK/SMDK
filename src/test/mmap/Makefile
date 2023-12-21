@@ -7,7 +7,7 @@ OBJS=test_mmap_cxl.o
 all: $(APP)
 
 $(APP): $(OBJS) 
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lnuma
 
 clean:
 	rm -rf *.o $(APP)

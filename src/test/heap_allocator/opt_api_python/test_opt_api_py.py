@@ -12,7 +12,7 @@ my_list = [1, 2, 3, 4]
 my_tuple = (1, 2, 3, 4)
 my_dictionary = {"key1":"value1", "key2":"value2", "key3":"value3"}
 my_arr = [my_int, my_float, my_str, my_bytes, my_list, my_tuple, my_dictionary]
-
+node_exmem = sys.argv[1]
 
 #test0: how to use
 #0-1 get smdk mem_obj by data
@@ -188,9 +188,9 @@ print("test 9 done")
 
 #test10: mem_obj_nodes
 memtype = py_smalloc.SMDK_MEM_EXMEM
-smdk_obj_node = py_smalloc.mem_obj_node(memtype, "0", "SMDK")
+smdk_obj_node = py_smalloc.mem_obj_node(memtype, node_exmem, "SMDK")
 #print(smdk_obj_node.data, smdk_obj_node.buf)
-smdk_obj_node2 = py_smalloc.mem_obj_node(memtype, "0", size=1024)
+smdk_obj_node2 = py_smalloc.mem_obj_node(memtype, node_exmem, size=1024)
 smdk_obj_node2.set("SMDK")
 #print(smdk_obj_node2.data, smdk_obj_node2.buf)
 smdk_obj_node2.set("Hello SMDK")
@@ -213,7 +213,7 @@ assert error_count == 1, "error did not occur for wrong argument"
 print("test 10_2 done")
 
 #test10_3: set data without resize
-smdk_obj_node = py_smalloc.mem_obj_node(memtype, "0", 777)
+smdk_obj_node = py_smalloc.mem_obj_node(memtype, node_exmem, 777)
 for raw_data in my_arr:
     smdk_obj_node.set(raw_data)
     assert type(smdk_obj_node.data) == type(raw_data), "type difference between raw data and copied one"
@@ -222,7 +222,7 @@ print("test 10_3 done")
 
 
 #test10_4: test with resize
-smdk_obj_node = py_smalloc.mem_obj_node(memtype, "0", "start")
+smdk_obj_node = py_smalloc.mem_obj_node(memtype, node_exmem, "start")
 for raw_data in my_arr:
     smdk_obj_node.resize(sys.getsizeof(raw_data))
     smdk_obj_node.set(raw_data)
@@ -232,7 +232,7 @@ print("test 10_4 done")
 
 #test10_5: test python types
 #list
-smdk_obj_node = py_smalloc.mem_obj_node(memtype, "0", my_list)
+smdk_obj_node = py_smalloc.mem_obj_node(memtype, node_exmem, my_list)
 for i in range(4):
     smdk_obj_node.data[i]=i
 print("changed list=", smdk_obj_node.data)

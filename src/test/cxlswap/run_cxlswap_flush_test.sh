@@ -56,16 +56,16 @@ function modify_cxlswap_to_disabled() {
 # - But some pages are referenced under flush so cannot be flushed
 #   which interfere with N-Way Grouping.
 # - If you run flush repeatly, these pages can be flushed out to disk eventually.
-# - Note that there's no CXL Swap's page in ZONE_EXMEM, ENV_SET_FAIL is returned.
+# - Note that there's no CXL Swap's page in CXL memory, ENV_SET_FAIL is returned.
 #   There's no problem to run flush itself in this case,
-#   but this TC only targets flush out CXL Swap's pages in ZONE_EXMEM.
+#   but this TC only targets flush out CXL Swap's pages in CXL memory.
 #   So we return ENV_SET_FAIL in this case.
 # Pass/Fail
 # - Pass : Flush Operation Finished Well.
 # - Fail/Error : Requirement not fulfilled.
 #                - Cannot find loaded CXLSwap module.
 #                - Cannot modify CXLSwap Status to Disabled (Maybe Not Sudo)
-#                - There's no CXL Swap's page in ZONE_EXMEM
+#                - There's no CXL Swap's page in CXL memory
 
 echo Flush Test Start
 check_privilege
@@ -78,7 +78,7 @@ if [ -e $DEBUGFS_EXIST ]; then
 	SAME_FILLED_PAGES=$(cat /sys/kernel/debug/cxlswap/same_filled_pages)
 	ENV_CHECK=$(($STORED_PAGES-$SAME_FILLED_PAGES))
 	if [ $ENV_CHECK -eq 0 ]; then
-		echo "There's no CXL Swap's page in ZONE_EXMEM"
+		echo "There's no CXL Swap's page in CXL memory"
 		exit $ENV_SET_FAIL
 	fi
 	echo Before Flush : ${ENV_CHECK}

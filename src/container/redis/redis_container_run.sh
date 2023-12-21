@@ -13,7 +13,7 @@ function run_app(){
 	echo 3 > /proc/sys/vm/drop_caches
 
 	CXLMALLOC_LIB=/usr/lib/libcxlmalloc.so
-	CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
+	CXLMALLOC_CONF=use_exmem:true,exmem_size:16384,normal_size:16384,maxmemory_policy:remain
 	if [ "$PRIORITY" == 'exmem' ]; then
 		CXLMALLOC_CONF+=,priority:exmem
 	elif [ "$PRIORITY" == 'normal' ]; then

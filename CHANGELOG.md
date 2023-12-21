@@ -1,5 +1,39 @@
 # Changelog
 
+## v2.0: Intelligent Tiering Engine / CMM-DC Device Support / Vanilla Linux Integration / Userspace CLI Tool
+
+- SMDK v2.0 expands the functionality of the Reference SDM solution for CXL Compute Pool(DDR/CMM-D/CMM-DC) and focuses on integration 
+with developing CXL SWs. The main contents are
+
+**1. Intelligent Tiering Engine**
+- Provide experimental memory tiering/pooling features to explore and lead to CXL usecases <br>
+- BW/Capacity-Aware tiering: BW order allocation, BW order fallback, Weighted page allocation <br>
+> BW-Aware tiering(v1.5~), Capacity-Aware tiering(v1.1~), Memory-Node SW Interleaving/Grouping(v1.2~), OS Level Swap/Cache(v1.3~)
+
+**2. CMM-DC Device Support**
+- DDR/CMM-D(a.k.a CXL MXP)/CMM-DC(a.k.a CXL PNM) Resource Allocator API and Testcases
+
+**3. Vanilla Linux Integration**
+- Mitigate changes in Linux MM and DD based on kernel v6.6 <br>
+- Using vanilla memory zoning and syscall, less dependency on CXL/DAX driver
+
+**4. CXL-CLI**
+- Support QoS CMDs and expand Region CMDs to configure SW interleaving/grouping
+
+**5. Use of CXL SW**
+- Use [OneMCC PNM Library](https://github.com/SAITPublic/PNMLibrary) and [Linux RFC by Gregory Price](https://lwn.net/Articles/946321)
+
+**6. Testcase and Documentation**
+- Apply v2.0 changes above and refactoring <br>
+> [SMDK Architecture](https://github.com/OpenMPDK/SMDK/wiki/2.-SMDK-Architecture) <br>
+> [Installation Guide](https://github.com/OpenMPDK/SMDK/wiki/3.-Installation) <br>
+> [Kernel Guide](https://github.com/OpenMPDK/SMDK/wiki/4.-Kernel) <br>
+> [Plugin Guide](https://github.com/OpenMPDK/SMDK/wiki/5.-Plugin) <br>
+- Introduce the new experimental result that shows the benefit of DDR(hot)/CXL(cold) tiering on GPT application using SMDK API <br>
+> [Experiment Results](https://github.com/OpenMPDK/SMDK/wiki/7.-Experiment-Results#743-gpt--smdk-optimization-path)
+
+<br>
+
 ## v1.5.1: SMDK on QEMU
 
 **Support SMDK on QEMU**
@@ -25,9 +59,9 @@ MLC BW tool and PMU related SW are not working on QEMU due to the CPU emulation.
 
 <br>
 
-## v1.5: Adaptive Interleaving / Userspace CLI Tool / Kernel (update)
+## v1.5: Intelligent Tiering Engine / Userspace CLI Tool / Kernel (update)
 
-**1. Adaptive Interleaving**
+**1. Intelligent Tiering Engine**
 
 - SMDK v1.5 supports a new DDR/CXL memory tiering scenario, *adaptive interleaving*, by expanding the Intelligent Tiering Engine.
 This is a DDR/CXL memory interleaving in a software manner to lead to an effective bandwidth aggregation of DDR/CXL memories.

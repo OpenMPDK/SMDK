@@ -22,14 +22,22 @@ source "$TCDIR/cxlcache_common.sh"
 
 echo Multi Thread Test Start
 check_privilege
-check_exmem_exist
+check_movable_exist
 check_cxlcache_exist
 check_dir_fs_type
 modify_cxlcache_to_enabled
 
-for i in 128m 256m;
+if [ -z $RUN_ON_QEMU ]; then
+	SIZE=("128m" "256m")
+	NUM_DIR=10
+else
+	SIZE=("16m" "32m")
+	NUM_DIR=3
+fi
+
+for i in "${SIZE[@]}";
 do
-	$CXLCACHE_TEST $i multi_thread $TEST_DIR 10
+	$CXLCACHE_TEST $i multi_thread $TEST_DIR $NUM_DIR
 	RETURN=$?
 	if [ $RETURN -eq $ENV_SET_FAIL ]; then
 		echo Environment setting for Test Fail.

@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+menuconfig PNM
+	tristate "PNM class resource manager"
+	depends on EXMEM
+	default y
+	help
+	  Support for management of SLS/IMDB class resource
+
+	  Create /sys/class/dev class resource
+	  with /dev/pnm/ devnode
+	  which used to create sls_resource and
+	  imdb_resource
+
+if PNM
+
+config SLS_RESOURCE
+	tristate "SLS Resource Manager"
+	depends on PNM
+	select PNM_LIB
+	default m
+	help
+	  Support for management of SLS device resources
+
+	  Create /dev/pnm/sls_resource entry which is responsible for
+	  providing such sls device resources as: cunits, memory to userspace
+	  by means of ioctl interface. Also it provide monitoring facilities
+	  using sysfs interface.
+
+menuconfig IMDB_RESOURCE
+	tristate "IMDB Resource Manager"
+	depends on PNM
+	select PNM_LIB
+	default m
+	help
+	  Support for management of CXL-IMDB device resources
+
+	  Create /dev/pnm/imdb_resourceX device that provides IOCTL
+	  interface to handle IMDB resources like memory, threads and
+	  cores.
+
+if SLS_RESOURCE
+
+choice
+	prompt "Choose PNM SLS type"
+	depends on SLS_RESOURCE
+	default DEV_SLS_CXL
+	help
+	  Choose SLS accelerator device type. Currently both AXDIMM and CXL
+	  SLS accelerators exclude each other, so you should choose only one.
+	  The main differences between AXDIMM and CXL accelerator is the bus type,
+	  total memory and accelerators core count.
+
+config DEV_SLS_AXDIMM
+	bool "AXDIMM"
+	help
+	  Axdimm SLS accelerator is placed in DIMM slot and uses
+	  RDIMM interface. It has 2 channels and 2 interleaved rank
+	  per chip select. One rank has 16GB, so AXDIMM totally
+	  has 64GB of memory. Every rank has one SLS compute unit,
+	  so AXDIMM has 4 accelerator cores, which can access only its own rank.
+
+config DEV_SLS_CXL
+	bool "CXL"
+	help
+	  CXL SLS accelerator placed in CXL slot. It has 2 channels
+	  and 2 rank in each channel. One rank has 16GB of memory, but
+	  only first rank in each channel accessible, so SLS CXL can
+	  use only 32GB of memory. Every channel has one SLS compute unit,
+	  which can access only their own channel.
+
+endchoice
+
+config DEV_SLS_BUS
+	int
+	depends on SLS_RESOURCE
+	default 1 if DEV_SLS_AXDIMM
+	default 2 if DEV_SLS_CXL
+	default 0
+
+config DEV_SLS_CXL_BUS_DRIVER
+	tristate "CXL bus driver for SLS"
+	depends on SLS_RESOURCE && CXL_PCI && CXL_ACPI && DEV_SLS_CXL && DEV_DAX
+	default m
+	help
+	  Enable SLS CXL device auto detection in CXL subsystem
+
+	  When this option is enabled, SLS can be detected on CXL
+	  bus. Then if SLS is detected, SLS and DAX devices are started
+	  automatically.
+endif
+
+if IMDB_RESOURCE
+
+config CXL_IMDB
+	tristate "CXL bus driver for In-memory database accelerator"
+	depends on CXL_BUS && CXL_ACPI && DEV_DAX && IMDB_RESOURCE
+	default m
+	help
+	  Enable IMDB accelerator support on CXL bus
+
+	  IMDB accelerator is a Type 2 CXL device - a PNM
+	  device. It is incorporated into memory attached
+	  through the CXL interface.
+
+endif
+
+endif

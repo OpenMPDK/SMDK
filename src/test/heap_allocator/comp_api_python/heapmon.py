@@ -4,6 +4,7 @@
 import gc
 import os
 import time
+import argparse
 
 ##########################################################################################
 class MemMonitor:
@@ -77,11 +78,15 @@ class MemMonitor:
 		return '%s: %s'% (msg, str(self))
 
 ##########################################################################################
-def test(hm):
+parser = argparse.ArgumentParser()
+parser.add_argument('-iter', help=' : iterations', default=50000000)
+args = parser.parse_args()
+
+def test(hm, args):
 	print(hm.check('Before allocation'))
 	# print 'Before allocating ', rss(),
 
-	iterations = 50000000
+	iterations = int(args.iter)
 	l = {}
 	for i in range(iterations):
 		l[i] = ({})
@@ -111,10 +116,11 @@ def test(hm):
 
 
 ##########################################################################################
+
 if __name__ == '__main__':
     hm = MemMonitor()
     repeat = 10
     for i in range(repeat):
         print()
-        test(hm)
+        test(hm, args)
         time.sleep(2)

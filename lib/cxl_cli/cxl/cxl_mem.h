@@ -53,6 +53,9 @@
 	___C(TRANSFER_FW, "Transfer FW Package"),                         \
 	___C(ACTIVATE_FW, "Activate FW"),                                 \
 	___C(SANITIZE, "Sanitize Memdev"),                                \
+	___C(GET_SLD_QOS_CONTROL, "Get SLD QoS Control"),		  \
+	___C(SET_SLD_QOS_CONTROL, "Set SLD QoS Control"),		  \
+	___C(GET_SLD_QOS_STATUS, "Get SLD QoS Status"),			  \
 	___C(MAX, "invalid / last command")
 
 #define ___C(a, b) CXL_MEM_COMMAND_ID_##a

@@ -68,6 +68,7 @@ static struct cmd_struct commands[] = {
 	{ "enable-memdev", .c_fn = cmd_enable_memdev },
 	{ "reserve-dpa", .c_fn = cmd_reserve_dpa },
 	{ "free-dpa", .c_fn = cmd_free_dpa },
+	{ "update-firmware", .c_fn = cmd_update_fw },
 	{ "disable-port", .c_fn = cmd_disable_port },
 	{ "enable-port", .c_fn = cmd_enable_port },
 	{ "set-partition", .c_fn = cmd_set_partition },
@@ -84,13 +85,6 @@ static struct cmd_struct commands[] = {
 	{ "get-timestamp", .c_fn = cmd_get_timestamp },
 	{ "get-event-record", .c_fn = cmd_get_event_record },
 	{ "clear-event-record", .c_fn = cmd_clear_event_record },
-	{ "group-zone", .c_fn = cmd_group_zone },
-	{ "group-node", .c_fn = cmd_group_node },
-	{ "group-noop", .c_fn = cmd_group_noop },
-	{ "group-dax", .c_fn = cmd_group_dax },
-	{ "group-list", .c_fn = cmd_group_list },
-	{ "group-add", .c_fn = cmd_group_add },
-	{ "group-remove", .c_fn = cmd_group_remove },
 	{ "get-latency-matrix", .c_fn = cmd_get_latency_matrix },
 	{ "disable-cxlswap", .c_fn = cmd_disable_cxlswap },
 	{ "enable-cxlswap", .c_fn = cmd_enable_cxlswap },
@@ -113,6 +107,9 @@ static struct cmd_struct commands[] = {
 	{ "scan-media", .c_fn = cmd_scan_media },
 	{ "get-scan-media", .c_fn = cmd_get_scan_media },
 	{ "sanitize-memdev", .c_fn = cmd_sanitize_memdev },
+	{ "get-sld-qos-control", .c_fn = cmd_get_sld_qos_control },
+	{ "set-sld-qos-control", .c_fn = cmd_set_sld_qos_control },
+	{ "get-sld-qos-status", .c_fn = cmd_get_sld_qos_status },
 #endif
 };
 

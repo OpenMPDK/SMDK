@@ -46,14 +46,14 @@ int put_get_correctness();
 int modify_put_get_correctness();
 int multi_thread();
 int multi_process();
-int put_exmem_page();
+int put_cxl_page();
 
 test_info_t test_list[TEST_NUM] = {
 	{ &put_get_correctness, "put_get_correctness" },
 	{ &modify_put_get_correctness, "modify_put_get_correctness" },
 	{ &multi_thread, "multi_thread" },
 	{ &multi_process, "multi_process" },
-	{ &put_exmem_page, "put_exmem_page" }
+	{ &put_cxl_page, "put_cxl_page" }
 };
 
 pid_t pid;
@@ -82,7 +82,7 @@ void input_help_message()
 	printf("e.g. $CXLCACHE_TEST $i multi_thread $TCDIR 10 -> Testing by 10 threads");
 	printf("\n\n");
 	printf("Support test list below\n");
-	printf("put_get_correctness modify_put_get_correctness multi_thread multi_process put_exmem_page");
+	printf("put_get_correctness modify_put_get_correctness multi_thread multi_process put_cxl_page");
 	printf("\n");
 }
 

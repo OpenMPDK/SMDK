@@ -112,21 +112,8 @@ typedef int malloc_cpuid_t;
 #endif
 
 /* mmap flag */
-#ifndef MAP_NORMAL
-#define MAP_NORMAL 0x400000
-#endif
-#ifndef MAP_EXMEM
-#define MAP_EXMEM 0x200000
-#endif
 #ifndef MAP_JEMALLOC_INTERNAL_MMAP
 #define MAP_JEMALLOC_INTERNAL_MMAP 0x800000
 #endif
-
-#define MEM_ZONE_EXMEM (1)
-#define MEM_ZONE_NORMAL (0)
-
-typedef struct {
-    struct bitmask *nodemask;
-}cpu_node_config_t;
 
 #endif /* JEMALLOC_INTERNAL_TYPES_H */

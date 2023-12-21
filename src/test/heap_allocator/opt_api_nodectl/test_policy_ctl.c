@@ -1,3 +1,8 @@
+/*
+ * Remove this test if the new allcator library cannot support
+ * s_enable_node_interleave() and s_disable_node_interleave()
+ */
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,15 +12,17 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <numa.h>
+#include <sys/mman.h>
 
 #include "smdk_opt_api.h"
 
 #define MAX_NUM_THREADS (100)
 
 size_t size = 64*1024*1024;
-int iter = 10;
+int iter = 100;
 int nthreads=1;
 char *node = "0-1";
+unsigned int flag = MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE;
 
 bool is_node_valid(char *node) {
     if (numa_parse_nodestring(node) == NULL) {
@@ -32,18 +39,16 @@ void* thd_start(void *arg) {
 
     s_enable_node_interleave(node);
     for(int i=0; i<iter/2; i++){
-        ptr1 = s_malloc(SMDK_MEM_EXMEM, size);
+        ptr1 = mmap(NULL, size, PROT_READ|PROT_WRITE, flag, -1, 0);
         assert(ptr1);
         memset(ptr1, '0', size);
-        //s_free(ptr1);
     }
 
     s_disable_node_interleave();
     for(int i=0; i<iter/2; i++){
-        ptr1 = s_malloc(SMDK_MEM_EXMEM, size);
+        ptr1 = mmap(NULL, size, PROT_READ|PROT_WRITE, flag, -1, 0);
         assert(ptr1);
         memset(ptr1, '0', size);
-        //s_free(ptr1);
     }
     printf("thread%d malloc test over\n",thread_num);
     return NULL;

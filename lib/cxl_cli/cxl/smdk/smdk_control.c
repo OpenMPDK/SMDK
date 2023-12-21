@@ -14,12 +14,11 @@
 #include <stdint.h>
 #include <cpuid.h>
 #include <signal.h>
+#include <numa.h>
 
 #define IOMEM "/proc/iomem"
-#define SYSFS_DAX_BIND "/sys/bus/dax/drivers/device_dax/bind"
-#define SYSFS_DAX_UNBIND "/sys/bus/dax/drivers/device_dax/unbind"
-#define SYSFS_DAX_MAP "/sys/devices/platform/hmem.%d/dax%d.0/mapping"
-#define SYSFS_DAX_MAP0 "/sys/devices/platform/hmem.%d/dax%d.0/mapping0"
+#define SYSFS_KMEM_NEWID   "/sys/bus/dax/drivers/kmem/new_id"
+#define SYSFS_KMEM_BIND	   "/sys/bus/dax/drivers/kmem/bind"
 
 #define SYSFS_CXL_DEVICES "/sys/kernel/cxl/devices"
 #define SYSFS_PCI_DEVICES "/sys/bus/pci/devices"
@@ -36,7 +35,7 @@
 
 #define MAX_NUMA_NODES (64)
 #define MAX_CHAR_LEN (1024)
-#define PCI_INFO_LEN (16)
+#define INFO_LEN       (16)
 #define MAX_ULLONG_LEN (32)
 
 #define PRINT_EVERY_NODE (-2)
@@ -51,6 +50,13 @@
 #define OFFSET_MODEL (4)
 #define OFFSET_EXT_MODEL (16)
 
+struct memdev_pci_info {
+	int id;
+	char pci_bus_addr[INFO_LEN];
+	char pci_cur_link_speed[INFO_LEN];
+	char pci_cur_link_width[INFO_LEN];
+};
+
 struct cxl_dev_info {
 	int num;
 	int node_id;
@@ -58,10 +64,9 @@ struct cxl_dev_info {
 	size_t start;
 	size_t size;
 	int state;
-	int memdev;
-	char pci_bus_addr[PCI_INFO_LEN];
-	char pci_cur_link_speed[PCI_INFO_LEN];
-	char pci_cur_link_width[PCI_INFO_LEN];
+	int num_memdev;
+	struct memdev_pci_info *memdev;
+	char name_daxdev[INFO_LEN];
 };
 
 int nr_socket;
@@ -117,47 +122,39 @@ static uint32_t get_msr_offset(void)
 	}
 }
 
-static int arg_to_int(const char *s, void (*fp)(void))
+struct range {
+	uint64_t start;
+	uint64_t end;
+};
+
+static inline uint64_t range_len(const struct range *range)
 {
-	int i = 0;
-	int size = strlen(s);
-
-	if (size == 0)
-		return 0;
-
-	for (i = 0; i < size; i++) {
-		if (!((s[i] >= '0' && s[i] <= '9') || s[i] == '-')) {
-			error("Invalid option. Aborting.\n");
-			fp();
-			exit(1);
-		}
-	}
-	return atoi(s);
+	return range->end - range->start + 1;
 }
 
-static int get_system_max_node(void)
+static int get_memdev_dvsec_ranges(int mdid, struct range *dvsec_ranges)
 {
-	int max_node_parse = 0;
-	char str[10];
+	char str[MAX_CHAR_LEN], mdpath[MAX_CHAR_LEN];
 	FILE *fp;
-	fp = fopen(SYSFS_NODE_POSSIBLE, "r");
-	if (!fp) {
-		error("cannot open %s.\nAborting.", SYSFS_NODE_POSSIBLE);
-		exit(1);
-	}
-	if (fgets(str, 10, fp) == NULL) {
-		error("cannot get content of %s.\nAborting.",
-		      SYSFS_NODE_POSSIBLE);
-		fclose(fp);
-		exit(1);
+	int cnt = 0;
+
+	sprintf(mdpath, "/sys/bus/cxl/devices/mem%d/dvsec_ranges", mdid);
+	fp = fopen(mdpath, "r");
+	if (!fp)
+		return 0;
+
+	while (fgets(str, sizeof(str), fp) != NULL) {
+		if (sscanf(str, "%lx-%lx", &dvsec_ranges[cnt].start,
+			   &dvsec_ranges[cnt].end) != 2) {
+			fclose(fp);
+			return cnt;
+		}
+		if (++cnt == 2)
+			break;
 	}
 
-	if (!sscanf(str, "0-%d", &max_node_parse)) {
-		fclose(fp);
-		return 0;
-	}
 	fclose(fp);
-	return max_node_parse;
+	return cnt;
 }
 
 static int get_nr_cxl_devs(void)
@@ -204,18 +201,18 @@ static int get_dev_state(int dev)
 
 	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/state", dev);
 	if (access(path, R_OK)) {
-		error("%s is not accessible.\nAborting.", path);
-		exit(1);
+		error("%s is not accessible.", path);
+		return -1;
 	}
 	fp = fopen(path, "r");
 	if (!fp) {
-		error("cannot open %s.\nAborting.", path);
-		exit(1);
+		error("cannot open %s.", path);
+		return -1;
 	}
 	if (fgets(str, 20, fp) == NULL) {
 		error("cannot get content of %s.\nAborting.", path);
 		fclose(fp);
-		exit(1);
+		return -1;
 	}
 	fclose(fp);
 	if (!strncmp(str, "online", 6))
@@ -329,28 +326,121 @@ static size_t get_dev_size(int dev)
 	return size;
 }
 
-static int get_dev_memdev(int dev)
+static int get_num_memdev(struct cxl_dev_info *dev)
+{
+	int num_memdev;
+	DIR *d;
+	struct dirent *de;
+	char path[MAX_CHAR_LEN];
+
+	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", dev->num);
+	num_memdev = 0;
+	d = opendir(path);
+	if (d) {
+		while ((de = readdir(d)) != NULL) {
+			if (strncmp(de->d_name, "mem", 3))
+				continue;
+			num_memdev++;
+		}
+		closedir(d);
+	}
+	return num_memdev;
+}
+
+static void get_dev_memdev(struct cxl_dev_info *dev)
 {
 	DIR *d;
 	struct dirent *de;
 	char path[MAX_CHAR_LEN];
-	int memdev_id = -1;
+	int memdev_id = 0;
 
-	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", dev);
+	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", dev->num);
+	dev->num_memdev = get_num_memdev(dev);
+	if (!dev->num_memdev) {
+		errno = EINVAL;
+		return;
+	}
+
+	dev->memdev = (struct memdev_pci_info *)calloc(
+		dev->num_memdev, sizeof(struct memdev_pci_info));
+	if (!dev->memdev) {
+		errno = ENOMEM;
+		return;
+	}
+
 	d = opendir(path);
 	if (d) {
 		char *endptr;
 		while ((de = readdir(d)) != NULL) {
 			if (strncmp(de->d_name, "mem", 3))
 				continue;
-			memdev_id = strtol(de->d_name + 3, &endptr, 0);
+			dev->memdev[memdev_id++].id =
+				strtol(de->d_name + 3, &endptr, 0);
 			if (endptr == (de->d_name + 3)) //no conversion case
 				continue;
-			break;
 		}
 		closedir(d);
 	}
-	return memdev_id;
+}
+
+static void get_name_daxdev(struct cxl_dev_info *dev)
+{
+	DIR *d;
+	struct dirent *de;
+	char path[MAX_CHAR_LEN];
+
+	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", dev->num);
+	d = opendir(path);
+	if (d) {
+		while ((de = readdir(d)) != NULL) {
+			if (!strncmp(de->d_name, "dax", 3)) {
+				strcpy(dev->name_daxdev, de->d_name);
+				break;
+			}
+		}
+		closedir(d);
+	}
+}
+
+static void get_dev_memdev2(struct cxl_dev_info *dev)
+{
+	DIR *d;
+	struct dirent *de;
+	char path[MAX_CHAR_LEN];
+	struct range dvsec_ranges[2];
+	int mdid, cnt;
+
+	if (!dev)
+		return;
+
+	dev->memdev = (struct memdev_pci_info *)calloc(
+		2, sizeof(struct memdev_pci_info));
+	if (!dev->memdev) {
+		errno = ENOMEM;
+		return;
+	}
+
+	sprintf(path, "/sys/bus/cxl/devices/");
+	dev->num_memdev = 0;
+	d = opendir(path);
+	if (!d)
+		return;
+
+	while ((de = readdir(d)) != NULL) {
+		if (strncmp(de->d_name, "mem", 3))
+			continue;
+		mdid = strtol(de->d_name + 3, NULL, 0);
+
+		cnt = get_memdev_dvsec_ranges(mdid, dvsec_ranges);
+		for (int i = 0; i < cnt; i++) {
+			if (dev->start == dvsec_ranges[i].start &&
+			    dev->size == range_len(&dvsec_ranges[i])) {
+				dev->memdev[dev->num_memdev++].id = mdid;
+			}
+		}
+	}
+
+	closedir(d);
 }
 
 static void get_dev_pci_info(struct cxl_dev_info *dev)
@@ -369,49 +459,65 @@ static void get_dev_pci_info(struct cxl_dev_info *dev)
 	};
 	char *tok;
 	FILE *fp;
-	size_t read_len, len = 0;
+	size_t read_len;
 	int sz_link;
 
-	/* get pci bus addr */
-	sprintf(path_symlink, "/sys/kernel/cxl/devices/cxl%d/mem%d", dev->num,
-		dev->memdev);
-	sz_link = readlink(path_symlink, path_bus_addr, MAX_CHAR_LEN);
-	if (sz_link < 0)
-		return;
-	tok = strtok(path_bus_addr, "/");
-	while (tok != NULL && len != 12) {
-		tok = strtok(NULL, "/");
-		len = strlen(tok);
-	}
-	strcpy(dev->pci_bus_addr, tok);
+	for (int i = 0; i < dev->num_memdev; i++) {
+		char *tokens[100];
+		int token_cnt = 0;
 
-	/* get link speed */
-	sprintf(path_link_speed, "%s/%s/current_link_speed", SYSFS_PCI_DEVICES,
-		dev->pci_bus_addr);
-	if (!access(path_link_speed, R_OK)) {
-		fp = fopen(path_link_speed, "r");
-		if (fp) {
-			read_len = fread(dev->pci_cur_link_speed, 1,
-					 PCI_INFO_LEN, fp);
-			dev->pci_cur_link_speed[read_len - 1] =
-				(char)0; //remove newline
-			fclose(fp);
+		/* get pci bus addr */
+		sprintf(path_symlink, "/sys/kernel/cxl/devices/cxl%d/mem%d",
+			dev->num, dev->memdev[i].id);
+		sz_link = readlink(path_symlink, path_bus_addr, MAX_CHAR_LEN);
+		if (sz_link < 0) {
+			sprintf(path_symlink, "/sys/bus/cxl/devices/mem%d",
+				dev->memdev[i].id);
+			sz_link = readlink(path_symlink, path_bus_addr,
+					   MAX_CHAR_LEN);
+			if (sz_link < 0)
+				return;
 		}
-	}
+		tok = strtok(path_bus_addr, "/");
+		while (tok != NULL) {
+			tokens[token_cnt++] = tok;
+			tok = strtok(NULL, "/");
+		}
+		strcpy(dev->memdev[i].pci_bus_addr, tokens[token_cnt - 2]);
 
-	/* get link width */
-	sprintf(path_link_width, "%s/%s/current_link_width", SYSFS_PCI_DEVICES,
-		dev->pci_bus_addr);
-	if (!access(path_link_width, R_OK)) {
-		fp = fopen(path_link_width, "r");
-		if (fp) {
-			read_len = fread(dev->pci_cur_link_width, 1,
-					 PCI_INFO_LEN, fp);
-			dev->pci_cur_link_width[read_len - 1] =
-				(char)0; //remove newline
-			if (strcmp(dev->pci_cur_link_width, "0") == 0)
-				sprintf(dev->pci_cur_link_width, "Unknown");
-			fclose(fp);
+		/* get link speed */
+		sprintf(path_link_speed, "%s/%s/current_link_speed",
+			SYSFS_PCI_DEVICES, dev->memdev[i].pci_bus_addr);
+		if (!access(path_link_speed, R_OK)) {
+			fp = fopen(path_link_speed, "r");
+			if (fp) {
+				read_len =
+					fread(dev->memdev[i].pci_cur_link_speed,
+					      1, INFO_LEN, fp);
+				dev->memdev[i].pci_cur_link_speed[read_len - 1] =
+					(char)0; //remove newline
+				fclose(fp);
+			}
+		}
+
+		/* get link width */
+		sprintf(path_link_width, "%s/%s/current_link_width",
+			SYSFS_PCI_DEVICES, dev->memdev[i].pci_bus_addr);
+		if (!access(path_link_width, R_OK)) {
+			fp = fopen(path_link_width, "r");
+			if (fp) {
+				read_len =
+					fread(dev->memdev[i].pci_cur_link_width,
+					      1, INFO_LEN, fp);
+				dev->memdev[i].pci_cur_link_width[read_len - 1] =
+					(char)0; //remove newline
+				if (strcmp(dev->memdev[i].pci_cur_link_width,
+					   "0") == 0)
+					sprintf(dev->memdev[i]
+							.pci_cur_link_width,
+						"Unknown");
+				fclose(fp);
+			}
 		}
 	}
 }
@@ -419,10 +525,15 @@ static void get_dev_pci_info(struct cxl_dev_info *dev)
 static void init_cxl_dev_info(void)
 {
 	int i;
+
 	nr_cxl_devs = get_nr_cxl_devs();
 	nr_socket = get_nr_socket();
-	max_node = get_system_max_node();
+	max_node = numa_max_node();
 	cxl_info = calloc(nr_cxl_devs, sizeof(struct cxl_dev_info));
+	if (!cxl_info) {
+		errno = ENOMEM;
+		return;
+	}
 
 	for (i = 0; i < nr_cxl_devs; i++) {
 		cxl_info[i].num = i;
@@ -431,42 +542,27 @@ static void init_cxl_dev_info(void)
 		cxl_info[i].state = get_dev_state(i);
 		cxl_info[i].start = get_dev_start_addr(i);
 		cxl_info[i].size = get_dev_size(i);
-		cxl_info[i].memdev = get_dev_memdev(i);
+		get_name_daxdev(&cxl_info[i]);
+		get_dev_memdev(&cxl_info[i]);
+		if (cxl_info[i].num_memdev == 0)
+			get_dev_memdev2(&cxl_info[i]);
 		get_dev_pci_info(&cxl_info[i]);
 	}
 }
 
-static bool is_dev_dax(int dev)
+static void finalize_cxl_dev_info(void)
 {
-	/* read /proc/iomem , check if dev is in dax mode */
-	char str[MAX_CHAR_LEN];
-	char devname[MAX_CHAR_LEN];
-	char *tok;
-	FILE *fp;
-
-	sprintf(devname, "dax%d.0", dev);
-	if (access(IOMEM, R_OK)) {
-		error("%s is not accessible.\nAborting.", IOMEM);
-		exit(1);
-	}
-	fp = fopen(IOMEM, "r");
-	while (1) {
-		if (fgets(str, MAX_CHAR_LEN, fp) == NULL) {
-			break;
+	int i;
+	if (cxl_info) {
+		for (i = 0; i < nr_cxl_devs; i++) {
+			if (cxl_info[i].memdev)
+				free(cxl_info[i].memdev);
 		}
-		tok = strtok(str, " ");
-		tok = strtok(NULL, " ");
-		tok = strtok(NULL, "\n");
-		if (!strcmp(tok, devname)) {
-			fclose(fp);
-			return true;
-		}
+		free(cxl_info);
 	}
-	fclose(fp);
-	return false;
 }
 
-static int write_to_path(const char *path, const char *buf)
+static int _write_to_path(const char *path, const char *buf, int quiet)
 {
 	int fd = open(path, O_WRONLY | O_CLOEXEC);
 	int n, len = strlen(buf) + 1;
@@ -479,11 +575,22 @@ static int write_to_path(const char *path, const char *buf)
 	n = write(fd, buf, len);
 	close(fd);
 	if (n < len) {
-		error("Failed to write %s to %s: %s\n", buf, path,
-		      strerror(errno));
+		if (!quiet)
+			error("Failed to write %s to %s: %s\n", buf, path,
+			      strerror(errno));
 		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
+}
+
+static int write_to_path(const char *path, const char *buf)
+{
+	return _write_to_path(path, buf, 0);
+}
+
+static int write_to_path_quiet(const char *path, const char *buf)
+{
+	return _write_to_path(path, buf, 1);
 }
 
 static int dev_change_node(int dev, int target_node)
@@ -499,132 +606,111 @@ static int dev_change_node(int dev, int target_node)
 	return write_to_path(path, buf);
 }
 
-static int dax_map(int dev, size_t start, size_t size)
+static int dax_remove_id(int dev)
 {
-	char map_path[MAX_CHAR_LEN], map0_path[MAX_CHAR_LEN];
-	char range[MAX_CHAR_LEN];
-
-	sprintf(map0_path, SYSFS_DAX_MAP0, dev, dev);
-	if (!access(map0_path, F_OK)) {
-		/* mapped already */
-		return EXIT_SUCCESS;
-	}
-
-	sprintf(map_path, SYSFS_DAX_MAP, dev, dev);
-	if (access(map_path, W_OK)) {
-		error("%s is not accessible.\n", map_path);
+	char *devname = cxl_info[dev].name_daxdev;
+	char path[MAX_CHAR_LEN];
+	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/%s/driver/remove_id", dev,
+		devname);
+	if (access(path, W_OK)) {
+		error("%s is not accessible.\n", path);
 		return EXIT_FAILURE;
 	}
-
-	sprintf(range, "%lx-%lx", start, start + size - 1);
-	return write_to_path(map_path, range);
-}
-
-static int dax_bind(int dev)
-{
-	char devname[MAX_CHAR_LEN];
-
-	if (access(SYSFS_DAX_BIND, W_OK)) {
-		error("%s is not accessible.\n", SYSFS_DAX_BIND);
-		return EXIT_FAILURE;
-	}
-	sprintf(devname, "dax%d.0", dev);
-
-	return write_to_path(SYSFS_DAX_BIND, devname);
+	return write_to_path(path, devname);
 }
 
 static int dax_unbind(int dev)
 {
-	char devname[MAX_CHAR_LEN];
-
-	if (access(SYSFS_DAX_UNBIND, W_OK)) {
-		error("%s is not accessible.\n", SYSFS_DAX_UNBIND);
+	char *devname = cxl_info[dev].name_daxdev;
+	char path[MAX_CHAR_LEN];
+	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/%s/driver/unbind", dev,
+		devname);
+	if (access(path, W_OK)) {
+		error("%s is not accessible.\n", path);
 		return EXIT_FAILURE;
 	}
-	sprintf(devname, "dax%d.0", dev);
-
-	return write_to_path(SYSFS_DAX_UNBIND, devname);
+	return write_to_path(path, devname);
 }
 
-static int register_dev_dax(int dev)
+static int kmem_new_id(int dev)
+{
+	char *devname = cxl_info[dev].name_daxdev;
+	return write_to_path(SYSFS_KMEM_NEWID, devname);
+}
+
+static int kmem_bind(int dev)
+{
+	char *devname = cxl_info[dev].name_daxdev;
+	return write_to_path_quiet(SYSFS_KMEM_BIND, devname);
+}
+
+#define RUN_AND_CHECK_FAIL(n)            \
+	do {                             \
+		ret = n;                 \
+		if (ret == EXIT_FAILURE) \
+			goto exit;       \
+	} while (0)
+
+static int register_kmem(int dev, int node_id)
 {
 	int ret = 0;
+	char path[MAX_CHAR_LEN];
 
-	ret = dev_change_node(dev, -1);
-	if (ret == EXIT_FAILURE)
-		return EXIT_FAILURE;
-	ret = dax_map(dev, cxl_info[dev].start, cxl_info[dev].size);
-	if (ret == EXIT_FAILURE)
-		return EXIT_FAILURE;
-	ret = dax_bind(dev);
+	RUN_AND_CHECK_FAIL(dax_remove_id(dev));
+	RUN_AND_CHECK_FAIL(dax_unbind(dev));
+	RUN_AND_CHECK_FAIL(kmem_new_id(dev));
+	kmem_bind(dev);
+	RUN_AND_CHECK_FAIL(dev_change_node(dev, node_id));
+
+	sprintf(path, "/sys/kernel/cxl/devices/cxl%d/%s/driver", dev,
+		cxl_info[dev].name_daxdev);
+	if (access(path, F_OK))
+		ret = EXIT_FAILURE;
+
+exit:
 	return ret;
 }
 
-static int unbind_all(void)
+#undef RUN_AND_CHECK_FAIL
+
+static int mode_node(int *count)
 {
-	int i = 0;
+	int ret, i = 0;
+	int target_node;
+	bool invalid_socket_id = false;
 
 	for (i = 0; i < nr_cxl_devs; i++) {
-		if (is_dev_dax(i)) {
-			if (dax_unbind(i) == EXIT_FAILURE)
-				return EXIT_FAILURE;
+		if (cxl_info[i].socket_id != -1) {
+			target_node = nr_socket + cxl_info[i].socket_id;
+		} else {
+			target_node = nr_socket;
+			invalid_socket_id = true;
 		}
-	}
-	return EXIT_SUCCESS;
-}
 
-static int mode_dax(int *devs, int n_target_devs)
-{
-	/* register devices in array devs to dax */
-	int i;
-	int ret = 0;
-	for (i = 0; i < n_target_devs; i++) {
-		/* if device is already dax, jump to next dev*/
-		if (is_dev_dax(devs[i]))
+		if (target_node == cxl_info[i].node_id)
 			continue;
-		ret = register_dev_dax(devs[i]);
+
+		ret = register_kmem(i, target_node);
 		if (ret == EXIT_FAILURE)
 			return ret;
 	}
+	*count = (invalid_socket_id) ? 1 : nr_socket;
 	return EXIT_SUCCESS;
 }
 
-static int mode_zone(void)
+static int mode_noop(int *count)
 {
-	int i = 0;
-	if (unbind_all() == EXIT_FAILURE)
-		return EXIT_FAILURE;
-	for (i = 0; i < nr_cxl_devs; i++) {
-		if (dev_change_node(i, cxl_info[i].socket_id) == EXIT_FAILURE)
-			return EXIT_FAILURE;
-	}
-	return EXIT_SUCCESS;
-}
-
-static int mode_node(void)
-{
-	int target_node, i = 0;
-	if (unbind_all() == EXIT_FAILURE)
-		return EXIT_FAILURE;
-	for (i = 0; i < nr_cxl_devs; i++) {
-		target_node = nr_socket + cxl_info[i].socket_id;
-		if (dev_change_node(i, target_node) == EXIT_FAILURE)
-			return EXIT_FAILURE;
-	}
-	return EXIT_SUCCESS;
-}
-
-static int mode_noop(void)
-{
-	int i = 0;
+	int ret, i = 0;
 	int target_node = nr_socket;
-	if (unbind_all() == EXIT_FAILURE)
-		return EXIT_FAILURE;
 	for (i = 0; i < nr_cxl_devs; i++) {
-		if (dev_change_node(i, target_node) == EXIT_FAILURE)
-			return EXIT_FAILURE;
+		if (target_node != cxl_info[i].node_id) {
+			ret = register_kmem(i, target_node);
+			if (ret == EXIT_FAILURE)
+				return ret;
+		}
 		target_node++;
 	}
+	*count = nr_cxl_devs;
 	return EXIT_SUCCESS;
 }
 
@@ -638,69 +724,28 @@ static void _print_cxl_info_dev(int dev_id)
 	printf("      \"size\":\"0x%lx\",\n", cxl_info[dev_id].size);
 	printf("      \"node_id\":\"%d\",\n", cxl_info[dev_id].node_id);
 	printf("      \"socket_id\":\"%d\",\n", cxl_info[dev_id].socket_id);
-	printf("      \"memdev\":\"%d\",\n", cxl_info[dev_id].memdev);
-	printf("      \"pci_bus_addr\":\"%s\",\n",
-	       cxl_info[dev_id].pci_bus_addr);
-	printf("      \"pci_cur_link_speed\":\"%s\",\n",
-	       cxl_info[dev_id].pci_cur_link_speed);
-	printf("      \"pci_cur_link_width\":\"%s\",\n",
-	       cxl_info[dev_id].pci_cur_link_width);
 	if (cxl_info[dev_id].state == 1)
 		printf("      \"state\":\"online\",\n");
 	else if (cxl_info[dev_id].state == 0)
 		printf("      \"state\":\"offline\",\n");
 	else
 		printf("      \"state\":\"error\",\n");
+	if (cxl_info[dev_id].num_memdev > 0)
+		printf("      \"memdev\":\n");
+	for (int i = 0; i < cxl_info[dev_id].num_memdev; i++) {
+		printf("      {\n");
+		printf("         \"memdev_id\":\"%d\",\n",
+		       cxl_info[dev_id].memdev[i].id);
+		printf("         \"pci_bus_addr\":\"%s\",\n",
+		       cxl_info[dev_id].memdev[i].pci_bus_addr);
+		printf("         \"pci_cur_link_speed\":\"%s\",\n",
+		       cxl_info[dev_id].memdev[i].pci_cur_link_speed);
+		printf("         \"pci_cur_link_width\":\"%s\",\n",
+		       cxl_info[dev_id].memdev[i].pci_cur_link_width);
+		printf("      }%s",
+		       (i < (cxl_info[dev_id].num_memdev - 1) ? ",\n" : "\n"));
+	}
 	printf("   }\n");
-}
-
-static void print_usage_group_dax(void)
-{
-	printf("*** cxl group-dax cmd usage ***\n\n");
-	printf("\tcxl group-dax [--dev <cxl0> [<cxl1>..<cxlN>]]\n");
-	printf("\t\t : Converts designated cxl device(s) into dax device(s).\n");
-	printf("\t\t   When the list of devices is not set, all cxl devices are converted into dax devices.\n");
-	printf("\t\t   ex) cxl group-dax\n");
-	printf("\t\t   ex) cxl group-dax --dev cxl0 cxl2\n\n");
-	return;
-}
-
-static void print_usage_group_add(void)
-{
-	printf("*** cxl group-add cmd usage ***\n\n");
-	printf("\tcxl group-add --target_node <node_id> --dev <cxl0> [<cxl1>..<cxlN>]\n");
-	printf("\t\t : Adds designated device(s) to target node.\n");
-	printf("\t\t   If the device(s) is already included in another node, it is automatically excluded from that node.\n");
-	printf("\t\t   ex) cxl group-add --target_node 1 --dev cxl0 cxl2\n\n");
-	return;
-}
-
-static void print_usage_group_remove(void)
-{
-	printf("*** cxl group-remove cmd usage ***\n\n");
-	printf("\tcxl group-remove --dev <cxl0> [<cxl1>..<cxlN>]\n");
-	printf("\t\t : Removes designated device(s) from its node, and make the device offline.\n");
-	printf("\t\t   ex) cxl group-remove --dev cxl1 cxl2 cxl4\n");
-	printf("\tcxl group-remove --node <node_id>\n");
-	printf("\t\t : Removes all cxl devices from specified node.\n");
-	printf("\t\t   ex) cxl group-remove --node 1\n\n");
-	return;
-}
-
-static void print_usage_group_list(void)
-{
-	printf("*** cxl group-list cmd usage ***\n\n");
-	printf("\tcxl group-list --dev [<cxlN>]\n");
-	printf("\t\t : Displays information of designated cxl device.\n");
-	printf("\t\t   If there is no specified device, this command shows information of all cxl devices in the system.\n");
-	printf("\t\t   ex) cxl group-list --dev\n");
-	printf("\t\t   ex) cxl group-list --dev cxl2\n");
-	printf("\tcxl group-list --node [<node_id>]\n");
-	printf("\t\t : Displays information about node-grouping status of designated node.\n");
-	printf("\t\t   If there is no specified  node, this command shows information of all nodes in the system.\n");
-	printf("\t\t   ex) cxl group-list --node\n");
-	printf("\t\t   ex) cxl group-list --node 1\n\n");
-	return;
 }
 
 static void print_usage_get_latency_matrix(void)
@@ -715,33 +760,30 @@ static void print_usage_get_latency_matrix(void)
 	printf("\t\t   --iteration <n>: iterate n times (default: iterate only 1 time)\n\n");
 }
 
-static int print_cxl_info_dev(int argc, const char **argv)
+static int print_cxl_info_dev(char *dev)
 {
 	int i;
 	int dev_id;
-	if (argc > 2)
-		goto inval_option;
-	if (argc == 2) {
-		if ((!sscanf(argv[1], "cxl%d", &dev_id)) ||
-		    (dev_id < 0 || dev_id >= nr_cxl_devs))
-			goto inval_option;
-	}
 
 	printf("[\n");
-	if (argc == 2) {
-		if (dev_id < nr_cxl_devs && dev_id >= 0)
-			_print_cxl_info_dev(dev_id);
-	} else {
+
+	if (dev == NULL) {
 		for (i = 0; i < nr_cxl_devs; i++)
 			_print_cxl_info_dev(i);
+	} else {
+		if ((!sscanf(dev, "cxl%d", &dev_id)) ||
+		    (dev_id < 0 || dev_id >= nr_cxl_devs))
+			goto inval_option;
+
+		_print_cxl_info_dev(dev_id);
 	}
+
 	printf("]\n");
 	return EXIT_SUCCESS;
 
 inval_option:
-	error("Invalid option. Aborting.\n");
-	print_usage_group_list();
-	return EXIT_FAILURE;
+	error("set valid cxl device(s) \n");
+	return -EINVAL;
 }
 
 static int print_cxl_info_node(int target_node)
@@ -752,7 +794,6 @@ static int print_cxl_info_node(int target_node)
 	if ((target_node != PRINT_EVERY_NODE) &&
 	    (target_node < -1 || target_node > max_node))
 		goto inval_option;
-
 	printf("[\n");
 	for (i = -1; i <= max_node; i++) {
 		if (target_node != PRINT_EVERY_NODE) {
@@ -778,65 +819,18 @@ static int print_cxl_info_node(int target_node)
 	return EXIT_SUCCESS;
 
 inval_option:
-	error("Invalid Node. Aborting.\n");
-	print_usage_group_list();
-	return EXIT_FAILURE;
-}
-
-static int group_dax(int argc, const char **argv)
-{
-	/*
-	 * If target mode is dax,
-	 * more args(target dev) should be handled
-	 */
-	int i = 0;
-	int ret = 0;
-	int n_target_devs = 0;
-	int *target_devs;
-
-	/*
-	 * If a user designates specific devices to convert into dax,
-	 * register the devices to target_dev_array.
-	 * Meanwhile, check if the devices are valid.
-	 */
-	if ((argc > 2) && !strcmp(argv[1], "--dev")) {
-		n_target_devs = argc - 2;
-		target_devs = malloc(sizeof(int) * n_target_devs);
-		for (i = 0; i < n_target_devs; i++) {
-			if (!sscanf(argv[i + 2], "cxl%d", &target_devs[i]))
-				goto inval_option;
-			if (target_devs[i] >= nr_cxl_devs)
-				goto inval_option;
-		}
-		ret = mode_dax(target_devs, n_target_devs);
-	} else if (argc == 1) {
-		/* register all devices to target_device_array */
-		n_target_devs = nr_cxl_devs;
-		target_devs = malloc(sizeof(int) * n_target_devs);
-		for (i = 0; i < n_target_devs; i++)
-			target_devs[i] = i;
-		ret = mode_dax(target_devs, n_target_devs);
-	} else {
-		error("Invalid option. Aborting.\n");
-		print_usage_group_dax();
-		return EXIT_FAILURE;
-	}
-	free(target_devs);
-	return ret;
-
-inval_option:
-	error("Invalid option. Aborting.\n");
-	print_usage_group_dax();
-	free(target_devs);
-	return EXIT_FAILURE;
+	error("set valid node id \n");
+	return -EINVAL;
 }
 
 static int add_devs_to_node(int target_node, int nr_devs, const char **devs)
 {
 	/* add cxl devices in array devs to target node. */
-	int i = 0;
+	int ret, i = 0;
 	int *dev_list;
 	dev_list = malloc(sizeof(int) * nr_devs);
+	if (!dev_list)
+		return EXIT_FAILURE;
 	for (i = 0; i < nr_devs; i++) {
 		/* check if devices are valid. */
 		if (!sscanf(devs[i], "cxl%d", &dev_list[i])) {
@@ -849,12 +843,40 @@ static int add_devs_to_node(int target_node, int nr_devs, const char **devs)
 		}
 	}
 	for (i = 0; i < nr_devs; i++) {
-		if (is_dev_dax(dev_list[i])) {
-			/* if device is dax device, unbind. */
-			if (dax_unbind(dev_list[i]) == EXIT_FAILURE)
-				goto inval_option;
+		ret = register_kmem(dev_list[i], target_node);
+		if (ret == EXIT_FAILURE)
+			goto inval_option;
+	}
+	free(dev_list);
+	return EXIT_SUCCESS;
+
+inval_option:
+	free(dev_list);
+	return EXIT_FAILURE;
+}
+
+static int remove_devs_from_node(int nr_devs, const char **devs)
+{
+	/* add cxl devices in array devs to target node. */
+	int ret, i = 0;
+	int *dev_list;
+	dev_list = malloc(sizeof(int) * nr_devs);
+	if (!dev_list)
+		return EXIT_FAILURE;
+	for (i = 0; i < nr_devs; i++) {
+		/* check if devices are valid. */
+		if (!sscanf(devs[i], "cxl%d", &dev_list[i])) {
+			error("Invalid option. Aborting.\n");
+			goto inval_option;
 		}
-		if (dev_change_node(dev_list[i], target_node) == EXIT_FAILURE)
+		if (dev_list[i] >= nr_cxl_devs) {
+			error("Invalid option. Aborting.\n");
+			goto inval_option;
+		}
+	}
+	for (i = 0; i < nr_devs; i++) {
+		ret = dev_change_node(dev_list[i], -1);
+		if (ret == EXIT_FAILURE)
 			goto inval_option;
 	}
 	free(dev_list);
@@ -870,6 +892,10 @@ static int remove_node(int target_node)
 	/* unload every cxl device in target node */
 	int i = 0;
 	int ret = 0;
+
+	if (target_node > max_node || target_node < 0)
+		goto inval_option;
+
 	for (i = 0; i < nr_cxl_devs; i++) {
 		if (cxl_info[i].node_id == target_node)
 			ret = dev_change_node(i, -1);
@@ -877,95 +903,9 @@ static int remove_node(int target_node)
 			return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
-}
-
-int group_add(int argc, const char **argv)
-{
-	int ret = 0;
-	int target_node = -2;
-	int nr_devs = 0;
-
-	if (argc < 5)
-		goto inval_option;
-	if (!strcmp(argv[1], "--target_node"))
-		target_node = arg_to_int(argv[2], print_usage_group_add);
-	else
-		goto inval_option;
-
-	if (target_node > max_node || target_node < -1)
-		goto inval_option;
-	if (!strcmp(argv[3], "--dev")) {
-		nr_devs = argc - 4;
-		ret = add_devs_to_node(target_node, nr_devs, argv + 4);
-		if (ret == EXIT_FAILURE)
-			print_usage_group_add();
-	} else {
-		goto inval_option;
-	}
-	return ret;
 
 inval_option:
 	error("Invalid option. Aborting.\n");
-	print_usage_group_add();
-	return EXIT_FAILURE;
-}
-
-int group_remove(int argc, const char **argv)
-{
-	int ret = 0;
-	int target_node = -1;
-	int nr_devs = 0;
-
-	if (argc < 3)
-		goto inval_option;
-	if (!strcmp(argv[1], "--dev")) {
-		nr_devs = argc - 2;
-		ret = add_devs_to_node(target_node, nr_devs, argv + 2);
-		if (ret)
-			print_usage_group_remove();
-	} else if (!strcmp(argv[1], "--node")) {
-		target_node = arg_to_int(argv[2], print_usage_group_remove);
-		if (target_node < -1 || target_node > max_node)
-			goto inval_option;
-		remove_node(target_node);
-	} else {
-		goto inval_option;
-	}
-	return ret;
-
-inval_option:
-	error("Invalid option. Aborting.\n");
-	print_usage_group_remove();
-	return EXIT_FAILURE;
-}
-
-int group_list(int argc, const char **argv)
-{
-	int ret = 0;
-	int target = 0;
-
-	if (argc < 2)
-		goto inval_option;
-	if (!strcmp(argv[1], "--dev"))
-		ret = print_cxl_info_dev(argc - 1, argv + 1);
-	else if (!strcmp(argv[1], "--node")) {
-		if (argc == 2)
-			ret = print_cxl_info_node(PRINT_EVERY_NODE);
-		else if (argc == 3) {
-			target = arg_to_int(argv[2], print_usage_group_list);
-			if (target > max_node || target < -1)
-				goto inval_option;
-			ret = print_cxl_info_node(target);
-		} else
-			goto inval_option;
-	} else {
-		goto inval_option;
-	}
-	return ret;
-
-inval_option:
-	error("Invalid option. Aborting.\n");
-	print_usage_group_list();
 	return EXIT_FAILURE;
 }
 
@@ -1544,82 +1484,94 @@ static int flush_cxlcache(void)
 	return EXIT_SUCCESS;
 }
 
-int cmd_group_zone(int argc, const char **argv, struct cxl_ctx *ctx)
+static int _soft_interleaving_group_add(int nr_devs, const char **devs,
+					int target_node)
+{
+	if (target_node > max_node || target_node < 0)
+		goto inval_option;
+
+	return add_devs_to_node(target_node, nr_devs, devs);
+
+inval_option:
+	error("Invalid option. Aborting.\n");
+	return EXIT_FAILURE;
+}
+
+static int _soft_interleaving_group_remove(int nr_devs, const char **devs,
+					   int target_node)
+{
+	if (target_node == -1)
+		return remove_devs_from_node(nr_devs, devs);
+	else
+		return remove_node(target_node);
+}
+
+int soft_interleaving_group_add(int argc, const char **argv, int target_node,
+				int *count)
 {
 	int ret = 0;
 
-	if (argc > 1)
-		error("This CMD does not require additional param(s)");
-
 	init_cxl_dev_info();
-	ret = mode_zone();
-	free(cxl_info);
+	ret = _soft_interleaving_group_add(argc, argv, target_node);
+	finalize_cxl_dev_info();
+	if (!ret)
+		*count = 1;
 	return ret;
 }
 
-int cmd_group_node(int argc, const char **argv, struct cxl_ctx *ctx)
+int soft_interleaving_group_remove(int argc, const char **argv, int target_node,
+				   int *count)
 {
 	int ret = 0;
 
-	if (argc > 1)
-		error("This CMD does not require additional param(s)");
-
 	init_cxl_dev_info();
-	ret = mode_node();
-	free(cxl_info);
+	ret = _soft_interleaving_group_remove(argc, argv, target_node);
+	finalize_cxl_dev_info();
+	if (!ret)
+		*count = 1;
 	return ret;
 }
 
-int cmd_group_noop(int argc, const char **argv, struct cxl_ctx *ctx)
+int soft_interleaving_group_node(int *count)
 {
 	int ret = 0;
 
-	if (argc > 1)
-		error("This CMD does not require additional param(s)");
-
 	init_cxl_dev_info();
-	ret = mode_noop();
-	free(cxl_info);
+	ret = mode_node(count);
+	finalize_cxl_dev_info();
 	return ret;
 }
 
-int cmd_group_dax(int argc, const char **argv, struct cxl_ctx *ctx)
+int soft_interleaving_group_noop(int *count)
 {
 	int ret = 0;
 
 	init_cxl_dev_info();
-	ret = group_dax(argc, argv);
-	free(cxl_info);
+	ret = mode_noop(count);
+	finalize_cxl_dev_info();
 	return ret;
 }
 
-int cmd_group_list(int argc, const char **argv, struct cxl_ctx *ctx)
+int soft_interleaving_group_list_node(int target)
 {
 	int ret = 0;
 
 	init_cxl_dev_info();
-	ret = group_list(argc, argv);
-	free(cxl_info);
+	if (target != -2)
+		ret = print_cxl_info_node(target);
+	else
+		ret = print_cxl_info_node(PRINT_EVERY_NODE);
+	finalize_cxl_dev_info();
 	return ret;
 }
 
-int cmd_group_add(int argc, const char **argv, struct cxl_ctx *ctx)
+int soft_interleaving_group_list_dev(char *dev)
 {
 	int ret = 0;
 
 	init_cxl_dev_info();
-	ret = group_add(argc, argv);
-	free(cxl_info);
-	return ret;
-}
-
-int cmd_group_remove(int argc, const char **argv, struct cxl_ctx *ctx)
-{
-	int ret = 0;
-
-	init_cxl_dev_info();
-	ret = group_remove(argc, argv);
-	free(cxl_info);
+	ret = print_cxl_info_dev(dev);
+	finalize_cxl_dev_info();
 	return ret;
 }
 

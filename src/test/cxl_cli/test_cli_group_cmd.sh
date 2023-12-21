@@ -29,59 +29,39 @@ function check_result() {
     print_sysinfo
 }
 
-TEST="[group-dax dev0]"
-log_normal "[group-dax dev0]"
-$CLI group-dax --dev cxl0
+log_normal "[create-region -V -G node]"
+$CLI create-region -V -G node
 check_result $?
 
-TEST="[group-dax (all)]"
-log_normal "[group-dax (all)]"
-$CLI group-dax
+log_normal "[create-region -V -G noop]"
+$CLI create-region -V -G noop
 check_result $?
 
-TEST="[group-zone]"
-log_normal "[group-zone]"
-$CLI group-zone
+log_normal "[list -V --list_dev]"
+$CLI list -V --list_dev
+
+log_normal "[-V --list_dev cxl0]"
+$CLI list -V --list_dev cxl0
+
+log_normal "[list -V --list_node]"
+$CLI list -V --list_node
+
+log_normal "[list -V --list_node 1]"
+$CLI list -V --list_node 1
+
+log_normal "[destroy-region -V -w 1 cxl0]"
+$CLI destroy-region -V -w 1 cxl0
 check_result $?
 
-TEST="[group-node]"
-log_normal "[group-node]"
-$CLI group-node
+log_normal "[destroy-region -V -N 1]"
+$CLI destroy-region -V -N 1
 check_result $?
 
-TEST="[group-noop]"
-log_normal "[group-noop]"
-$CLI group-noop
+log_normal "[create-region -V -N 1 -w 1 cxl0]"
+$CLI create-region -V -N 1 -w 1 cxl0
 check_result $?
 
-log_normal "[group-list --dev]"
-$CLI group-list --dev
-
-log_normal "[group-list --dev cxl0]"
-$CLI group-list --dev cxl0
-
-log_normal "[group-list --node]"
-$CLI group-list --node
-
-log_normal "[group-list --node 1]"
-$CLI group-list --node 1
-
-TEST="[group-remove --dev cxl0]"
-log_normal "[group-remove --dev cxl0]"
-$CLI group-remove --dev cxl0
-check_result $?
-
-TEST="[group-remove --node 1]"
-log_normal "[group-remove --node 1]"
-$CLI group-remove --node 1
-check_result $?
-
-TEST="[group-add --target_node 1 --dev cxl0]"
-log_normal "[group-add --target_node 1 --dev cxl0]"
-$CLI group-add --target_node 1 --dev cxl0
-check_result $?
-
-$CLI group-zone
+$CLI create-region -V -G noop
 
 echo
 if [ $TEST_FAIL -eq 0 ]; then

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../../
 
 SCRIPT_PATH=$(readlink -f $(dirname $0))/
@@ -11,10 +12,18 @@ function run_app(){
     
     case "$APP" in
         api)
-            $SCRIPT_PATH/test_metadata_api
+	    if [ -z $RUN_ON_QEMU ]; then
+		$SCRIPT_PATH/test_metadata_api
+	    else
+		$SCRIPT_PATH/test_metadata_api size 20
+	    fi
             ;;
         node)
-            $SCRIPT_PATH/test_metadata_api_node
+	    if [ -z $RUN_ON_QEMU ]; then
+		$SCRIPT_PATH/test_metadata_api_node
+	    else
+		$SCRIPT_PATH/test_metadata_api_node size 20
+	    fi
             ;;
         *)
             ;;

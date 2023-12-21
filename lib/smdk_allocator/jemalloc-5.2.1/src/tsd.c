@@ -21,8 +21,7 @@ JEMALLOC_TSD_TYPE_ATTR(tsd_t) tsd_tls = TSD_INITIALIZER;
 JEMALLOC_TSD_TYPE_ATTR(bool) JEMALLOC_TLS_MODEL tsd_initialized = false;
 bool tsd_booted = false;
 #elif (defined(JEMALLOC_TLS))
-JEMALLOC_TSD_TYPE_ATTR(tsd_set_t) tsd_set_tls = {{TSD_INITIALIZER, TSD_EXMEM_INITIALIZER}, \
-    MEM_ZONE_NORMAL, false};
+JEMALLOC_TSD_TYPE_ATTR(tsd_t) tsd_tls = TSD_INITIALIZER;
 pthread_key_t tsd_tsd;
 bool tsd_booted = false;
 #elif (defined(_WIN32))
@@ -49,9 +48,7 @@ tsd_init_head_t	tsd_init_head = {
 
 tsd_wrapper_t tsd_boot_wrapper = {
     false,
-    {TSD_INITIALIZER, TSD_EXMEM_INITIALIZER},
-    MEM_ZONE_NORMAL,
-    false
+    TSD_INITIALIZER,
 };
 bool tsd_booted = false;
 #endif

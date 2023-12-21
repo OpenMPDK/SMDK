@@ -22,12 +22,18 @@ source "$TCDIR/cxlcache_common.sh"
 
 echo Multi Process Test Start
 check_privilege
-check_exmem_exist
+check_movable_exist
 check_cxlcache_exist
 check_dir_fs_type
 modify_cxlcache_to_enabled
 
-for i in 256m 512m;
+if [ -z $RUN_ON_QEMU ]; then
+	SIZE=("256m" "512m")
+else
+	SIZE=("16m" "32m")
+fi
+
+for i in "${SIZE[@]}";
 do
 	$CXLCACHE_TEST $i multi_process $TEST_DIR
 	RETURN=$?

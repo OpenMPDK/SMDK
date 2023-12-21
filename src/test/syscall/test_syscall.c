@@ -10,7 +10,7 @@
 
 int main(void) {
 	unsigned long size = 4*1024*1024;
-	unsigned int flag = MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE|MAP_POPULATE;
+	unsigned int flag = MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE;
 	struct timeval startTime, endTime, gapTime;
 	unsigned int elapsedTime;
 	int i = 0;

@@ -98,15 +98,22 @@ arena_get(tsdn_t *tsdn, unsigned ind, bool init_if_missing) {
 }
 
 static inline void
-arena_set_mmap_flag(arena_t* arena, int flag){
+arena_set_smdk_flag(arena_t* arena, int pid, struct bitmask* nodemask){
     assert(arena);
-    arena->arena_mmap_flag = flag;
+    arena->arena_pid = pid;
+    arena->arena_nodemask = nodemask;
 }
 
 static inline int
-arena_get_mmap_flag(arena_t* arena){
+arena_get_pid(arena_t* arena){
     assert(arena);
-    return arena->arena_mmap_flag;
+    return arena->arena_pid;
+}
+
+static inline struct bitmask*
+arena_get_nodemask(arena_t* arena){
+    assert(arena);
+    return arena->arena_nodemask;
 }
 
 static inline ticker_t *

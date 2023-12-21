@@ -53,7 +53,7 @@ int put_get_correctness()
 
 	/* Test end, summray */
 	if (put_pages == 0 || get_pages == 0) {
-		fprintf(stderr, "Maybe there's no put/get from/to ZONE_EXMEM\n");
+		fprintf(stderr, "Maybe there's no put/get from/to CXL memory\n");
 		return ENV_SET_FAIL;
 	}
 
@@ -135,7 +135,7 @@ int modify_put_get_correctness()
 
 
 	if (put_pages == 0 || get_pages == 0) {
-		fprintf(stderr, "Maybe there's no put/get from/to ZONE_EXMEM\n");
+		fprintf(stderr, "Maybe there's no put/get from/to CXL memory\n");
 		return ENV_SET_FAIL;
 	}
 
@@ -320,7 +320,7 @@ int multi_process()
 
 
 	if (put_pages == 0 || get_pages == 0) {
-		fprintf(stderr, "Maybe there's no put/get from/to ZONE_EXMEM\n");
+		fprintf(stderr, "Maybe there's no put/get from/to CXL memory\n");
 		return ENV_SET_FAIL;
 	}
 
@@ -334,7 +334,7 @@ end:
 	return ret;
 }
 
-int put_exmem_page()
+int put_cxl_page()
 {
 	u64 before_put = 0, after_put = 0, put_pages;
 	u64 before_get = 0, after_get = 0, get_pages;
@@ -383,7 +383,7 @@ int put_exmem_page()
 	/* Set membind at CXL only node for using CXL by page cache */
 	numa_set_membind(mem_mask);
 
-	/* Read test file by ExMem */
+	/* Read test file by CXL Memory*/
 	ret = read_file_seq(filepath);
 	if (ret != 0) {
 		goto end;
@@ -434,7 +434,7 @@ int main(int argc, char *argv[])
 
 	if (!strcmp(argv[2], "multi_thread"))
 		tc_num = 1;
-	else if (!strcmp(argv[2], "put_exmem_page"))
+	else if (!strcmp(argv[2], "put_cxl_page"))
 		tc_num = 2;
 
 	need = (tc_num)? 5: 4;

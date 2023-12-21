@@ -32,46 +32,37 @@ function check_result() {
 }
 
 
-$CLI group-dax --inval
+$CLI list -V --list_dev --inval
 check_result $?
-$CLI group-dax --dev
+$CLI list -V --list_dev cxl99
 check_result $?
-$CLI group-dax --dev cxl99
+$CLI list -V --list_dev mem0
 check_result $?
-$CLI group-dax --dev mem0
-check_result $?
-
-$CLI group-list --inval
-check_result $?
-$CLI group-list --dev cxl99
-check_result $?
-$CLI group-list --dev mem0
-check_result $?
-$CLI group-list --node 99
+$CLI list -V --list_node 99
 check_result $?
 
-$CLI group-add --inval
+$CLI create-region -V -G inval
 check_result $?
-$CLI group-add --target_node 0
+$CLI create-region -V -N cxl0
 check_result $?
-$CLI group-add --dev cxl0
+$CLI create-region -V -N 2 -w 2 cxl0
 check_result $?
-$CLI group-add --target_node 99 --dev cxl0
+$CLI create-region -V -N 99 -w 1 cxl0
 check_result $?
-$CLI group-add --target_node 0 --dev cxl99
+$CLI create-region -V -N 2 -w 1 cxl99
 check_result $?
 
-$CLI group-remove --inval
+$CLI destroy-region -V --inval
 check_result $?
-$CLI group-remove --dev
+$CLI destroy-region -V -w 2 cxl0
 check_result $?
-$CLI group-remove --dev cxl99
+$CLI destroy-region -V -w 1 cxl99
 check_result $?
-$CLI group-remove --dev mem0
+$CLI destroy-region -V -w 1 mem0
 check_result $?
-$CLI group-remove --node
+$CLI destroy-region -V -N
 check_result $?
-$CLI group-remove --node 99
+$CLI destroy-region -V -N 99
 check_result $?
 
 echo "Test Total: $TEST_TOTAL_COUNT, Test Pass: $TEST_PASS_COUNT"

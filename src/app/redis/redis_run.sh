@@ -17,7 +17,7 @@ function run_app(){
 	CXLMALLOC=$BASEDIR/lib/smdk_allocator/lib/libcxlmalloc.so
 	export LD_PRELOAD=$CXLMALLOC
 
-	CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
+	CXLMALLOC_CONF=use_exmem:true,exmem_size:16384,normal_size:16384,maxmemory_policy:remain
 	if [ "$PRIORITY" == 'exmem' ]; then
 		CXLMALLOC_CONF+=,priority:exmem
 		echo $CXLMALLOC_CONF

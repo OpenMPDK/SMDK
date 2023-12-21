@@ -5,8 +5,8 @@ SMDK_ROOT_DIR := $(CURDIR)/../../../..
 CXLMALLOC_DIR=$(SMDK_ROOT_DIR)/lib/smdk_allocator
 override CFLAGS += -I$(CXLMALLOC_DIR)/opt_api/include -I$(SMDK_ROOT_DIR)/src/test/include
 override LDFLAGS += -L$(CXLMALLOC_DIR)/lib/
-override LIBS += -lc -lpthread -lsmalloc #for dynamic link
-#override LIBS += $(CXLMALLOC_DIR)/lib/libsmalloc.a -lpthread -ldl #for static link
+override LIBS += -lc -lpthread -lnuma -lsmalloc -lpnm #for dynamic link
+#override LIBS += $(CXLMALLOC_DIR)/lib/libsmalloc.a -lpthread -ldl -lnuma#for static link
 
 TC1=test_metadata_api
 TC2=test_metadata_api_node

@@ -3,8 +3,6 @@ from _py_smdk import lib, ffi
 
 SMDK_MEM_NORMAL = lib.SMDK_MEM_NORMAL
 SMDK_MEM_EXMEM = lib.SMDK_MEM_EXMEM
-MAP_EXMEM = 0x200000
-MAP_NORMAL = 0x400000
 
 class mem_obj:
     def __init__(self, mem_type, data=None, size=None):
@@ -48,7 +46,7 @@ class mem_obj:
 
     def __set_internal(self, data):# only for private
         lib.memcpy(self.buf, ffi.cast("void*", id(data)), sys.getsizeof(data))
-        data_id = ctypes.c_uint64(ffi.cast("uint64_t", self.buf)).value
+        data_id = ffi.cast("uint64_t", self.buf).__int__()
         self.data = ctypes.cast(data_id, ctypes.py_object).value
 
     def get(self):
@@ -61,7 +59,7 @@ class mem_obj:
             self.size = size
             self.buf = buf
             if hasattr(self, 'data'): #update only when data is exist already
-                data_id = ctypes.c_uint64(ffi.cast("uint64_t", self.buf)).value
+                data_id = ffi.cast("uint64_t", self.buf).__int__()
                 self.data = ctypes.cast(data_id, ctypes.py_object).value
         else:
             raise ValueError("mem_obj.resize() fail.")
@@ -110,7 +108,7 @@ class mem_obj_node:
 
     def __set_internal(self, data):# only for private
         lib.memcpy(self.buf, ffi.cast("void*", id(data)), sys.getsizeof(data))
-        data_id = ctypes.c_uint64(ffi.cast("uint64_t", self.buf)).value
+        data_id = ffi.cast("uint64_t", self.buf).__int__()
         self.data = ctypes.cast(data_id, ctypes.py_object).value
 
     def get(self):
@@ -119,13 +117,13 @@ class mem_obj_node:
     def resize(self, size):
         old_size = self.size;
         old_buf = self.buf;
-        buf = lib.s_malloc_node(self.mem_type, self.size, self.node.encode())
+        buf = lib.s_malloc_node(self.mem_type, size, self.node.encode())
         if buf != ffi.NULL:
             lib.memcpy(buf, old_buf, size)
             self.size = size
             self.buf = buf
             if hasattr(self, 'data'): #update only when data is exist already
-                data_id = ctypes.c_uint64(ffi.cast("uint64_t", self.buf)).value
+                data_id = ffi.cast("uint64_t", self.buf).__int__()
                 self.data = ctypes.cast(data_id, ctypes.py_object).value
             lib.s_free_node(self.mem_type, old_buf, old_size)
         else:

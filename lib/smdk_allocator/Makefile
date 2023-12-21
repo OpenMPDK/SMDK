@@ -7,7 +7,11 @@ all : SMDK_api jemalloc
 jemalloc :
 	cd $(JEMALLOC_DIR) && make -j
 
-opt_api : jemalloc
+libpnm :
+	mkdir -p lib
+	cp $(CURDIR)/../PNMLibrary-pnm-v3.0.0/PNMLibrary/build/libs/lib/libpnm.so $(CURDIR)/lib/
+
+opt_api : jemalloc libpnm
 	mkdir -p lib
 	cd $(OPT_DIR) && make
 
@@ -22,6 +26,9 @@ ifneq (, $(wildcard $(JEMALLOC_DIR)/Makefile))
 	cd $(JEMALLOC_DIR) && make distclean
 endif
 
+clean_pnm :
+	rm -f $(CURDIR)/lib/libpnm.so
+
 clean_SMDK :
 	cd $(OPT_DIR) && make clean
 	cd $(COMP_DIR) && make clean
@@ -29,6 +36,6 @@ clean_SMDK :
 clean_lib :
 	rm -rf lib
 
-clean: clean_jemalloc clean_SMDK clean_lib
+clean: clean_jemalloc clean_SMDK clean_pnm clean_lib
 
 .PHONY: all clean jemalloc SMDK_api opt_api comp_api

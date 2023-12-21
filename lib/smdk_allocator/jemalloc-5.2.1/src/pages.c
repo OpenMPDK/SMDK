@@ -51,7 +51,7 @@ static void os_pages_unmap(void *addr, size_t size);
 /******************************************************************************/
 
 static void *
-os_pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int flags) {
+os_pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int flags, struct bitmask *nodemask) {
 	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
 	assert(ALIGNMENT_CEILING(size, os_page) == size);
 	assert(size != 0);
@@ -76,9 +76,7 @@ os_pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int f
 	{
 		int prot = *commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;
 
-		//fprintf(stderr,"%s: mmap_flag=%08x\n",__FUNCTION__,flags);
 		ret = mmap(addr, size, prot, flags|MAP_JEMALLOC_INTERNAL_MMAP, -1, 0);
-
 	}
 	assert(ret != NULL);
 
@@ -90,11 +88,25 @@ os_pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int f
 		 */
 		os_pages_unmap(ret, size);
 		ret = NULL;
+	} else {
+		/* succeeded in mapping memory */
+		if (likely(nodemask != NULL) && *commit) {
+			if (unlikely(mbind(ret, size, MPOL_BIND, nodemask->maskp, nodemask->size + 1, 0)))
+				goto err;
+			if (unlikely(madvise(ret, size, MADV_TRY_POPULATE_WRITE)))
+				goto err;
+			if (unlikely(mbind(ret, size, MPOL_DEFAULT, numa_no_nodes_ptr->maskp, nodemask->size + 1, 0)))
+				goto err;
+		}
 	}
 #endif
 	assert(ret == NULL || (addr == NULL && ret != addr) || (addr != NULL &&
 	    ret == addr));
 	return ret;
+
+err:
+	munmap(ret, size);
+	return NULL;
 }
 
 static void *
@@ -128,7 +140,7 @@ os_pages_trim(void *addr, size_t alloc_size, size_t leadsize, size_t size,
 
 static void *
 os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
-	return os_pages_map_flag(addr, size, alignment, commit, mmap_flags);
+	return os_pages_map_flag(addr, size, alignment, commit, mmap_flags, NULL);
 }
 
 static void
@@ -184,11 +196,11 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 
 void *
 pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
-	return pages_map_flag(addr, size, alignment, commit, 0);
+	return pages_map_nodemask(addr, size, alignment, commit, NULL);
 }
 
 void *
-pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int extra_flag) {
+pages_map_nodemask(void *addr, size_t size, size_t alignment, bool *commit, struct bitmask *nodemask) {
 	assert(alignment >= PAGE);
 	assert(ALIGNMENT_ADDR2BASE(addr, alignment) == addr);
 
@@ -216,9 +228,22 @@ pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int extr
 		void *ret = mmap(addr, size, prot, flags|MAP_JEMALLOC_INTERNAL_MMAP, -1, 0);
 		if (ret == MAP_FAILED) {
 			ret = NULL;
+		} else {
+			/* succeeded in mapping memory */
+			if (likely(nodemask != NULL) && *commit) {
+				if (unlikely(mbind(ret, size, MPOL_BIND, nodemask->maskp, nodemask->size + 1, 0)))
+					goto err;
+				if (unlikely(madvise(ret, size, MADV_TRY_POPULATE_WRITE)))
+					goto err;
+				if (unlikely(mbind(ret, size, MPOL_DEFAULT, numa_no_nodes_ptr->maskp, nodemask->size + 1, 0)))
+					goto err;
+			}
 		}
-
 		return ret;
+
+err:
+		munmap(ret, size);
+		return NULL;
 	}
 #endif
 	/*
@@ -235,10 +260,7 @@ pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int extr
 	 * approach works most of the time.
 	 */
 	int flags = mmap_flags;
-	if(extra_flag){
-		flags |= extra_flag;
-	}
-	void *ret = os_pages_map_flag(addr, size, os_page, commit, flags);
+	void *ret = os_pages_map_flag(addr, size, os_page, commit, flags, nodemask);
 	if (ret == NULL || ret == addr) {
 		return ret;
 	}
@@ -622,7 +644,7 @@ pages_boot(void) {
 	}
 
 #ifndef _WIN32
-	mmap_flags = MAP_PRIVATE | MAP_ANON | MAP_POPULATE;
+	mmap_flags = MAP_PRIVATE | MAP_ANON;
 #endif
 
 #ifdef JEMALLOC_SYSCTL_VM_OVERCOMMIT

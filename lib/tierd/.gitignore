@@ -1,0 +1,19 @@
+# Object files:
+*.o
+
+# Built binaries:
+tierd
+
+# ctags files:
+tags
+TAGS
+
+# cscope files:
+cscope.*
+ncscope.*
+
+# Unzip files:
+AMDuProf_Linux_x64_4.0.341
+
+# TC:
+TC_result/

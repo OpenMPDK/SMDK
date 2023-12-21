@@ -54,19 +54,11 @@ function modify_cxlcache_to_disabled() {
 	fi
 }
 
-CXL_CLI=$BASEDIR/lib/cxl_cli/build/cxl/cxl
-function check_cxlcli_exist() {
-	if [ ! -f "$CXL_CLI" ]; then
-		echo cxl_cli does not exist. Run 'build_lib.sh cxl_cli' in /path/to/SMDK/lib
-		exit $ENV_SET_FAIL
-	fi
-}
-
-function check_exmem_exist() {
-	ZONE_EXMEM=$(cat /proc/buddyinfo | grep -i exmem)
+function check_movable_exist() {
+	ZONE_MOVABLE=$(cat /proc/buddyinfo | grep -i movable)
 	ret=$?
 	if [ $ret -ne 0 ]; then
-		log_error "This test requires ExMem zone."
+		log_error "This test requires Movable zone."
 		exit $ENV_SET_FAIL
 	fi
 }

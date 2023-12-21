@@ -80,36 +80,26 @@ typedef void (*test_callback_t)(int *);
     O(witness_tsd,              witness_tsd_t,		witness_tsdn_t)	\
     MALLOC_TEST_TSD
 
-#define _TSD_INITIALIZER    \
-    ATOMIC_INIT(tsd_state_uninitialized),               \
-    TCACHE_ENABLED_ZERO_INITIALIZER,                    \
-    false,                              \
-    0,                                  \
-    0,                                  \
-    0,                                  \
-    0,                                  \
-    0,                                  \
-    0,                                  \
-    NULL,                               \
-    RTREE_CTX_ZERO_INITIALIZER,                     \
-    NULL,                               \
-    NULL,                               \
-    NULL,                               \
-    TSD_BINSHARDS_ZERO_INITIALIZER,                 \
-    TCACHE_ZERO_INITIALIZER,                        \
-    WITNESS_TSD_INITIALIZER                     \
-    MALLOC_TEST_TSD_INITIALIZER
-
-#define TSD_INITIALIZER {                       \
-    _TSD_INITIALIZER,				\
-    MEM_ZONE_NORMAL, /* mem_zone_normal */	\
-    -1		     /* not allocated aid */	\
-}
-
-#define TSD_EXMEM_INITIALIZER {			\
-    _TSD_INITIALIZER,				\
-    MEM_ZONE_EXMEM, /* mem_zone_exmem */	\
-    -1		    /* not allocated aid */	\
+#define TSD_INITIALIZER {                                               \
+    ATOMIC_INIT(tsd_state_uninitialized),                               \
+    TCACHE_ENABLED_ZERO_INITIALIZER,                                    \
+    false,                                                              \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    0,                                                                  \
+    NULL,                                                               \
+    RTREE_CTX_ZERO_INITIALIZER,                                         \
+    NULL,                                                               \
+    NULL,                                                               \
+    NULL,                                                               \
+    TSD_BINSHARDS_ZERO_INITIALIZER,                                     \
+    TCACHE_ZERO_INITIALIZER,                                            \
+    WITNESS_TSD_INITIALIZER                                             \
+    MALLOC_TEST_TSD_INITIALIZER,                                        \
+    NULL								\
 }
 
 void *malloc_tsd_malloc(size_t size);
@@ -209,8 +199,7 @@ struct tsd_s {
 	t TSD_MANGLE(n);
 MALLOC_TSD
 #undef O
-	int memtype;
-	int aid;
+	unsigned *list_tcache;
 };
 
 JEMALLOC_ALWAYS_INLINE uint8_t
@@ -222,11 +211,6 @@ tsd_state_get(tsd_t *tsd) {
 	 */
 	/* return atomic_load_u8(&tsd->state, ATOMIC_RELAXED); */
 	return *(uint8_t *)&tsd->state;
-}
-
-JEMALLOC_ALWAYS_INLINE int
-tsd_memtype_get(tsd_t *tsd) {
-    return tsd->memtype;
 }
 
 /*

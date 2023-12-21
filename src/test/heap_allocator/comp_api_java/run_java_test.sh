@@ -16,7 +16,7 @@ function run_java(){
     unset LD_PRELOAD
     CXLMALLOC=$BASEDIR/lib/smdk_allocator/lib/libcxlmalloc.so
     export LD_PRELOAD=$CXLMALLOC
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:65536,normal_zone_size:65536,maxmemory_policy:remain
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:65536,normal_size:65536,maxmemory_policy:remain
     if [ "$PRIORITY" == 'exmem' ]; then
         CXLMALLOC_CONF+=,priority:exmem
     elif [ "$PRIORITY" == 'normal' ]; then
@@ -48,7 +48,7 @@ function run_jni(){
     unset LD_PRELOAD
     CXLMALLOC=$BASEDIR/lib/smdk_allocator/lib/libcxlmalloc.so
     export LD_PRELOAD=$CXLMALLOC
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:65536,normal_zone_size:65536,maxmemory_policy:remain
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:65536,normal_size:65536,maxmemory_policy:remain
     if [ "$PRIORITY" == 'exmem' ]; then
         CXLMALLOC_CONF+=,priority:exmem
     elif [ "$PRIORITY" == 'normal' ]; then

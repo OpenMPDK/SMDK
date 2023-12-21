@@ -194,4 +194,12 @@ struct cxl_cmd_get_scan_media {
 #define RESULT_GET_SCAN_MEDIA_MORE_RECORDS	  (0x1)
 #define RESULT_GET_SCAN_MEDIA_STOPPED_PREMATURELY (0x2)
 
+/* CXL 3.0 8.2.9.8.8.1 Get SLD QoS Control */
+struct cxl_cmd_sld_qos_control {
+	u8 qos_telemetry_control;
+	u8 egress_moderate_percentage;
+	u8 egress_severe_percentage;
+	u8 backpressure_sample_interval;
+} __attribute__((packed));
+
 #endif /* _LIBCXL_PRIVATE_SMDK_H_ */

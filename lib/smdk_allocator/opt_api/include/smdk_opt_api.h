@@ -46,7 +46,7 @@ void s_enable_node_interleave(char* nodes);
 
 void s_disable_node_interleave(void);
 
-void *s_malloc_node(smdk_memtype_t type, size_t size, char* nodes);
+void *s_malloc_node(smdk_memtype_t type, size_t size, char* node);
 
 void s_free_node(smdk_memtype_t type, void* mem, size_t size);
 

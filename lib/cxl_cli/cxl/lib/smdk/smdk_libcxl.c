@@ -428,7 +428,8 @@ char *poison_source_type(unsigned long source_flag)
 	return source;
 }
 
-static void print_poison_list(struct media_error_record *rcd, int count)
+static void print_poison_list(struct media_error_record *rcd,
+			      int start_poison_idx, int count)
 {
 	int i;
 	unsigned long address;
@@ -437,8 +438,9 @@ static void print_poison_list(struct media_error_record *rcd, int count)
 	for (i = 0; i < count; i++) {
 		source = rcd[i].dpa & POISON_SOURCE_MASK;
 		address = rcd[i].dpa & POISON_ADDR_MASK;
-		printf("%d. Physical Address : 0x%-18lx, Source : %s\n", i + 1,
-		       address, poison_source_type(source));
+		printf("%d. Physical Address : 0x%-18lx, Source : %s\n",
+		       start_poison_idx + i + 1, address,
+		       poison_source_type(source));
 	}
 }
 
@@ -466,6 +468,7 @@ static int cxl_cmd_scan_media_get_results(struct cxl_cmd *cmd)
 {
 	struct cxl_cmd_get_scan_media *ret;
 	int rc;
+	static int start_poison_idx = 0;
 
 	rc = cxl_cmd_validate_status(cmd, CXL_MEM_COMMAND_ID_GET_SCAN_MEDIA);
 	if (rc)
@@ -478,16 +481,20 @@ static int cxl_cmd_scan_media_get_results(struct cxl_cmd *cmd)
 	if (ret->count == 0) {
 		printf("No poison address\n");
 	} else {
-		print_poison_list(ret->rcd, (int)ret->count);
+		print_poison_list(ret->rcd, start_poison_idx,
+				  (int)le16_to_cpu(ret->count));
 	}
 
 	if (ret->flag & CXL_CMD_GET_SCAN_MEDIA_FLAGS_SCAN_STOPPED_PREMATURELY) {
+		start_poison_idx += le16_to_cpu(ret->count);
 		return RESULT_GET_SCAN_MEDIA_STOPPED_PREMATURELY;
 	}
 	if (ret->flag & CXL_CMD_GET_SCAN_MEDIA_FLAGS_MORE_MEDIA_ERROR_RECORDS) {
+		start_poison_idx += le16_to_cpu(ret->count);
 		return RESULT_GET_SCAN_MEDIA_MORE_RECORDS;
 	}
 
+	start_poison_idx = 0;
 	return rc;
 }
 
@@ -721,6 +728,71 @@ CXL_EXPORT int cxl_cmd_get_shutdown_state_payload(struct cxl_cmd *cmd)
 	if (!state)
 		return -ENXIO;
 	printf("Shutdown State: %s\n", ((*state) & BIT(0)) ? "Dirty" : "Clean");
+	return rc;
+}
+
+#define cxl_cmd_sld_qos_control_get(fieldname)					\
+CXL_EXPORT int cxl_cmd_sld_qos_control_get_##fieldname(struct cxl_cmd *cmd)		\
+{										\
+	cmd_get_field_u8(cmd, sld_qos_control, GET_SLD_QOS_CONTROL, fieldname);	\
+}
+cxl_cmd_sld_qos_control_get(qos_telemetry_control)
+cxl_cmd_sld_qos_control_get(egress_moderate_percentage)
+cxl_cmd_sld_qos_control_get(egress_severe_percentage)
+cxl_cmd_sld_qos_control_get(backpressure_sample_interval)
+
+#define cxl_cmd_sld_qos_control_set(fieldname)					\
+CXL_EXPORT int cxl_cmd_sld_qos_control_set_##fieldname(struct cxl_cmd *cmd, int val)\
+{										\
+	struct cxl_cmd_sld_qos_control *qosctl = cmd->input_payload;		\
+	qosctl->fieldname = (u8)val;						\
+	return 0;								\
+}
+cxl_cmd_sld_qos_control_set(qos_telemetry_control)
+cxl_cmd_sld_qos_control_set(egress_moderate_percentage)
+cxl_cmd_sld_qos_control_set(egress_severe_percentage)
+cxl_cmd_sld_qos_control_set(backpressure_sample_interval)
+
+
+CXL_EXPORT int cxl_cmd_get_sld_qos_control(struct cxl_cmd *cmd)
+{
+	u8 out_qos_telemetry_control;
+	int rc = 0;
+
+	rc = cxl_cmd_validate_status(cmd,
+				     CXL_MEM_COMMAND_ID_GET_SLD_QOS_CONTROL);
+	if (rc)
+		return rc;
+
+	out_qos_telemetry_control =
+		cxl_cmd_sld_qos_control_get_qos_telemetry_control(cmd);
+	printf("Egress Port Congestion: %s\n",
+	       (out_qos_telemetry_control & BIT(0)) ? "Enable" : "Disable");
+	printf("Temporary Throughput Reduction: %s\n",
+	       (out_qos_telemetry_control & BIT(1)) ? "Enable" : "Disable");
+	printf("Egress Moderate Percentage: %d%%\n",
+	       cxl_cmd_sld_qos_control_get_egress_moderate_percentage(cmd));
+	printf("Egress Severe Percentage: %d%%\n",
+	       cxl_cmd_sld_qos_control_get_egress_severe_percentage(cmd));
+	printf("Backpressure Sample Interval: %dns\n",
+	       cxl_cmd_sld_qos_control_get_backpressure_sample_interval(cmd));
+
+	return rc;
+}
+
+CXL_EXPORT int cxl_cmd_get_sld_qos_status(struct cxl_cmd *cmd)
+{
+	u8 *bp_avg_pct;
+	int rc = 0;
+
+	rc = cxl_cmd_validate_status(cmd,
+				     CXL_MEM_COMMAND_ID_GET_SLD_QOS_STATUS);
+	if (rc)
+		return rc;
+	bp_avg_pct = (u8 *)cmd->output_payload;
+	if (!bp_avg_pct)
+		return -ENXIO;
+	printf("Backpressure Average Percent: %d%%\n", *bp_avg_pct);
 	return rc;
 }
 
@@ -1552,4 +1624,38 @@ cxl_cmd_new_set_shutdown_state(struct cxl_memdev *memdev, bool is_clean)
 	*state = !is_clean;
 
 	return cmd;
+}
+
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_set_sld_qos_control(
+	struct cxl_memdev *memdev, int qos_telemetry_control,
+	int egress_moderate_percentage, int egress_severe_percentage,
+	int backpressure_sample_interval)
+{
+	struct cxl_cmd *cmd;
+
+	cmd = cxl_cmd_new_generic(memdev,
+				  CXL_MEM_COMMAND_ID_SET_SLD_QOS_CONTROL);
+	if (!cmd)
+		return NULL;
+
+	cxl_cmd_sld_qos_control_set_qos_telemetry_control(
+		cmd, qos_telemetry_control);
+	cxl_cmd_sld_qos_control_set_egress_moderate_percentage(
+		cmd, egress_moderate_percentage);
+	cxl_cmd_sld_qos_control_set_egress_severe_percentage(
+		cmd, egress_severe_percentage);
+	cxl_cmd_sld_qos_control_set_backpressure_sample_interval(
+		cmd, backpressure_sample_interval);
+
+	return cmd;
+}
+
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_sld_qos_control(struct cxl_memdev *memdev)
+{
+	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_SLD_QOS_CONTROL);
+}
+
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_get_sld_qos_status(struct cxl_memdev *memdev)
+{
+	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_SLD_QOS_STATUS);
 }

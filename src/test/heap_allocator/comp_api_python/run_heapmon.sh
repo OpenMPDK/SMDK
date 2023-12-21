@@ -10,7 +10,7 @@ PYTHON=python3
 function run_app(){
     unset LD_PRELOAD
     CXLMALLOC=$CXLMALLOCDIR/libcxlmalloc.so
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:16384,normal_zone_size:16384,maxmemory_policy:remain
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:16384,normal_size:16384,maxmemory_policy:remain
     export LD_PRELOAD=$CXLMALLOC
     if [ "$PRIORITY" == 'exmem' ]; then
         CXLMALLOC_CONF+=,priority:exmem
@@ -20,12 +20,20 @@ function run_app(){
 
     export CXLMALLOC_CONF
     echo $CXLMALLOC_CONF
-    $PYTHON -O $SCRIPT_PATH/heapmon.py
+    if [ -z $RUN_ON_QEMU ]; then
+	$PYTHON -O $SCRIPT_PATH/heapmon.py
+    else
+	$PYTHON -O $SCRIPT_PATH/heapmon.py -iter 50
+    fi
 }
 
 function run_libc(){
     unset LD_PRELOAD
-    $PYTHON $SCRIPT_PATH/heapmon.py
+    if [ -z $RUN_ON_QEMU ]; then
+	$PYTHON -O $SCRIPT_PATH/heapmon.py
+    else
+	$PYTHON -O $SCRIPT_PATH/heapmon.py -iter 50
+    fi
 }
 
 function usage(){

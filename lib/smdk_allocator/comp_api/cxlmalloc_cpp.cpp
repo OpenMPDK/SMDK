@@ -45,8 +45,8 @@ handleOOM(std::size_t size, bool nothrow) {
         } catch (const std::bad_alloc &) {
             break;
         }
-        mem_zone_t type = get_cur_prioritized_memtype();
-        ptr = s_malloc_internal(type, size, false);
+        mem_type_t type = get_cur_prioritized_memtype();
+        ptr = s_malloc_internal(type, size, false, 0) ;
     }
 
     if (ptr == nullptr && !nothrow)
@@ -59,8 +59,8 @@ SMDK_INLINE
 void *
 newImpl(std::size_t size) noexcept(IsNoExcept) {
     CXLMALLOC_PRECONDITION(malloc(size));
-    mem_zone_t type = get_cur_prioritized_memtype();
-    void *ret = s_malloc_internal(type, size, false);
+    mem_type_t type = get_cur_prioritized_memtype();
+    void *ret = s_malloc_internal(type, size, false, 0);
     if (likely(ret)) {
         return ret;
     }

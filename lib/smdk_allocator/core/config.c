@@ -53,6 +53,9 @@ bool conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
                 /* to parse node mask values linked by comma e.g. 1,2,3 */
                 break;
             }
+            if (!strncmp(*k_p, "interleave_node", strlen("interleave_node")) && is_number(*opts)) {
+                break;
+            }
             if (*opts == '\0') {
                 fprintf(stderr, "Conf string ends with comma\n");
             }
@@ -79,18 +82,15 @@ void smdk_init_helper(const char *envname, bool is_opt_api) {
     size_t klen, vlen;
 
     if (smdk_info.smdk_initialized) return;
+    if (opt_smdk.is_parsed) return;
 
     if (opts != NULL) {
         while (*opts != '\0' && !conf_next(&opts, &k, &klen, &v, &vlen)) {
             if (!is_opt_api) {
                 /* configs below are not used for optimization API libs */
                 CONF_HANDLE_BOOL(opt_smdk.use_exmem,"use_exmem")
-                CONF_HANDLE_SSIZE_T(opt_smdk.exmem_zone_size, "exmem_zone_size", 1, MAX_MEMZONE_LIMIT_MB)
-                CONF_HANDLE_SSIZE_T(opt_smdk.normal_zone_size, "normal_zone_size", 1, MAX_MEMZONE_LIMIT_MB)
-                CONF_HANDLE_UNSIGNED(opt_smdk.nr_normal_arena, "nr_normal_arena", 1, NR_ARENA_MAX,
-                        CONF_CHECK_MIN, CONF_CHECK_MAX, false)
-                CONF_HANDLE_UNSIGNED(opt_smdk.nr_exmem_arena, "nr_exmem_arena", 1, NR_ARENA_MAX,
-                        CONF_CHECK_MIN, CONF_CHECK_MAX, false)
+                CONF_HANDLE_SSIZE_T(opt_smdk.exmem_pool_size, "exmem_size", 1, MAX_MEMPOOL_LIMIT_MB)
+                CONF_HANDLE_SSIZE_T(opt_smdk.normal_pool_size, "normal_size", 1, MAX_MEMPOOL_LIMIT_MB)
 
                 if(CONF_MATCH("maxmemory_policy")){
                     if(CONF_MATCH_VALUE("oom")){
@@ -109,25 +109,29 @@ void smdk_init_helper(const char *envname, bool is_opt_api) {
 
                 if(CONF_MATCH("priority")){
                     if(CONF_MATCH_VALUE("exmem")){
-                        opt_smdk.prio[0] = mem_zone_exmem;
-                        opt_smdk.prio[1] = mem_zone_normal;
+                        opt_smdk.prio[0] = mem_type_exmem;
+                        opt_smdk.prio[1] = mem_type_normal;
                     }
                     else if(CONF_MATCH_VALUE("normal")){
-                        opt_smdk.prio[0] = mem_zone_normal;
-                        opt_smdk.prio[1] = mem_zone_exmem;
+                        opt_smdk.prio[0] = mem_type_normal;
+                        opt_smdk.prio[1] = mem_type_exmem;
                     }
                     else{
-                        opt_smdk.prio[0] = mem_zone_normal;
-                        opt_smdk.prio[1] = mem_zone_exmem;
+                        opt_smdk.prio[0] = mem_type_normal;
+                        opt_smdk.prio[1] = mem_type_exmem;
                     }
                 }
-
                 CONF_HANDLE_CHAR_P(opt_smdk.exmem_partition_range,"exmem_partition_range", "")
-                CONF_HANDLE_BOOL(opt_smdk.use_adaptive_interleaving, "use_adaptive_interleaving")
 
+                CONF_HANDLE_BOOL(opt_smdk.use_adaptive_interleaving, "use_adaptive_interleaving")
+                CONF_HANDLE_CHAR_P(opt_smdk.interleave_node, "interleave_node", "")
                 if (CONF_MATCH("adaptive_interleaving_policy")) {
                     if (CONF_MATCH_VALUE("bw_saturation")) {
                         opt_smdk.adaptive_interleaving_policy = policy_bw_saturation;
+                    } else if (CONF_MATCH_VALUE("bw_order")) {
+                        opt_smdk.adaptive_interleaving_policy = policy_bw_order;
+                    } else if (CONF_MATCH_VALUE("weighted_interleaving")) {
+                        opt_smdk.adaptive_interleaving_policy = policy_weighted_interleaving;
                     } else {
                         fprintf(stderr, "Note: invalid adaptive_interleaving_policy:%s, "
                                 "use default policy (bw_saturation)\n", v);
@@ -140,18 +144,19 @@ void smdk_init_helper(const char *envname, bool is_opt_api) {
 
         if (opt_smdk.use_adaptive_interleaving) {
             fprintf(stderr, "*** use_adaptive_interleaving:true. \n");
-            fprintf(stderr, "*** So, use priority:normal,normal_zone_size:-1,"
-                    "exmem_zone_size:-1 and ignore maxmemory_policy\n");
-            opt_smdk.prio[0] = mem_zone_normal;
-            opt_smdk.prio[1] = mem_zone_exmem;
-            opt_smdk.normal_zone_size = MEMZONE_UNLIMITED;
-            opt_smdk.exmem_zone_size = MEMZONE_UNLIMITED;
+            fprintf(stderr, "*** So, use priority:normal,normal_size:-1,"
+                    "exmem_size:-1 and ignore maxmemory_policy\n");
+            opt_smdk.prio[0] = mem_type_normal;
+            opt_smdk.prio[1] = mem_type_exmem;
+            opt_smdk.normal_pool_size = MEMPOOL_UNLIMITED;
+            opt_smdk.exmem_pool_size = MEMPOOL_UNLIMITED;
         }
     }
+    opt_smdk.is_parsed = true;
 }
 
-char *str_priority(mem_zone_t prio){
-    return (prio == mem_zone_normal) ? "normal" : "exmem";
+char *str_type(mem_type_t type){
+    return (type == mem_type_normal) ? "normal" : "exmem";
 }
 
 char *str_maxmemory_policy(maxmemory_policy_t policy){
@@ -167,6 +172,10 @@ char *str_adaptive_interleaving_policy(adaptive_interleaving_policy_t policy) {
     switch (policy) {
         case policy_bw_saturation:
             return "bw_saturation";
+		case policy_bw_order:
+            return "bw_order";
+		case policy_weighted_interleaving:
+            return "weighted_interleaving";
         default:
             return "invalid policy";
     }
@@ -174,48 +183,45 @@ char *str_adaptive_interleaving_policy(adaptive_interleaving_policy_t policy) {
 
 void show_smdk_info(bool is_opt_api) {
     int i,j;
-    fprintf(stderr,"use_exmem = %d\n", opt_smdk.use_exmem);
-    fprintf(stderr,"use_auto_arena_scaling = %d\n", opt_smdk.use_auto_arena_scaling);
-    fprintf(stderr,"use_adaptive_interleaving = %d\n", opt_smdk.use_adaptive_interleaving);
-    for(i=0;i<2;i++){
-        fprintf(stderr,"g_arena_pool[%s].nr_arena=%d limit=%ld\n\t[",
-        str_priority(opt_smdk.prio[i]), g_arena_pool[i].nr_arena, g_arena_pool[i].zone_limit);
+    for(i=0;i<smdk_info.nr_pool;i++){
+        fprintf(stderr,"g_arena_pool[%d].nr_arena=%d\n", i, g_arena_pool[i].nr_arena);
+        fprintf(stderr,"g_arena_pool[%d].type_mem=%s\n\t[", i, str_type(g_arena_pool[i].type_mem));
         for(j=0;j<g_arena_pool[i].nr_arena;j++){
             bool detail = false;
             if(detail){
                 arena_t* arena = arena_get(TSDN_NULL,g_arena_pool[i].arena_id[j],false);
-                fprintf(stderr,"%d(0x%08x), ",g_arena_pool[i].arena_id[j],arena_get_mmap_flag(arena));
+                fprintf(stderr,"%d(0x%08x), ",g_arena_pool[i].arena_id[j],arena_get_pid(arena));
             }
             else{
                 fprintf(stderr,"%d, ",g_arena_pool[i].arena_id[j]);
-            }
-            if(!((i+1)%4)){
-                fprintf(stderr,"\n\t");
             }
         }
         fprintf(stderr,"]\n");
     }
     if (!is_opt_api) {
-        fprintf(stderr,"prio = [%s->%s]\n", str_priority(opt_smdk.prio[0]), str_priority(opt_smdk.prio[1]));
-        if(opt_smdk.normal_zone_size==MEMZONE_UNLIMITED){
-            fprintf(stderr,"normal_zone_size = unlimited\n");
-        } else {
-            fprintf(stderr,"normal_zone_size = %lu MB\n", opt_smdk.normal_zone_size);
+        fprintf(stderr,"use_exmem = %d\n", opt_smdk.use_exmem);
+        fprintf(stderr,"use_adaptive_interleaving = %d\n", opt_smdk.use_adaptive_interleaving);
+        if (opt_smdk.use_adaptive_interleaving) {
+            fprintf(stderr, "adaptive_interleaving_policy = %s\n",
+                            str_adaptive_interleaving_policy(opt_smdk.adaptive_interleaving_policy));
         }
-        if(opt_smdk.exmem_zone_size==MEMZONE_UNLIMITED){
-            fprintf(stderr,"exmem_zone_size = unlimited\n");
+        fprintf(stderr,"prio = [%s->%s]\n", str_type(opt_smdk.prio[0]), str_type(opt_smdk.prio[1]));
+        if(opt_smdk.normal_pool_size==MEMPOOL_UNLIMITED){
+            fprintf(stderr,"normal_size = unlimited\n");
         } else {
-            fprintf(stderr,"exmem_zone_size = %lu MB\n",opt_smdk.exmem_zone_size);
+            fprintf(stderr,"normal_size = %lu MB\n", opt_smdk.normal_pool_size);
+        }
+        if(opt_smdk.exmem_pool_size==MEMPOOL_UNLIMITED){
+            fprintf(stderr,"exmem_size = unlimited\n");
+        } else {
+            fprintf(stderr,"exmem_size = %lu MB\n",opt_smdk.exmem_pool_size);
         }
         if (opt_smdk.use_adaptive_interleaving) {
             fprintf(stderr, "maxmemory_policy = ignored\n");
         } else {
             fprintf(stderr, "maxmemory_policy = %s\n", str_maxmemory_policy(opt_smdk.maxmemory_policy));
         }
-        if (opt_smdk.use_adaptive_interleaving) {
-            fprintf(stderr, "adaptive_interleaving_policy = %s\n",
-                            str_adaptive_interleaving_policy(opt_smdk.adaptive_interleaving_policy));
-        }
         fprintf(stderr,"exmem_partition_range = %s\n", opt_smdk.exmem_partition_range);
     }
+    fprintf(stderr,"use_auto_arena_scaling = %d\n", opt_smdk.use_auto_arena_scaling);
 }

@@ -56,4 +56,8 @@ cxl_tool = executable('cxl',
   install_dir : rootbindir,
 )
 
-install_headers('libcxl.h', subdir : 'cxl')
+if get_option('smdkplugin').enabled()
+  install_headers('libcxl.h', 'smdk/smdk_control.h' , subdir : 'cxl')
+else
+  install_headers('libcxl.h', subdir : 'cxl')
+endif

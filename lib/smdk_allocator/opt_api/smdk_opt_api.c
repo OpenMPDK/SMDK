@@ -8,12 +8,12 @@
 
 SMDK_EXPORT
 void * s_malloc(smdk_memtype_t type, size_t size) {
-    return s_malloc_internal(type, size, false);
+    return s_malloc_internal(type, size, false, 0);
 }
 
 SMDK_EXPORT
 void* s_calloc(smdk_memtype_t type, size_t num, size_t size) {
-    return s_malloc_internal(type, num * size, true);
+    return s_malloc_internal(type, num * size, true, 0);
 }
 
 SMDK_EXPORT
@@ -92,43 +92,18 @@ void s_disable_node_interleave(void){
 }
 
 SMDK_EXPORT
-void* s_malloc_node(smdk_memtype_t type, size_t size, char *nodes) {
-    void *mem;
-    struct bitmask *original_bitmask = numa_get_interleave_mask();
-    struct bitmask *nodemask_parsed = numa_parse_nodestring(nodes);
-    if (unlikely(nodemask_parsed == 0)) {
-        fprintf(stderr, "[Warning] %s:invalid node(s).(%s)\n", __FUNCTION__, nodes);
-        return NULL;
-    }
-    int flags = MAP_PRIVATE|MAP_ANON|MAP_POPULATE;
-    int core = sched_getcpu();
-    if (type == SMDK_MEM_EXMEM) {
-        flags |= MAP_EXMEM;
-        smdk_info.node_alloc_stat_exmem[core]+=(long long)size;
-    } else {
-        flags |= MAP_NORMAL;
-        smdk_info.node_alloc_stat_normal[core]+=(long long)size;
-    }
-    numa_set_interleave_mask(nodemask_parsed);
-    mem = mmap(0, size, PROT_READ|PROT_WRITE, flags, 0, 0);
-    assert(mem != MAP_FAILED);
-
-    numa_set_interleave_mask(original_bitmask);
-
+void* s_malloc_node(smdk_memtype_t type, size_t size, char *node) {
+    void *mem = NULL;
+    int node_id = strtol(node, NULL, 0);
+    if (errno != EINVAL || errno != ERANGE)
+         mem = s_malloc_internal_node(type, size, node_id);
 
     return mem;
 }
 
 SMDK_EXPORT
 void s_free_node(smdk_memtype_t type, void* mem, size_t size){
-    munmap(mem, size);
-
-    int core = sched_getcpu();
-    if (type == SMDK_MEM_EXMEM) {
-        smdk_info.node_alloc_stat_exmem[core]-=(long long)size;
-    } else {
-        smdk_info.node_alloc_stat_normal[core]-=(long long)size;
-    }
+    return s_free_internal(mem);
 }
 
 
@@ -136,4 +111,10 @@ SMDK_CONSTRUCTOR(SMALLOC_CONSTRUCTOR_PRIORITY)
 static void smalloc_constructor(void) {
     init_smalloc();
     show_smdk_info(true);
+}
+
+SMDK_DESTRUCTOR(SMALLOC_DESTRUCTOR_PRIORITY)
+static void
+smalloc_destructor(void) {
+    terminate_smalloc();
 }

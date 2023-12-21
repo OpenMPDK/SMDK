@@ -12,7 +12,7 @@ PRIORITY=normal
 function run_app(){
     unset LD_PRELOAD
     export LD_PRELOAD=$CXLMALLOC_DIR/libcxlmalloc.so
-    export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,normal_zone_size:2048,exmem_zone_size:2048,maxmemory_policy:interleave
+    export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,normal_size:2048,exmem_size:2048,maxmemory_policy:interleave
     if [ "$PRIORITY" == 'exmem' ]; then
         CXLMALLOC_CONF+=,priority:exmem
     elif [ "$PRIORITY" == 'normal' ]; then

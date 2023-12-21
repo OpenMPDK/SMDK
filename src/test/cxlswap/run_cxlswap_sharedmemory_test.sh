@@ -78,9 +78,15 @@ check_privilege
 check_cxlswap_exist
 modify_cxlswap_to_enabled
 
+if [ -z $RUN_ON_QEMU ]; then
+	SIZE=("512m" "1g")
+else
+	SIZE=("16m" "32m")
+fi
+
 for ((i = 90; i > 50; i -= 20));
 do
-	for j in 512m 1g;
+	for j in "${SIZE[@]}";
 	do
 		$CXLSWAP_TEST $j $i shared_memory
 		RETURN=$?

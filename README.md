@@ -1,7 +1,7 @@
-## Announcing the Release of Scalable Memory Development Kit (SMDK) v1.5
+## Announcing the Release of Scalable Memory Development Kit (SMDK) v2.0
 
-We are pleased to announce the release of SMDK v1.5 to leverage and help CXL ecosystem and industry.
-SMDK consists of the following conponents: plugin, library, cli tool, kernel, testcases, and a guide providing an example workload test.
+We are pleased to announce the release of SMDK v2.0 to leverage and help CXL ecosystem and industry.
+SMDK consists of the following components: plugin, library, cli tool, kernel, testcases, and a guide providing an example workload test.
 
 We previously published pre-release articles introducing SMDK to the industry, as well as demonstrated SMDK functionality at 2023 Flash Memory Summit, 2023 OCP APAC, 2022 SuperComputing, 2022 HPE Discover, 2021 OCP Global Summit, and so on.
 Currently, SMDK has been successfully integrated and tested with many industry partners on a variety of purposes and application workloads, utilizing Samsung’s CXL Memory Expander:
@@ -28,15 +28,15 @@ The SMDK is a collection of software tools and APIs that sit between application
 
 The toolkit thus reduces the burden of introducing new memory and allows users to quickly reap the benefits of heterogeneous memory. The SMDK accomplishes this with a four-level approach:
 
-• Memory Interface layer that distinguishes between the onboard bunch of DIMM memory and the Memory Expander (CXL) memory, which have different latencies, and optimizes how each interface of memory is utilized.
+• Memory Interface layer that distinguishes between the onboard bunch of DIMM and CMM(a.k.a CXL Memory Expander) memory, which have different latencies, and optimizes how each interface of memory is utilized.
 
 • Memory Pool Management, which makes the two pools of memory clusters appear as one to applications, and manages memory topography in scalability.
 
 • An Intelligent Tiering Engine, which handles communication between the memory provider and consumer and assigns memory based on the applications’ needs (latency, capacity, bandwidth, etc.).
 
-• A pair of APIs: a Compatible API, enabling end-user to access to the Memory Expander without any changes to their applications, and an Optimization API that can be used to achieve higher levels of performance through application optimization.
+• A pair of APIs: a Compatible API, enabling end-user to access to the hybrid memories without any changes to their applications, and an Optimization API that can be used to achieve higher levels of performance through application optimization.
 
-• Userspace Cli Tool: a unified tool is provided for users to control and acquire the functions and information of a CXL device in a human-readable format, as well as control and manage SMDK features.
+• Userspace Cli Tool: a unified tool is provided for users to interact with a CXL device via CXL standard protocol in a human-readable format, as well as manage SMDK features.
 
 • Memory Interfaces: The SMDK provides 3 OS-level memory interfaces for logical use of the CXL device: memory-node, swap, cache
 

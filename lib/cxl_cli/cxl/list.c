@@ -12,6 +12,10 @@
 
 #include "filter.h"
 
+#ifdef ENABLE_SMDK_PLUGIN
+#include "smdk/smdk_control.h"
+#endif
+
 static struct cxl_filter_params param;
 static bool debug;
 
@@ -45,7 +49,8 @@ static const struct option options[] = {
 	OPT_STRING('r', "region", &param.region_filter, "region name",
 		   "filter by CXL region name(s)"),
 	OPT_BOOLEAN('R', "regions", &param.regions, "include CXL regions"),
-	OPT_BOOLEAN('X', "dax", &param.dax, "include CXL DAX region enumeration"),
+	OPT_BOOLEAN('X', "dax", &param.dax,
+		    "include CXL DAX region enumeration"),
 	OPT_BOOLEAN('i', "idle", &param.idle, "include disabled devices"),
 	OPT_BOOLEAN('u', "human", &param.human,
 		    "use human friendly number formats"),
@@ -53,9 +58,19 @@ static const struct option options[] = {
 		    "include memory device health information"),
 	OPT_BOOLEAN('I', "partition", &param.partition,
 		    "include memory device partition information"),
+	OPT_BOOLEAN('F', "firmware", &param.fw,
+		    "include memory device firmware information"),
 	OPT_BOOLEAN('A', "alert-config", &param.alert_config,
 		    "include alert configuration information"),
 	OPT_INCR('v', "verbose", &param.verbose, "increase output detail"),
+#ifdef ENABLE_SMDK_PLUGIN
+	OPT_BOOLEAN('V', "soft_interleaving", &param.soft_interleaving,
+		    "list soft-interelaving node(s)"),
+	OPT_BOOLEAN('n', "list_node", &param.list_node,
+		    "soft-interleaving list information per each node"),
+	OPT_BOOLEAN('C', "list_dev", &param.list_dev,
+		    "soft-interleaving list information per each cxldev"),
+#endif
 #ifdef ENABLE_DEBUG
 	OPT_BOOLEAN(0, "debug", &debug, "debug list walk"),
 #endif
@@ -75,11 +90,63 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 		NULL
 	};
 	struct json_object *jtopology;
+#ifndef ENABLE_SMDK_PLUGIN
 	int i;
+#endif
 
 	argc = parse_options(argc, argv, options, u, 0);
+
+#ifdef ENABLE_SMDK_PLUGIN
+	if (argc > 1) {
+		error("invalid parameter \n");
+		goto inval_option;
+	}
+
+	if (argc == 1) {
+		strtoul(argv[0], NULL, 0);
+		if (errno == EINVAL) {
+			if (strncmp(argv[0], "cxl", 3)) {
+				error("invalid parameter \n");
+				goto inval_option;
+			}
+		}
+	}
+
+	if (param.soft_interleaving) {
+		int ret;
+		if (param.list_node && param.list_dev) {
+			error("set one of the two options: list_node, list_dev\n");
+			goto inval_option;
+		} else if (!param.list_node && !param.list_dev) {
+			error("set one of the two options: list_node, list_dev\n");
+			goto inval_option;
+		}
+
+		if (param.list_node) {
+			int target_node;
+			if (argc == 0)
+				target_node = -2;
+			else
+				target_node = (int)strtoul(argv[0], NULL, 0);
+			ret = soft_interleaving_group_list_node(target_node);
+			if (ret)
+				goto inval_option;
+		} else if (param.list_dev) {
+			char *dev = (argc > 0) ? (char *)argv[0] : NULL;
+			ret = soft_interleaving_group_list_dev(dev);
+			if (ret)
+				goto inval_option;
+		}
+		return ret;
+
+	inval_option:
+		usage_with_options(u, options);
+		return -EINVAL;
+	}
+#else
 	for (i = 0; i < argc; i++)
 		error("unknown parameter \"%s\"\n", argv[i]);
+#endif
 
 	if (argc)
 		usage_with_options(u, options);
@@ -116,6 +183,7 @@ int cmd_list(int argc, const char **argv, struct cxl_ctx *ctx)
 	case 3:
 		param.health = true;
 		param.partition = true;
+		param.fw = true;
 		param.alert_config = true;
 		param.dax = true;
 		/* fallthrough */

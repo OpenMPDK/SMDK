@@ -27,7 +27,7 @@ override CFLAGS += -I$(JEMALLOC_DIR)/include \
 		   -I$(SMDK_ROOT_DIR) \
 		   -D_GNU_SOURCE -fPIC
 override LDFLAGS += -L$(JEMALLOC_DIR)/lib/
-override LIBS +=-Wl,--whole-archive $(JEMALLOC_SLIB_PIC) -Wl,--no-whole-archive -lpthread -ldl -lnuma -lstdc++
+override LIBS +=-Wl,--whole-archive $(JEMALLOC_SLIB_PIC) -Wl,--no-whole-archive -lpthread -ldl -lnuma -lstdc++ -lurcu
 
 all: $(LIBCXLMALLOC) static_lib
 $(LIBCXLMALLOC): $(C_OBJS)

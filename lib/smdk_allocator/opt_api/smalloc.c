@@ -39,8 +39,32 @@ int init_smalloc(void) {
     if (ret == SMDK_RET_SUCCESS) {
         init_system_mem_size();
         smdk_info.smdk_initialized = true;
-        smdk_info.node_alloc_stat_exmem = calloc(sizeof(long long),sysconf(_SC_NPROCESSORS_ONLN));
-        smdk_info.node_alloc_stat_normal = calloc(sizeof(long long),sysconf(_SC_NPROCESSORS_ONLN));
     }
     return ret;
+}
+
+void terminate_smalloc(void) {
+    if (smdk_info.smdk_initialized == false)
+        return;
+
+    terminate_smdk();
+    free(smdk_info.stats_per_node);
+}
+
+void intersect_bitmask(mem_type_t type, struct bitmask *nodemask) {
+    int node_start = (type == mem_type_normal) ? smdk_info.nr_pool_normal : 0;
+
+    for (int node = node_start; node <= numa_max_node(); node++) {
+        if (!numa_bitmask_isbitset(nodemask, node))
+            continue;
+        if (type == mem_type_normal) {
+            /* type = normal, bitmask = exmem */
+            numa_bitmask_clearbit(nodemask, node);
+        } else {
+            if ((node >= smdk_info.nr_pool_normal) && numa_bitmask_isbitset(numa_nodes_ptr, node))
+                continue;
+            /* type = exmem, bitmask = normal or invalid exmem */
+            numa_bitmask_clearbit(nodemask, node);
+        }
+    }
 }

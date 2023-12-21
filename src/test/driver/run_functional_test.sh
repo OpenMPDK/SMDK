@@ -1,6 +1,7 @@
 #!/bin/bash
 deviceId=0
 DEVICE_PATH=/sys/kernel/cxl/devices/cxl$deviceId
+DEVINCE_CNT=`ls -al /sys/kernel/cxl/devices/ | grep cxl | wc -l`
 
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
 source "$BASEDIR/script/common.sh"
@@ -29,6 +30,11 @@ if [ `whoami` != 'root' ]; then
     exit 2
 fi
 
+if [ ! -d "$DEVICE_PATH" ]; then
+    log_error "kmem-ext module should be installed."
+    exit $ENV_SET_FAIL
+fi
+
 print_buddyinfo
 print_deviceinfo
 echo
@@ -37,6 +43,7 @@ echo
 echo [OFFLINE TEST]
 state=`cat $DEVICE_PATH/state`
 if [ $state == "online" ]; then
+    old_node_id=`cat $DEVICE_PATH/node_id`
     echo -1 > $DEVICE_PATH/node_id
     new_state=`cat $DEVICE_PATH/state`
     if [ $new_state == "offline" ]; then
@@ -59,7 +66,7 @@ echo
 state=`cat $DEVICE_PATH/state`
 echo [ONLINE TEST]
 if [ $state == "offline" ]; then
-    echo 0 > $DEVICE_PATH/node_id
+    echo $old_node_id > $DEVICE_PATH/node_id
     new_state=`cat $DEVICE_PATH/state`
     if [ $new_state == "online" ]; then
         print_buddyinfo
@@ -80,15 +87,18 @@ echo
 #node change test
 echo [NODE CHANGE TEST]
 
-echo 1 > $DEVICE_PATH/node_id
-new_nodeid=`cat $DEVICE_PATH/node_id`
-if [ $new_nodeid == "1" ]; then
-    print_buddyinfo
-    print_deviceinfo
-    echo "PASS"
-else
-    echo "FAIL"
-    exit 1
+if [ $DEVINCE_CNT -ge 2 ]; then
+    cxl1_node_id=`cat /sys/kernel/cxl/devices/cxl1/node_id`
+    echo $cxl1_node_id > $DEVICE_PATH/node_id
+    new_nodeid=`cat $DEVICE_PATH/node_id`
+    if [ $new_nodeid == $cxl1_node_id ]; then
+        print_buddyinfo
+        print_deviceinfo
+        echo "PASS"
+    else
+        echo "FAIL"
+        exit 1
+    fi
 fi
 
 echo
@@ -97,19 +107,32 @@ echo
 echo [KOBJECT RELEASE TEST]
 SYSFS_PATH=/sys/kernel/cxl
 KERNEL_NAME=`uname -r`
-rmmod cxl_acpi
-rmmod cxl_pci
+
+devdax=()
+for path in $DEVICE_PATH/dax*; do
+    name=$(basename $path)
+    devdax+=($name)
+done
+
+# bind to device_dax driver
+for name in ${devdax[@]}; do
+    echo $name > /sys/bus/dax/devices/$name/driver/remove_id
+    echo $name > /sys/bus/dax/devices/$name/driver/unbind
+    echo $name > /sys/bus/dax/drivers/device_dax/new_id
+    echo $name > /sys/bus/dax/drivers/device_dax/bind > /dev/null 2>&1
+done
+
+# remove kmem and check sysfs path
+rmmod kmem
 if [ $? == "0" ]; then
     if [ ! -d "$SYSFS_PATH" ]; then
         echo "kobject is released"
         echo "PASS"
-        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
-        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_acpi.ko
+        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/dax/kmem.ko
     else
         echo "koject release is failed"
         echo "FAIL"
-        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_pci.ko
-        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/cxl/cxl_acpi.ko
+        insmod /lib/modules/$KERNEL_NAME/kernel/drivers/dax/kmem.ko
         exit 1
     fi
 else
@@ -119,17 +142,28 @@ fi
 
 echo
 
+# bind to kmem driver
+for name in ${devdax[@]}; do
+    echo $name > /sys/bus/dax/devices/$name/driver/remove_id
+    echo $name > /sys/bus/dax/devices/$name/driver/unbind
+    echo $name > /sys/bus/dax/drivers/kmem/new_id
+    echo $name > /sys/bus/dax/drivers/kmem/bind > /dev/null 2>&1
+done
+
 #check symlink 
 echo [SYMLINK CHECK]
-for memdev_path in $DEVICE_PATH/mem*; do
-    if [ -d "$memdev_path" ]; then
-        echo "memdev: $(readlink -f $memdev_path)"
-        echo "PASS"
-    else
-        echo "memdev: not exist"
-        exit 1
-    fi
-    break
-done
+memdevs=($DEVICE_PATH/mem*)
+if [ ${#memdevs[@]} -gt 0 ] && [ -e "${memdevs[0]}" ]; then
+	for memdev_path in "${memdevs[@]}"; do
+		if [ -d "$memdev_path" ]; then
+			echo "memdev: $(readlink -f $memdev_path)"
+			echo "PASS"
+		else
+			echo "memdev: not exist"
+			exit 1
+		fi
+		break
+	done
+fi
 
 exit 0

@@ -194,9 +194,9 @@ int avoid_oom()
     int ret;
     char command[BUF_SIZE];
 
-    sprintf(command, "echo -17 > /proc/%d/oom_adj", pid);
+    sprintf(command, "echo -17 > /proc/%d/oom_score_adj", pid);
     if ((ret = system(command)) < 0) {
-        set_err("Set oom_adj failed", ret);
+        set_err("Set oom_score_adj failed", ret);
         return -1;
     }
 

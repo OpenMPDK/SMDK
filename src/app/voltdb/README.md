@@ -2,7 +2,7 @@ prerequisite:
 
 1. build library
 ```
-$BASEDIR/lib/build_lib.sh smdkmalloc
+$BASEDIR/lib/build_lib.sh libsmdk
 ```
 
 2. build voltdb

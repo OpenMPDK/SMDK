@@ -36,7 +36,7 @@ function check_binaries() {
 function check_region_created() {
 	REGION_IOMEM=`sudo cat /proc/iomem | grep region0`
 	if [ ! -z "$REGION_IOMEM" ]; then
-		log_error "cxl-region is already created. Reconfigure-device to devdax and destory cxl-region."
+		log_error "cxl-region is already created. Reconfigure-device to devdax and destroy cxl-region."
 		exit $ENV_SET_FAIL
 	fi
 }

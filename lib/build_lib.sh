@@ -7,7 +7,7 @@ cd $BASEDIR/lib
 set -e
 
 source "$BASEDIR/script/common.sh"
-SMDKMALLOC=smdk_allocator
+LIBSMDK=smdk_allocator
 SMDK_PY=smdk_allocator/opt_api/py_smdk_pkg
 SMDK_PYPACKAGE=_py_smdk.so
 JEMALLOC=jemalloc-5.2.1
@@ -17,18 +17,18 @@ MEMTIER=memtier_benchmark-1.3.0
 STREAM=stream
 PCM=pcm
 UPROF=AMDuProf_Linux_x64_4.0.341
-NUMACTL=numactl-2.0.14
-CXL_KERNEL=linux-6.4-smdk
-CXL_KERNEL_CONFIG=config-linux-6.4-smdk
+NUMACTL=numactl-2.0.16
+CXL_KERNEL=linux-6.6-smdk
+CXL_KERNEL_CONFIG=config-linux-6.6-smdk
 QEMU=qemu-8.1.50
 MLC=mlc
 VOLTDB=$BASEDIR/src/app/voltdb
 CXLCLI=cxl_cli
-BWMAP=bwd
-BWMAP_DRIVER=bwd/drivers
+TIERD=tierd
+LIBPNM=PNMLibrary-pnm-v3.0.0
 
 SMDK_BIN=$BASEDIR/lib/SMDK_bin
-SMDK_VERSION=v1.5
+SMDK_VERSION=v2.0
 
 function build_voltdb() {
 	app=$VOLTDB
@@ -200,11 +200,16 @@ function build_smdk_kernel(){
 	fi
 }
 
-function build_smdkmalloc(){
-	app=$SMDKMALLOC
-	log_normal "[build smdkmalloc]"
+function build_libsmdk(){
+	app=$LIBSMDK
+	log_normal "[build libsmdk]"
 
-	if [ ! -f "$app/lib/libcxlmalloc.a" ]; then
+	if [ ! -e "$LIBPNM/PNMLibrary/build/libs/lib/libpnm.so" ]; then
+		log_error "[build libsmdk] build PNMLibrary first(libpnm)..error"
+		return
+	fi
+
+	if [ ! -f "$app/lib/libcxlmalloc.a" ] || [ ! -f "$app/lib/libsmalloc.a" ] ; then
 		cd $app/$JEMALLOC
 		autoconf
 		./configure --with-jemalloc-prefix='je_' --with-private-namespace='' --disable-cxx
@@ -215,19 +220,19 @@ function build_smdkmalloc(){
 	ret=$?
 
 	if [ $ret = 0 ]; then
-		log_normal "[build smdkmalloc]..success"
+		log_normal "[build libsmdk]..success"
 	else
-		log_error "[build smdkmalloc]..error"
+		log_error "[build libsmdk]..error"
 	fi
 }
 
 function build_py_smdk(){
-	smdklib=$SMDKMALLOC/lib
+	smdklib=$LIBSMDK/lib
 	app=$SMDK_PY
 	log_normal "[build py_smdk]"
 
 	if [ ! -e "$smdklib/libsmalloc.so" ]; then
-		log_error "[build py_smdk] build SMDK library first(smdkmalloc)..error"
+		log_error "[build py_smdk] build SMDK library first(libsmdk)..error"
 		return
 	fi
 
@@ -260,12 +265,12 @@ function build_cxl_cli(){
 	fi
 }
 
-function build_bwd(){
+function build_tierd(){
 	app=$PCM
 	log_normal "[build $app]"
 
-	mkdir -p $BWMAP/$app/build
-	cd $BWMAP/$app/build
+	mkdir -p $TIERD/$app/build
+	cd $TIERD/$app/build
 	cmake_version=$(cmake --version | awk 'NR==1{print $3}')
 	if [[ $cmake_version < "3.12.0" ]]; then
 		cmake .. && cmake --build .
@@ -285,8 +290,8 @@ function build_bwd(){
 	log_normal "[unzip $app]"
 
 	ret=0
-	if [ ! -f "$BWMAP/$app/bin/AMDuProfPcm" ]; then
-		cd $BWMAP
+	if [ ! -f "$TIERD/$app/bin/AMDuProfPcm" ]; then
+		cd $TIERD
 		tar -xvf $app.tar.bz2 1>/dev/null
 		ret=$?
 		cd -
@@ -298,7 +303,7 @@ function build_bwd(){
 		log_error "[unzip $app]..error"
 	fi
 
-	for app in $BWMAP $BWMAP_DRIVER; do
+	for app in $TIERD; do
 		log_normal "[build $app]"
 
 		cd $app && make
@@ -313,8 +318,52 @@ function build_bwd(){
 	done
 }
 
+function build_libpnm(){
+	app=$LIBPNM
+	log_normal "[build $app]"
+
+	if [ ! -d "$app" ]; then
+		log_normal "extract $app"
+		tar -xvf $app.tar.gz 1>/dev/null
+		log_normal "extract $app..done"
+
+		cd $app/PNMLibrary
+		patch -p1 < ../patches/PNMLibrary/*.patch
+		chmod +111 ./scripts/*.sh ./scripts/*.py
+		cd -
+	fi
+
+	ret=0
+	if [ ! -f "$app/PNMLibrary/build/libs/lib/libpnm.so" ]; then
+		if [ ! -d "/usr/local/include/linux" ]; then
+			sudo mkdir -p /usr/local/include/linux
+		fi
+		if [ ! -f "/usr/local/include/linux/imdb_resources.h" ]; then
+			sudo cp $CXL_KERNEL/include/uapi/linux/imdb_resources.h /usr/local/include/linux/
+		fi
+		if [ ! -f "/usr/local/include/linux/sls_resources.h" ]; then
+			sudo cp $CXL_KERNEL/include/uapi/linux/sls_resources.h /usr/local/include/linux/
+		fi
+		if [ ! -f "/usr/local/include/linux/pnm_resources.h" ]; then
+			sudo cp $CXL_KERNEL/include/uapi/linux/pnm_resources.h /usr/local/include/linux/
+		fi
+		cd $app/PNMLibrary
+		mkdir -p test_tables
+		./scripts/build.sh -cb -j `nproc` -r --fsim
+		ret=$?
+		cd -
+	fi
+
+	if [ $ret = 0 ]; then
+		log_normal "[build $app]..success"
+	else
+		log_error "[build $app]..error"
+	fi
+}
+
 function build_all(){
-	build_smdkmalloc
+	build_libpnm
+	build_libsmdk
 	build_redis
 	build_memcached
 	build_memtier
@@ -325,18 +374,18 @@ function build_all(){
 	#build_smdk_kernel
 	build_py_smdk
 	build_cxl_cli
-	#build_bwd
+	#build_tierd
 }
 
-function clean_smdkmalloc(){
-	app=$SMDKMALLOC
-	log_normal "[clean smdkmalloc]"
+function clean_libsmdk(){
+	app=$LIBSMDK
+	log_normal "[clean libsmdk]"
 	if [ -d "$app" ]; then
 		cd $app
 		make clean
 		cd -
 	fi
-	log_normal "[clean smdkmalloc]..done"
+	log_normal "[clean libsmdk]..done"
 }
 
 function clean_py_smdk(){
@@ -467,11 +516,11 @@ function clean_cxl_cli(){
 	fi
 }
 
-function clean_bwd(){
+function clean_tierd(){
 	app=$PCM
 	log_normal "[clean $app]"
 
-	rm -rf $BWMAP/$app/build
+	rm -rf $TIERD/$app/build
 	ret=$?
 
 	if [ $ret = 0 ]; then
@@ -483,7 +532,7 @@ function clean_bwd(){
 	app=$UPROF
 	log_normal "[clean $app]"
 
-	rm -rf $BWMAP/$app
+	rm -rf $TIERD/$app
 	ret=$?
 
 	if [ $ret = 0 ]; then
@@ -492,7 +541,7 @@ function clean_bwd(){
 		log_error "[clean $app]..error"
 	fi
 
-	for app in $BWMAP $BWMAP_DRIVER; do
+	for app in $TIERD; do
 		log_normal "[clean $app]"
 
 		cd $app && make clean
@@ -507,14 +556,30 @@ function clean_bwd(){
 	done
 }
 
+function clean_libpnm(){
+	app=$LIBPNM
+	log_normal "[clean $app]"
+
+	sudo rm -f /usr/local/include/linux/imdb_resources.h
+	sudo rm -f /usr/local/include/linux/sls_resources.h
+	sudo rm -f /usr/local/include/linux/pnm_resources.h
+	rm -rf $app/PNMLibrary/build
+	ret=$?
+
+	if [ $ret = 0 ]; then
+		log_normal "[clean $app]..success"
+	else
+		log_error "[clean $app]..error"
+	fi
+}
 
 case "$1" in
 	kernel)
 		build_smdk_kernel
 		;;
 
-	smdkmalloc)
-		build_smdkmalloc
+	libsmdk)
+		build_libsmdk
 		;;
 
 	memcached)
@@ -553,8 +618,12 @@ case "$1" in
 		build_cxl_cli
 		;;
 
-	bwd)
-		build_bwd
+	tierd)
+		build_tierd
+		;;
+
+	libpnm)
+		build_libpnm
 		;;
 
 	all)
@@ -565,8 +634,8 @@ case "$1" in
 		clean_kernel
 		;;
 
-	clean_smdkmalloc)
-		clean_smdkmalloc
+	clean_libsmdk)
+		clean_libsmdk
 		;;
 
 	clean_memcached)
@@ -605,27 +674,32 @@ case "$1" in
 		clean_cxl_cli
 		;;
 
-	clean_bwd)
-		clean_bwd
+	clean_tierd)
+		clean_tierd
+		;;
+
+	clean_libpnm)
+		clean_libpnm
 		;;
 
 	clean_all)
-		clean_smdkmalloc
+		clean_libpnm
+		clean_libsmdk
 		clean_redis
 		clean_memcached
 		clean_memtier
 		clean_bm
-#		clean_kernel
-#		clean_qemu
+		#clean_kernel
+		#clean_qemu
 		clean_numactl
-#		clean_voltdb
+		#clean_voltdb
 		clean_py_smdk
 		clean_cxl_cli
-		#clean_bwd
+		#clean_tierd
 		;;
 	*)
-		echo "Usage: build_lib.sh {all|kernel|smdkmalloc|redis|memcached|memtier|qemu|numactl|voltdb|bm|py_smdk|cxl_cli|bwd}"
-		echo "Usage: build_lib.sh {clean_all|clean_kernel|clean_smdkmalloc|clean_redis|clean_memcached|clean_memtier|clean_qemu|clean_numactl|clean_voltdb|clean_bm|clean_py_smdk|clean_cxl_cli|clean_bwd}"
+		echo "Usage: build_lib.sh {all|kernel|libsmdk|redis|memcached|memtier|qemu|numactl|voltdb|bm|py_smdk|cxl_cli|tierd|libpnm}"
+		echo "Usage: build_lib.sh {clean_all|clean_kernel|clean_libsmdk|clean_redis|clean_memcached|clean_memtier|clean_qemu|clean_numactl|clean_voltdb|clean_bm|clean_py_smdk|clean_cxl_cli|clean_tierd|clean_libpnm}"
 		exit 1
 		;;
 esac

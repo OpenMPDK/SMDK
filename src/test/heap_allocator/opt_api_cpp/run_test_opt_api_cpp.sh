@@ -1,7 +1,12 @@
+#!/usr/bin/env bash
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../../
 
 SCRIPT_PATH=$(readlink -f $(dirname $0))/
 APP=$SCRIPT_PATH/test_opt_api_cpp
+CFG=$@
+if [ ! -z $RUN_ON_QEMU ]; then
+	CFG+=" iter 100000"
+fi
 
 function run_app(){
 ## dynamic link
@@ -11,7 +16,7 @@ function run_app(){
 #   echo $SMALLOC_CONF
     export SMALLOC_CONF
 
-    $APP
+    $APP $CFG
 }
 
 run_app

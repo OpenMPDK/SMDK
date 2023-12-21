@@ -1,5 +1,5 @@
 project('ndctl', 'c',
-  version : '77',
+  version : '78',
   license : [
     'GPL-2.0',
     'LGPL-2.1',
@@ -145,7 +145,7 @@ uuid = dependency('uuid')
 json = dependency('json-c')
 if get_option('libtracefs').enabled()
   traceevent = dependency('libtraceevent')
-  tracefs = dependency('libtracefs')
+  tracefs = dependency('libtracefs', version : '>=1.2.0')
 endif
 
 if get_option('docs').enabled()
@@ -299,16 +299,16 @@ config_h = configure_file(
 add_project_arguments('-include', 'config.h', language : 'c')
 
 LIBNDCTL_CURRENT=27
-LIBNDCTL_REVISION=1
+LIBNDCTL_REVISION=2
 LIBNDCTL_AGE=21
 
 LIBDAXCTL_CURRENT=6
 LIBDAXCTL_REVISION=2
 LIBDAXCTL_AGE=5
 
-LIBCXL_CURRENT=5
+LIBCXL_CURRENT=6
 LIBCXL_REVISION=0
-LIBCXL_AGE=4
+LIBCXL_AGE=5
 
 root_inc = include_directories(['.', 'ndctl', ])
 

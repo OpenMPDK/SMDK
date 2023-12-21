@@ -7,7 +7,7 @@ readonly BASEDIR=$(readlink -f $(dirname $0))/../../../
 source "$BASEDIR/script/common.sh"
 
 # numactl
-NUMACTL_DIR=$BASEDIR/lib/numactl-2.0.14/
+NUMACTL_DIR=$BASEDIR/lib/numactl-2.0.16/
 NUMACTL=$NUMACTL_DIR/numactl
 
 # cxl-cli
@@ -20,8 +20,29 @@ SIZE=4096		#4k
 ITER=1048576	# 1024 * 1024
 NTHREAD=1
 
+get_cxl_nodes() {
+	CXLNODES=
+	MOVABLES=`cat /proc/buddyinfo | grep Movable | awk '{ printf $2 }' | sed 's/.$//'`
+	IFS=',' read -ra tokens <<< "$MOVABLES"
+	for nid in "${tokens[@]}"; do
+		dirs=($(find /sys/devices/system/node/node$nid -maxdepth 1 -type l -name "cpu*"))
+		if [ ${#dirs[@]} -eq 0 ]; then
+			if [ -z "$CXLNODES" ]; then
+				CXLNODES=$nid
+			else
+				CXLNODES+=",$nid"
+			fi
+		fi
+	done
+
+	if [ -z "$CXLNODES" ]; then
+		log_error "cxl nodes don't exist."
+		exit 2
+	fi
+}
+
 run_malloc() {
-	$NUMACTL --zone e --interleave all $TEST_APP --size $SIZE --iter $ITER \
+	$NUMACTL --interleave $CXLNODES $TEST_APP --size $SIZE --iter $ITER \
 		--thread $NTHREAD
 
 	ret=$?
@@ -32,12 +53,10 @@ run_malloc() {
 }
 
 set_pol() {
-	if [ "$POL" = "zone" ]; then
-		$CXLCLI group-zone
-	elif [ "$POL" = "node" ]; then
-		$CXLCLI group-node
+	if [ "$POL" = "node" ]; then
+		$CXLCLI create-region -V -G node
 	elif [ "$POL" = "noop" ]; then
-		$CXLCLI group-noop
+		$CXLCLI create-region -V -G noop
 	else
 		log_error "Bad policy: $POL"
 		exit 2
@@ -48,10 +67,12 @@ set_pol() {
 		log_error "Faild to set policy, check out cxl_cli functionality."
 		exit 1
 	fi
+
+	get_cxl_nodes
 }
 
 print_desc_test() {
-	echo -n "cxl group-$POL, "
+	echo -n "cxl: set $POL, "
 	echo -n "size: `numfmt --to iec --format "%f" $SIZE` bytes, "
 	echo -n "iteration: `numfmt --to iec --format "%f" $ITER` times, "
 }
@@ -66,9 +87,6 @@ print_elapsed_time() {
 }
 
 run_test() {
-	POL="zone"
-	print_desc_test; set_pol; get_time; run_malloc; print_elapsed_time
-
 	POL="node"
 	print_desc_test; set_pol; get_time; run_malloc; print_elapsed_time
 
@@ -128,6 +146,11 @@ fi
 
 if [ ! -f "${CXLCLI}" ]; then
 	log_error "cxl does not exist. Run 'build_lib.sh cxl_cli' in /path/to/SMDK/lib/"
+	exit 2
+fi
+
+if [ ! -f "${TEST_APP}" ]; then
+	log_error "test application does not exist. Run 'make' in test directory"
 	exit 2
 fi
 

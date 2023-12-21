@@ -3,6 +3,7 @@
 #include "test.h"
 #include "smdk_opt_api.hpp"
 #include <numa.h>
+#include <sys/mman.h>
 
 using namespace std;
 
@@ -130,10 +131,10 @@ public:
 class Test4: public CPPTest
 {
 public:
-	Test4(size_t size, int iter, smdk_memtype_t type, string name, string nodes)
+	Test4(size_t size, int iter, smdk_memtype_t type, string name, string node)
 		: CPPTest(size, iter, type, name)
 	{
-		this->nodes = nodes;
+		this->node = node;
 	}
 	void run(void)
 	{
@@ -142,7 +143,7 @@ public:
 
 		void* buf;
 		for(int i = 0; i < iter; i++){
-			buf = allocator.malloc_node(type, size, nodes);
+			buf = allocator.malloc_node(type, size, node);
 			assert_ptr_not_null(buf, "s_malloc allocation failure");
 			memset(buf, 0, size);
 			allocator.free_node(type, buf, size);
@@ -152,7 +153,7 @@ public:
 
 		print_end();
 	}
-	string nodes;
+	string node;
 };
 
 class Test5: public CPPTest
@@ -169,12 +170,13 @@ public:
 		SmdkAllocator& allocator = SmdkAllocator::get_instance();
 
 		void* buf;
+		unsigned int flag = MAP_PRIVATE|MAP_ANONYMOUS|MAP_NORESERVE;
 		allocator.enable_node_interleave(nodes);
 		for(int i = 0; i < iter; i++){
-			buf = allocator.malloc(type, size);
+			buf = mmap(NULL, size, PROT_READ|PROT_WRITE, flag, -1, 0);
 			assert_ptr_not_null(buf, "s_malloc allocation failure");
 			memset(buf, 0, size);
-			allocator.free(buf);
+			munmap(buf, size);
 		}
 		allocator.disable_node_interleave();
 
@@ -185,14 +187,21 @@ public:
 	string nodes;
 };
 
-int main(void){
-	size_t size = 1024;
-	int iter = 10000000;
+int main(int argc, char *argv[]){
+	size_t size = 4096;
+	int iter = 1000000;
+	string node = "0";
 	string node_range = "0";
 	if(numa_max_node() != 0)
 		node_range += "-" + to_string(numa_max_node());
 	string node_max = to_string(numa_max_node());
+
 	smdk_memtype_t type = SMDK_MEM_NORMAL;
+
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "iter"))
+			iter = (int)atoi(argv[++i]);
+	}
 
 	Test1 tc1(size, iter, type, "basic functional test");
 	tc1.run();
@@ -203,7 +212,7 @@ int main(void){
 	Test3 tc3(size, iter, type, "malloc-memstat-free test");
 	tc3.run();
 
-	Test4 tc4(size, iter, type, "alloc_on_nodes test", node_range);
+	Test4 tc4(size, iter, type, "alloc_on_node test", node);
 	tc4.run();
 
 	Test5 tc5(size, iter, type, "enable_node_interleave test", node_max);

@@ -15,9 +15,7 @@ typedef struct tsd_init_head_s tsd_init_head_t;
 
 typedef struct {
     bool initialized;
-    tsd_t val[2];
-    int cur_type;
-    bool mem_policy_enabled;
+    tsd_t val;
 } tsd_wrapper_t;
 
 void *tsd_init_check_recursion(tsd_init_head_t *head,
@@ -36,9 +34,7 @@ tsd_cleanup_wrapper(void *arg) {
 
     if (wrapper->initialized) {
         wrapper->initialized = false;
-        tsd_cleanup(&wrapper->val[0]);
-        tsd_cleanup(&wrapper->val[1]);
-
+        tsd_cleanup(&wrapper->val);
         if (wrapper->initialized) {
             /* Trigger another cleanup round. */
             if (pthread_setspecific(tsd_tsd, (void *)wrapper) != 0)
@@ -83,32 +79,14 @@ tsd_wrapper_get(bool init) {
             wrapper->initialized = false;
       JEMALLOC_DIAGNOSTIC_PUSH
       JEMALLOC_DIAGNOSTIC_IGNORE_MISSING_STRUCT_FIELD_INITIALIZERS
-            tsd_t initializer_normal = TSD_INITIALIZER;
-            tsd_t initializer_exmem = TSD_EXMEM_INITIALIZER;
+            tsd_t initializer = TSD_INITIALIZER;
       JEMALLOC_DIAGNOSTIC_POP
-            wrapper->val[0] = initializer_normal;
-            wrapper->val[1] = initializer_exmem;
-            wrapper->cur_type = MEM_ZONE_NORMAL;
-            wrapper->mem_policy_enabled = false;
+            wrapper->val = initializer;
         }
         tsd_wrapper_set(wrapper);
         tsd_init_finish(&tsd_init_head, &block);
     }
     return wrapper;
-}
-
-JEMALLOC_ALWAYS_INLINE void
-set_tsd_set_cur_mem_type(int type) {
-    tsd_wrapper_t* wrapper = tsd_wrapper_get(true);
-    assert(wrapper);
-    wrapper->cur_type = type;
-}
-
-JEMALLOC_ALWAYS_INLINE void
-change_tsd_set_cur_mem_type(void) {
-    tsd_wrapper_t* wrapper = tsd_wrapper_get(true);
-    assert(wrapper);
-    wrapper->cur_type = !wrapper->cur_type;
 }
 
 JEMALLOC_ALWAYS_INLINE bool
@@ -130,18 +108,13 @@ tsd_boot1(void) {
         abort();
     }
     tsd_boot_wrapper.initialized = false;
-    tsd_cleanup(&tsd_boot_wrapper.val[0]);
-    tsd_cleanup(&tsd_boot_wrapper.val[1]);
+    tsd_cleanup(&tsd_boot_wrapper.val);
     wrapper->initialized = false;
 JEMALLOC_DIAGNOSTIC_PUSH
 JEMALLOC_DIAGNOSTIC_IGNORE_MISSING_STRUCT_FIELD_INITIALIZERS
-    tsd_t initializer_normal = TSD_INITIALIZER;
-    tsd_t initializer_exmem = TSD_EXMEM_INITIALIZER;;
+    tsd_t initializer = TSD_INITIALIZER;
 JEMALLOC_DIAGNOSTIC_POP
-    wrapper->val[0] = initializer_normal;
-    wrapper->val[1] = initializer_exmem;
-    wrapper->cur_type = MEM_ZONE_NORMAL;
-    wrapper->mem_policy_enabled = false;
+    wrapper->val = initializer;
     tsd_wrapper_set(wrapper);
 }
 
@@ -164,16 +137,21 @@ tsd_get_allocates(void) {
     return true;
 }
 
-JEMALLOC_ALWAYS_INLINE tsd_t *
-tsd_get_with_type(int type) {
-    tsd_wrapper_t *wrapper = tsd_wrapper_get(false);
-    if (tsd_get_allocates() && wrapper == NULL) {
-        return NULL;
-    }
-    return &(wrapper->val[type]);
+/* Get/set. */
+JEMALLOC_ALWAYS_INLINE void
+set_tsd_list_tcache(unsigned *list_tcache) {
+    tsd_wrapper_t* wrapper = tsd_wrapper_get(true);
+    assert(wrapper);
+    wrapper->val.list_tcache = list_tcache;
 }
 
-/* Get/set. */
+JEMALLOC_ALWAYS_INLINE unsigned *
+get_tsd_list_tcache(void) {
+    tsd_wrapper_t* wrapper = tsd_wrapper_get(true);
+    assert(wrapper);
+    return wrapper->val.list_tcache;
+}
+
 JEMALLOC_ALWAYS_INLINE tsd_t *
 tsd_get(bool init) {
     tsd_wrapper_t *wrapper;
@@ -182,7 +160,7 @@ tsd_get(bool init) {
     if (tsd_get_allocates() && !init && wrapper == NULL) {
         return NULL;
     }
-    return &(wrapper->val[wrapper->cur_type]);
+    return &(wrapper->val);
 }
 
 JEMALLOC_ALWAYS_INLINE void
@@ -190,43 +168,8 @@ tsd_set(tsd_t *val) {
     tsd_wrapper_t *wrapper;
     assert(tsd_booted);
     wrapper = tsd_wrapper_get(true);
-    if (likely(&(wrapper->val[wrapper->cur_type]) != val)) {
-        wrapper->val[wrapper->cur_type] = *(val);
+    if (likely(&wrapper->val != val)) {
+        wrapper->val = *(val);
     }
     wrapper->initialized = true;
 }
-
-JEMALLOC_ALWAYS_INLINE void
-tsd_set_mem_policy_info(bool policy) {
-    tsd_wrapper_t *wrapper;
-    assert(tsd_booted);
-    wrapper = tsd_wrapper_get(true);
-    assert(wrapper != NULL);
-    wrapper->mem_policy_enabled = policy;
-}
-
-JEMALLOC_ALWAYS_INLINE void
-tsd_set_aid(int aid) {
-    tsd_t *tsd = tsd_get(false);
-    assert(tsd);
-    tsd->aid = aid;
-}
-
-JEMALLOC_ALWAYS_INLINE int
-tsd_get_aid(void) {
-    tsd_t *tsd = tsd_get(false);
-    assert(tsd);
-    return tsd->aid;
-}
-
-JEMALLOC_ALWAYS_INLINE bool
-tsd_is_mem_policy_enabled(bool init) {
-    tsd_wrapper_t *wrapper;
-    assert(tsd_booted);
-    wrapper = tsd_wrapper_get(init);
-    if (tsd_get_allocates() && !init && wrapper == NULL) {
-        return -1;
-    }
-    return wrapper->mem_policy_enabled;
-}
-

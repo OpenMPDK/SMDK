@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 readonly BASEDIR=$(readlink -f $(dirname $0))/../../../../
 
-ARGS=""
+ARGS=$@
+if [ ! -z $RUN_ON_QEMU ]; then
+	ARGS+=" size 33554432"
+fi
 
 SCRIPT_PATH=$(readlink -f $(dirname $0))/
 APP=$SCRIPT_PATH/test_policy_ctl
@@ -17,7 +20,6 @@ function run_app(){
         $APP $ARGS
 }
 
-ARGS=$@
 run_app
 ret=$?
 

@@ -2082,8 +2082,8 @@ arena_new(tsdn_t *tsdn, unsigned ind, extent_hooks_t *extent_hooks) {
 	/* Set arena before creating background threads. */
 	arena_set(ind, arena);
 
-	/* SMDK: Set default mmap flag(NORMAL) for the arena */
-	arena_set_mmap_flag(arena, MAP_NORMAL);
+	/* SMDK: Set default nodemask(NULL)for the arena */
+	arena_set_smdk_flag(arena, 0, NULL);
 
 	nstime_init(&arena->create_time, 0);
 	nstime_update(&arena->create_time);

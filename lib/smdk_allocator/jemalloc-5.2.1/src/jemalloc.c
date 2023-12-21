@@ -3760,7 +3760,6 @@ je_arenaidx_find(const void *ptr) {
     if (extent == NULL) {
 		check_entry_exit_locking(tsdn);
 
-		change_tsd_set_cur_mem_type();
 		tsdn = tsdn_fetch();
 		check_entry_exit_locking(tsdn);
 		const extent_t *extent = iealloc(tsdn, ptr);
@@ -3782,6 +3781,43 @@ label_return:
     check_entry_exit_locking(tsdn);
     LOG("core.arenaidx_find.exit", "result: %d", ret);
     return ret;
+}
+
+JEMALLOC_EXPORT int JEMALLOC_NOTHROW
+je_arenaidx_pid(const void *ptr) { /* SMDK Extension */
+	int ret;
+	tsdn_t *tsdn;
+
+	LOG("core.arenaidx_pid.entry", "ptr: %p", ptr);
+
+	tsdn = tsdn_fetch();
+	check_entry_exit_locking(tsdn);
+
+	const extent_t *extent = iealloc(tsdn, ptr);
+	if (extent == NULL) {
+		check_entry_exit_locking(tsdn);
+
+		tsdn = tsdn_fetch();
+		check_entry_exit_locking(tsdn);
+		const extent_t *extent = iealloc(tsdn, ptr);
+		if (extent == NULL) {
+			ret = -1;
+			goto label_return;
+		}
+	}
+
+	const arena_t *arena = extent_arena_get(extent);
+	if (arena == NULL) {
+		ret = -1;
+		goto label_return;
+	}
+
+	return arena->arena_pid;
+
+label_return:
+	check_entry_exit_locking(tsdn);
+	LOG("core.arenaidx_pid.exit", "result: %d", ret);
+	return -1; /* invalid pid */
 }
 
 JEMALLOC_EXPORT size_t JEMALLOC_NOTHROW

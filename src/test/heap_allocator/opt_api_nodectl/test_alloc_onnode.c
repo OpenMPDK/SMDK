@@ -15,7 +15,7 @@
 size_t size = 64*1024*1024;
 int iter = 10;
 int nthreads=1;
-char* node = "0";
+char* node = "1";
 
 bool is_node_valid(char *node) {
     if (numa_parse_nodestring(node) == NULL) {

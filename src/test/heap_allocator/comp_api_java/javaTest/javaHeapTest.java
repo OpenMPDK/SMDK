@@ -55,24 +55,6 @@ public class javaHeapTest {
   }
 
   @Test
-  public void test127MBytes() {
-    memoryConsumer = allocateByteArray(Mbyte, 127);
-    javaHeapUtil.printUsedMemory();
-  }
-  
-  @Test
-  public void test1GBytes() {
-    memoryConsumer = allocateByteArray(Mbyte, 1024);
-    javaHeapUtil.printUsedMemory();
-  }
-  
-  @Test
-  public void test4GBytes() {
-    memoryConsumer = allocateByteArray(Mbyte, 1024 * 4);
-    javaHeapUtil.printUsedMemory();
-  }
-
-  @Test
   public void testBaseline3() {
     javaHeapUtil.printUsedMemory();
   }

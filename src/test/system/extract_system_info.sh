@@ -36,7 +36,7 @@ function check_srat_table(){
 	fi
 
 	# Print memory affinity of cxl memory range
-	cat srat.dsl | grep -A8 -B6 "$1"
+	cat srat.dsl | grep -A8 -B6 -i "$1"
 }
 
 if [ `whoami` != 'root' ]; then

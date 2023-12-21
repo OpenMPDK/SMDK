@@ -10,7 +10,7 @@ APP=$SCRIPT_PATH/test_heap_alloc
 function test_cxlmalloc_exmem(){
     log_normal "EXMEM Zone - cxlmalloc - $APP"
     export LD_PRELOAD=$CXLMALLOCDIR/libcxlmalloc.so
-    export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,priority:exmem,exmem_zone_size:1000,normal_zone_size:1000,maxmemory_policy:interleave
+    export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,priority:exmem,exmem_size:1000,normal_size:1000,maxmemory_policy:interleave
     echo $CXLMALLOC_CONF
     $APP
 }
@@ -18,7 +18,7 @@ function test_cxlmalloc_exmem(){
 function test_cxlmalloc_normal(){
     log_normal "NORMAL Zone - cxlmalloc - $APP"
     export LD_PRELOAD=$CXLMALLOCDIR/libcxlmalloc.so
-    export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,priority:normal,exmem_zone_size:1000,normal_zone_size:1000,maxmemory_policy:interleave
+    export CXLMALLOC_CONF=use_exmem:true,use_auto_arena_scaling:true,priority:normal,exmem_size:1000,normal_size:1000,maxmemory_policy:interleave
     echo $CXLMALLOC_CONF
     $APP
 }

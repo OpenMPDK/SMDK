@@ -43,6 +43,13 @@
 #  define PAGES_CAN_PURGE_FORCED
 #endif
 
+#include <numa.h>
+#include <numaif.h>
+
+#ifndef MADV_TRY_POPULATE_WRITE
+#define MADV_TRY_POPULATE_WRITE (26)
+#endif
+
 static const bool pages_can_purge_lazy =
 #ifdef PAGES_CAN_PURGE_LAZY
     true
@@ -73,7 +80,7 @@ extern thp_mode_t init_system_thp_mode; /* Initial system wide state. */
 extern const char *thp_mode_names[];
 
 void *pages_map(void *addr, size_t size, size_t alignment, bool *commit);
-void *pages_map_flag(void *addr, size_t size, size_t alignment, bool *commit, int extra_flag);
+void *pages_map_nodemask(void *addr, size_t size, size_t alignment, bool *commit, struct bitmask *nodemask);
 void pages_unmap(void *addr, size_t size);
 bool pages_commit(void *addr, size_t size);
 bool pages_decommit(void *addr, size_t size);

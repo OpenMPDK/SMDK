@@ -74,7 +74,7 @@
 		    (uintptr_t)v != vlen){				    \
                     CONF_ERROR("Invalid conf value", k, klen, v, vlen);	    \
                 } else if (l == UNLIMITED){				    \
-                    o = MEMZONE_UNLIMITED;				    \
+                    o = MEMPOOL_UNLIMITED;				    \
                 } else if (l < (ssize_t)(min) || l > (ssize_t)(max)) {	    \
                     CONF_ERROR("Out-of-range conf value", k, klen, v, vlen);\
                 } else {						    \
@@ -98,16 +98,26 @@ typedef enum {
 
 typedef enum {
     policy_bw_saturation = 0,
+    policy_bw_order = 1,
+    policy_weighted_interleaving = 2,
 } adaptive_interleaving_policy_t;
 
 extern bool conf_next(char const **opts_p, char const **k_p, size_t *klen_p, char const **v_p, size_t *vlen_p);
 extern void smdk_init_helper(const char *envname, bool is_opt_api);
-extern char *str_priority(mem_zone_t prio);
+extern char *str_type(mem_type_t prio);
 extern char *str_maxmemory_policy(maxmemory_policy_t policy);
 extern void show_smdk_info(bool is_opt_api);
 
 #define SMDK_RET_SUCCESS (0)
 #define SMDK_RET_USE_EXMEM_FALSE (1)
-#define SMDK_RET_INIT_MMAP_PTR_FAIL (2)
+#define SMDK_RET_INIT_DLSYM_FAIL (2)
+
+#ifdef _SMDK_DEBUG
+    #define DP(fmt,args...) fprintf(stderr,fmt,##args)
+    #define DLP(fmt,args...) fprintf(stderr, "[%s:%d %s]" fmt,__FILE__,__LINE__,__FUNCTION__,##args)
+#else
+    #define DP(fmt,args...)
+    #define DLP(fmt,args...)
+#endif
 
 #endif /* CONFIG_H_ */

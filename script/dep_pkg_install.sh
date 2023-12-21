@@ -59,14 +59,17 @@ apt-get install -y ant ant-optional
 apt-get install -y python-dev python3-dev libffi-dev
 python3 -m pip install cffi
 
-# meson
-apt-get install -y libiniparser1 libiniparser-dev libkmod-dev libkeyutils-dev
-apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build meson
-
 # cxl_cli
 apt-get install -y libiniparser1 libiniparser-dev libkmod-dev libkeyutils-dev
-apt-get install -y libjson-c3 libjson-c-dev libudev1 libudev-dev ninja-build asciidoctor meson
-apt-get install -y libtracefs-dev libtracefs1 libtraceevent-dev libtraceevent1 #ubuntu 22.04+
+apt-get install -y libjson-c-dev libudev1 libudev-dev ninja-build asciidoctor meson
+apt-get install -y libtracefs-dev libtracefs1 libtraceevent-dev libtraceevent1 libjson-c5 #ubuntu 22.04+
+
+# smdk_allocator userspace rcu library
+apt-get install -y liburcu-dev
+
+# PNMLibrary
+apt-get install -y ndctl libndctl-dev daxctl libdaxctl-dev numactl clang
+apt-get install -y fakeroot ncurses-dev xz-utils libssl-dev bc flex libelf-dev bison rsync kmod cpio dpkg-dev ccache
 
 # docker
 # Two ways to install Docker Engine

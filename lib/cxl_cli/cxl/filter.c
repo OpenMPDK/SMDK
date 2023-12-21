@@ -8,7 +8,6 @@
 #include <util/json.h>
 #include <cxl/libcxl.h>
 #include <json-c/json.h>
-#include <dirent.h>
 
 #include "filter.h"
 #include "json.h"
@@ -244,6 +243,25 @@ static struct cxl_port *util_cxl_port_filter_by_bus(struct cxl_port *port,
 	return NULL;
 }
 
+struct cxl_memdev *util_cxl_memdev_filter_by_bus(struct cxl_memdev *memdev,
+						 const char *__ident)
+{
+	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
+	struct cxl_bus *bus;
+
+	if (!__ident)
+		return memdev;
+
+	cxl_bus_foreach(ctx, bus) {
+		if (!util_cxl_bus_filter(bus, __ident))
+			continue;
+		if (bus == cxl_memdev_get_bus(memdev))
+			return memdev;
+	}
+
+	return NULL;
+}
+
 static struct cxl_decoder *
 util_cxl_decoder_filter_by_bus(struct cxl_decoder *decoder, const char *__ident)
 {
@@ -290,15 +308,7 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 	char *ident, *save;
 	const char *name;
 	int memdev_id;
-#ifdef ENABLE_SMDK_PLUGIN
-	char path[128];
-	int id = 0;
-	DIR *d;
-	struct dirent *de;
 
-	memdev_id = -1;
-#endif
-	
 	if (!__ident)
 		return util_cxl_memdev_serial_filter(memdev, serials);
 
@@ -310,28 +320,6 @@ struct cxl_memdev *util_cxl_memdev_filter(struct cxl_memdev *memdev,
 	     name = strtok_r(NULL, which_sep(__ident), &save)) {
 		if (strcmp(name, "all") == 0)
 			break;
-
-#ifdef ENABLE_SMDK_PLUGIN
-		if (sscanf(name, "cxl%d", &id) == 1) {
-			sprintf(path, "/sys/kernel/cxl/devices/cxl%d/", id);
-			d = opendir(path);
-			if (d) {
-				char *endptr;
-				while ((de = readdir(d)) != NULL) {
-					if (strncmp(de->d_name, "mem", 3))
-						continue;
-					memdev_id = strtol(de->d_name + 3, &endptr, 0);
-					if (endptr == (de->d_name + 3))
-						continue;
-					break;
-				}
-				closedir(d);
-			}
-			if (memdev_id == cxl_memdev_get_id(memdev)) {
-				break;
-			}
-		}
-#endif
 
 		if ((sscanf(name, "%d", &memdev_id) == 1 ||
 		     sscanf(name, "mem%d", &memdev_id) == 1) &&

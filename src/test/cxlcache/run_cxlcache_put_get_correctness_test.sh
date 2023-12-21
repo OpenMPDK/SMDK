@@ -20,12 +20,18 @@ source "$TCDIR/cxlcache_common.sh"
 
 echo Put Get Correctness Test Start
 check_privilege
-check_exmem_exist
+check_movable_exist
 check_cxlcache_exist
 check_dir_fs_type
 modify_cxlcache_to_enabled
 
-for i in 256m 512m 1g;
+if [ -z $RUN_ON_QEMU ]; then
+	SIZE=("256m" "512m" "1g")
+else
+	SIZE=("16m" "32m")
+fi
+
+for i in "${SIZE[@]}";
 do
 	$CXLCACHE_TEST $i put_get_correctness $TEST_DIR
 	RETURN=$?

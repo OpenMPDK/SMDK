@@ -25,7 +25,7 @@ int store_load()
 
 	get_stored_pages(&after);
 	if (after == 0) {
-		fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
+		fprintf(stderr, "Maybe there's no swap in/out from/to CXL memory\n");
 		return ENV_SET_FAIL;
 	}
 
@@ -65,7 +65,7 @@ int multi_thread()
 
 	get_stored_pages(&after);
 	if (after == 0) {
-		fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
+		fprintf(stderr, "Maybe there's no swap in/out from/to CXL memory\n");
 		return ENV_SET_FAIL;
 	}
 
@@ -152,7 +152,7 @@ int shared_memory()
 
 	get_stored_pages(&after);
 	if (after == 0) {
-		fprintf(stderr, "Maybe there's no swap in/out from/to ZONE_EXMEM\n");
+		fprintf(stderr, "Maybe there's no swap in/out from/to CXL memory\n");
 		return ENV_SET_FAIL;
 	}
 

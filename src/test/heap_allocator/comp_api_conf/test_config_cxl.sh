@@ -24,17 +24,17 @@ function t2(){
 }
 
 function t3(){
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:131072
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:131072
     run_test $CXLMALLOC_CONF
 }
 
 function t4(){
-    CXLMALLOC_CONF=use_exmem:true,normal_zone_size:2048
+    CXLMALLOC_CONF=use_exmem:true,normal_size:2048
     run_test $CXLMALLOC_CONF
 }
 
 function t5(){
-    CXLMALLOC_CONF=use_exmem:false,exmem_zone_size:512,normal_zone_size:4096
+    CXLMALLOC_CONF=use_exmem:false,exmem_size:512,normal_size:4096
     run_test $CXLMALLOC_CONF
 }
 
@@ -44,25 +44,25 @@ function t6(){
 }
 
 function t7(){
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:512,normal_zone_size:4096,priority:exmem
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:512,normal_size:4096,priority:exmem
     run_test $CXLMALLOC_CONF
 }
 
 function t8(){
     # zone size unit: m/M
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:512m,normal_zone_size:4096M,priority:exmem
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:512m,normal_size:4096M,priority:exmem
     run_test $CXLMALLOC_CONF
 }
 
 function t9(){
     # zone size unit: g/G
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:2g,normal_zone_size:4G,priority:exmem
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:2g,normal_size:4G,priority:exmem
     run_test $CXLMALLOC_CONF
 }
 
 function t10(){
     # zone size: -1(unlimited)
-    CXLMALLOC_CONF=use_exmem:true,exmem_zone_size:-1,normal_zone_size:-1,priority:exmem
+    CXLMALLOC_CONF=use_exmem:true,exmem_size:-1,normal_size:-1,priority:exmem
     run_test $CXLMALLOC_CONF
 }
 
@@ -134,7 +134,7 @@ function t22(){
 }
 
 function t23(){
-    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true,adaptive_interleaving_policy:bw_saturation,exmem_zone_size:2g,normal_zone_size:4G
+    CXLMALLOC_CONF=use_exmem:true,use_adaptive_interleaving:true,adaptive_interleaving_policy:bw_saturation,exmem_size:2g,normal_size:4G
     run_test $CXLMALLOC_CONF
 }
 

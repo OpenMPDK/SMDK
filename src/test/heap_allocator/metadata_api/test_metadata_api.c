@@ -88,21 +88,28 @@ void test(size_t size, size_t total, smdk_memtype_t type){
 	return;
 }
 
-int main(void){
+int main(int argc, char* argv[]) {
 	smdk_memtype_t type = SMDK_MEM_NORMAL;
-	size_t size_gb = 1<<30;
+	size_t size_shift = 30;
+
+	for (int i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "size"))
+			size_shift = (size_t)atoi(argv[++i]);
+	}
+
+	size_t size_base = 1 << size_shift;
 
 	s_stats_print('g');  //k/K, m/M, g/G
 
 	/* Notice: request size should be same with sc_size in jemalloc */
 	/* case 1: tcache_small(<=14KiB) */
-	test(4*KiB, 1*size_gb, type);
+	test(4*KiB, 1*size_base, type);
 
 	/* case 2: tcache_large(<=32KiB) */
-	test(16*KiB, 4*size_gb, type);
+	test(16*KiB, 4*size_base, type);
 
 	/* case 3: huge(>32KiB) */
-	test(64*KiB, 8*size_gb, type);
+	test(64*KiB, 8*size_base, type);
 
 	s_stats_print('G');
 	return 0;
