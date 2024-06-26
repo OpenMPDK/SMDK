@@ -27,9 +27,6 @@ static struct parameters {
 	bool clear_all;
 	unsigned int event_handle;
 	const char *decoder_filter;
-	const char *event_alert;
-	const char *action;
-	const char *threshold;
 	const char *slot;
 	bool online;
 	bool shutdown_state_clean;
@@ -72,14 +69,6 @@ OPT_UINTEGER('t', "type", &param.event_type, \
 OPT_BOOLEAN('a', "all", &param.clear_all, "clear all event"), \
 OPT_UINTEGER('n', "num_handle", &param.event_handle, \
 	"event handle number to clear")
-
-#define SET_ALERT_OPTIONS() \
-OPT_STRING('e', "event", &param.event_alert, "event", \
-	"event to set warning alert: 'life_used', 'over_temperature', 'under_temperature', 'volatile_mem_error', 'pmem_error'"), \
-OPT_STRING('a', "action", &param.action, "en/disable", \
-	"enable or disable warning alert"), \
-OPT_STRING('t', "threshold", &param.threshold, "threshold", \
-	"threshold value to set")
 
 #define TRANSFER_FW_OPTIONS() \
 OPT_STRING('i', "input", &param.infile, "input-file", \
@@ -163,12 +152,6 @@ static const struct option get_health_info_options[] = {
 
 static const struct option get_alert_config_options[] = {
 	BASE_OPTIONS(),
-	OPT_END(),
-};
-
-static const struct option set_alert_config_options[] = {
-	BASE_OPTIONS(),
-	SET_ALERT_OPTIONS(),
 	OPT_END(),
 };
 
@@ -697,113 +680,6 @@ static int action_get_alert_config(struct cxl_memdev *memdev,
 			       "" :
 			       "(Not programmable)");
 	}
-
-out:
-	cxl_cmd_unref(cmd);
-	return rc;
-}
-
-static int validate_alert_threshold(enum cxl_setalert_event event,
-				    int threshold)
-{
-	if (event == CXL_SETALERT_LIFE) {
-		if (threshold < 0 || threshold > 100) {
-			log_err(&ml, "life_used threshold: (0 - 100)\n");
-			return -EINVAL;
-		}
-	} else if (event == CXL_SETALERT_OVER_TEMP ||
-		   event == CXL_SETALERT_UNDER_TEMP) {
-		if (threshold < SHRT_MIN || threshold > SHRT_MAX) {
-			log_err(&ml,
-				"temperature threshold: (-32,768 - 32,767)\n");
-			return -EINVAL;
-		}
-	} else {
-		if (threshold < 0 || threshold > USHRT_MAX) {
-			log_err(&ml, "error count threshold: (0 - 65,535)\n");
-			return -EINVAL;
-		}
-	}
-	return 0;
-}
-
-static int action_set_alert_config(struct cxl_memdev *memdev,
-				   struct action_context *actx)
-{
-	const char *devname = cxl_memdev_get_devname(memdev);
-	struct cxl_cmd *cmd;
-	enum cxl_setalert_event event;
-	int rc, enable, threshold;
-
-	if (!param.event_alert) {
-		log_err(&ml, "%s: event is not specified\n", devname);
-		return -EINVAL;
-	}
-
-	if (!param.action) {
-		log_err(&ml, "%s: action is not specified\n", devname);
-		return -EINVAL;
-	}
-
-	if (strcmp(param.event_alert, "life_used") == 0)
-		event = CXL_SETALERT_LIFE;
-	else if (strcmp(param.event_alert, "over_temperature") == 0)
-		event = CXL_SETALERT_OVER_TEMP;
-	else if (strcmp(param.event_alert, "under_temperature") == 0)
-		event = CXL_SETALERT_UNDER_TEMP;
-	else if (strcmp(param.event_alert, "volatile_mem_error") == 0)
-		event = CXL_SETALERT_VOLATILE_ERROR;
-	else if (strcmp(param.event_alert, "pmem_error") == 0)
-		event = CXL_SETALERT_PMEM_ERROR;
-	else {
-		log_err(&ml, "%s: invalid event: %s\n", devname, param.event_alert);
-		return -EINVAL;
-	}
-
-	if (strcmp(param.action, "enable") == 0) {
-		if (!param.threshold) {
-			log_err(&ml, "%s: threshold is not specified\n",
-				devname);
-			return -EINVAL;
-		}
-		enable = 1;
-		threshold = atoi(param.threshold);
-		rc = validate_alert_threshold(event, threshold);
-		if (rc < 0) {
-			log_err(&ml, "%s: invalid threshold: %d\n", devname,
-				threshold);
-			return rc;
-		}
-	} else if (strcmp(param.action, "disable") == 0) {
-		enable = 0;
-		threshold = 0;
-	} else {
-		log_err(&ml, "%s: invalid action: %s\n", devname, param.action);
-		return -EINVAL;
-	}
-
-	cmd = cxl_cmd_new_set_alert_config(memdev, event, enable, threshold);
-	if (!cmd)
-		return -ENOMEM;
-
-	rc = cxl_cmd_submit(cmd);
-	if (rc < 0) {
-		log_err(&ml, "cmd submission failed: %s\n", strerror(-rc));
-		goto out;
-	}
-
-	rc = cxl_cmd_get_mbox_status(cmd);
-	if (rc != 0) {
-		log_err(&ml, "%s: mbox status: %d\n", __func__, rc);
-		rc = -ENXIO;
-		goto out;
-	}
-
-	if (enable)
-		printf("%s warning alert enabled to %d\n", param.event_alert,
-		       threshold);
-	else
-		printf("%s warning alert disabled\n", param.event_alert);
 
 out:
 	cxl_cmd_unref(cmd);
@@ -1475,8 +1351,7 @@ static int memdev_action(int argc, const char **argv, struct cxl_ctx *ctx,
 				continue;
 			found = true;
 
-			if (action == action_set_alert_config ||
-			    action == action_transfer_firmware ||
+			if (action == action_transfer_firmware ||
 			    action == action_activate_firmware ||
 			    action == action_get_shutdown_state ||
 			    action == action_set_shutdown_state ||
@@ -1497,16 +1372,13 @@ static int memdev_action(int argc, const char **argv, struct cxl_ctx *ctx,
 	}
 	rc = err;
 
-	if (action == action_set_alert_config ||
-	    action == action_transfer_firmware ||
+	if (action == action_transfer_firmware ||
 	    action == action_activate_firmware ||
 	    action == action_get_shutdown_state ||
 	    action == action_set_shutdown_state ||
 	    action == action_inject_poison || action == action_clear_poison) {
 		if (count > 1) {
-			if (action == action_set_alert_config)
-				error("set-alert-config only supports setting a single memdev\n");
-			else if (action == action_transfer_firmware)
+			if (action == action_transfer_firmware)
 				error("transfer-firmware only supports transferring a single memdev\n");
 			else if (action == action_activate_firmware)
 				error("activate-firmware only supports activating a single memdev\n");
@@ -1629,18 +1501,6 @@ int cmd_get_alert_config(int argc, const char **argv, struct cxl_ctx *ctx)
 		get_alert_config_options,
 		"cxl get-alert-config <mem0> [<mem1>..<memn>] [<options>]");
 	log_info(&ml, "get-alert-config %d mem%s\n", count >= 0 ? count : 0,
-		 count > 1 ? "s" : "");
-
-	return count >= 0 ? 0 : EXIT_FAILURE;
-}
-
-int cmd_set_alert_config(int argc, const char **argv, struct cxl_ctx *ctx)
-{
-	int count = memdev_action(
-		argc, argv, ctx, action_set_alert_config,
-		set_alert_config_options,
-		"cxl set-alert-config <memdev> -e <event> -a <action> -t <threshold> [<options>]");
-	log_info(&ml, "set-alert-config %d mem%s\n", count >= 0 ? count : 0,
 		 count > 1 ? "s" : "");
 
 	return count >= 0 ? 0 : EXIT_FAILURE;

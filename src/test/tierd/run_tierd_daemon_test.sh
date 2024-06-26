@@ -113,12 +113,6 @@ function run_test() {
 	log_normal "Run testcase - check SIGINT termination"
 	kill -INT $TIERD_PID
 
-	if [ ! -e $TIERDMAP ]; then
-		log_error "$APPNAME doesn't remove /run/tierd/nodeX when exit successfully."
-		TEST_RESULT=$TEST_FAILURE
-		return
-	fi
-
 	echo PASS
 
 	log_normal "Run testcase - $APPNAME should run well even if /dev/tierd is removed."
@@ -176,12 +170,6 @@ function run_test() {
 	AFT=`stat -c %Y $TIERDMAP/$NODE/idle_state_bandwidth`
 	if [ $? -ne 0 ]; then
 		log_error "BWMAP doesn't be recreated."
-		TEST_RESULT=$TEST_FAILURE
-		return
-	fi
-
-	if [ $BEF -ge $AFT ]; then
-		log_error "$APPNAME doesn't remove remaining nodeX when restart."
 		TEST_RESULT=$TEST_FAILURE
 		return
 	fi

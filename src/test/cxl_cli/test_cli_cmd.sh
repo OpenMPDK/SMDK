@@ -99,20 +99,6 @@ if [ -z $RUN_ON_QEMU ]; then
 	echo "$ cxl get-alert-config mem0"
 	$CLI get-alert-config mem0
 
-	log_normal "[set-alert-config]"
-	echo "$ cxl set-alert-config mem0 -e life_used -a enable -t 50"
-	$CLI set-alert-config mem0 -e life_used -a enable -t 50
-
-	echo "$ cxl set-alert-config mem0 -e over_temperature -a enable -t 60"
-	$CLI set-alert-config mem0 -e over_temperature -a enable -t 60
-
-	echo "$ cxl set-alert-config mem0 -e under_temperature -a disable"
-	$CLI set-alert-config mem0 -e under_temperature -a disable
-
-	log_normal "[get-alert-config]"
-	echo "$ cxl get-alert-config mem0"
-	$CLI get-alert-config mem0
-
 	# Shutdown State cmds
 	log_normal "[set-shutdown-state]"
 	echo "$ cxl set-shutdown-state mem0"

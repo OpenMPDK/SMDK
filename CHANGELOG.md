@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.1: Intelligent Tiering Engine / Userspace CLI Tool
+
+**1. Intelligent Tiering Engine**
+- BW-Aware tiering: Weighted page allocation
+> The weight ratio has been changed to be adjusted in more finely. <br>
+> ~v2.0: Set weight to zero for saturated node, and max bandwidth of node for others. <br>
+> v2.1~: Set weight to as much as available bandwidth based on max bandwidth.
+
+**2. Kernel**
+- Baseline v6.4 -> v6.9
+
+**3. CXL-CLI**
+- Baseline v78 -> v79
+> *set-alert-config* command has been integrated into the *ndctl* upstream since v79. <br>
+> Please refer to [ndctl v79 release note](https://github.com/pmem/ndctl/releases/tag/v79) for more details.
+
+**4. Documentation**
+- Updated
+> [Installation Guide](https://github.com/OpenMPDK/SMDK/wiki/3.-Installation) <br>
+> [Plugin Guide](https://github.com/OpenMPDK/SMDK/wiki/5.-Plugin) <br>
+
+<br>
+
 ## v2.0: Intelligent Tiering Engine / CMM-DC Device Support / Vanilla Linux Integration / Userspace CLI Tool
 
 - SMDK v2.0 expands the functionality of the Reference SDM solution for CXL Compute Pool(DDR/CMM-D/CMM-DC) and focuses on integration 

@@ -53,6 +53,9 @@
 #define TIERD_ROOT_DIR	"/run/tierd/"
 #define IDLE_STATE_BW_FILE "idle_state_bandwidth"
 #define IDLE_STATE_CAPA_FILE "idle_state_capacity"
+#define REMAIN_READ_BW_FILE "remain_read_bandwidth"
+#define REMAIN_WRITE_BW_FILE "remain_write_bandwidth"
+#define REMAIN_BW_FILE "remain_bandwidth"
 #define MAX_READ_BW_FILE "max_read_bw"
 #define MAX_WRITE_BW_FILE "max_write_bw"
 #define MAX_BW_FILE "max_bw"
@@ -61,6 +64,7 @@
 #define MAX_STATE_FILES 1024
 #define MPOL_WEIGHTED_INTERLEAVE MPOL_DEFAULT + 8
 
+static bool wil_init = true;
 bool weighted_interleaving = false;
 
 static int policy_idx;
@@ -86,6 +90,7 @@ static pthread_mutex_t monitor_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // NUM_OF_SOCKET x NUM_OF_RELATED_FILES
 static bool **g_idle_state;
+static float **g_remain;
 static float **g_max_bw;
 // NUM_OF_SOCKET x NUM_OF_RELATED_FILES x NUM_OF_NODES
 static int ***g_fallback_order;
@@ -98,6 +103,18 @@ static char idle_state_f[][64] = {
 enum idle_state_f_enum {
 	IDLE_STATE_BW = 0,
 	IDLE_STATE_CAPA,
+};
+
+static int remain_f_num;
+static char remain_f[][64] = {
+	REMAIN_READ_BW_FILE,
+	REMAIN_WRITE_BW_FILE,
+	REMAIN_BW_FILE,
+};
+enum remain_f_enum {
+	REMAIN_READ_BW = 0,
+	REMAIN_WRITE_BW,
+	REMAIN_BW,
 };
 
 static int max_bw_f_num;
@@ -121,6 +138,7 @@ static char fallback_order_f[][64] = {
 
 enum file_type {
 	IDLE_STATE = 1,
+	REMAIN,
 	MAX_BW,
 	FALLBACK_ORDER,
 	FILE_TYPE_MAX,
@@ -134,6 +152,12 @@ static int set_state_files(int target_nid, char (*managed_files)[MAX_PATH_LEN])
 		rc = snprintf(file_buf, sizeof(file_buf),
 				"%s/%s", node_dir_path[target_nid], idle_state_f[i]);
 		state_file_type[total_managed_files] = IDLE_STATE;
+		strncpy(managed_files[total_managed_files++], file_buf, rc);
+	}
+	for (i = 0; i < remain_f_num; i++) {
+		rc = snprintf(file_buf, sizeof(file_buf),
+				"%s/%s", node_dir_path[target_nid], remain_f[i]);
+		state_file_type[total_managed_files] = REMAIN;
 		strncpy(managed_files[total_managed_files++], file_buf, rc);
 	}
 	for (i = 0; i < max_bw_f_num; i++) {
@@ -154,27 +178,33 @@ static int set_state_files(int target_nid, char (*managed_files)[MAX_PATH_LEN])
 }
 
 static void set_state_info(int nid, int idx, char *buf,
-		bool *idle_state, float *max_bw, int **fallback_order)
+		bool *idle_state, float *remain, float *max_bw, int **fallback_order)
 {
 	int rIdx;
-	bool callback = false;
+	bool propagate = false;
 
 	switch (state_file_type[idx]) {
 		case IDLE_STATE:
-			callback = true;
+			propagate = true;
 			idle_state[idx] = strtobool(buf);
 			g_idle_state[nid][idx] = idle_state[idx];
 			break;
-		case MAX_BW:
-			callback = true;
+		case REMAIN:
+			propagate = true;
 			rIdx = idx - idle_state_f_num;
+			remain[rIdx] = atof(buf);
+			g_remain[nid][rIdx] = remain[rIdx];
+			break;
+		case MAX_BW:
+			propagate = true;
+			rIdx = idx - (idle_state_f_num + remain_f_num);
 			max_bw[rIdx] = atof(buf);
 			g_max_bw[nid][rIdx] = max_bw[rIdx];
 			break;
 		case FALLBACK_ORDER:
 			if (weighted_interleaving)
 				break;
-			rIdx = idx - (idle_state_f_num + max_bw_f_num);
+			rIdx = idx - (idle_state_f_num + remain_f_num + max_bw_f_num);
 			int *new_ptr, *old_ptr;
 			new_ptr = (int *)alloc_arr(total_nodes, sizeof(int));
 			if (!new_ptr) {
@@ -190,13 +220,13 @@ static void set_state_info(int nid, int idx, char *buf,
 			fprintf(stderr, "Unknown state_files\n");
 	}
 
-	if (weighted_interleaving && callback && monitor_init)
+	if (weighted_interleaving && propagate && monitor_init)
 		pthread_kill(foreground_tid, SIGUSR1);
 }
 
 static void read_state_file(int nid, int idx,
 		const char (*managed_files)[MAX_PATH_LEN],
-		bool *idle_state, float *max_bw, int **fallback_order)
+		bool *idle_state, float *remain, float *max_bw, int **fallback_order)
 {
 	int fd;
 	char buf[BUF_SIZE] = { '\0', };
@@ -217,7 +247,7 @@ static void read_state_file(int nid, int idx,
 	}
 	close(fd);
 
-	set_state_info(nid, idx, buf, idle_state, max_bw, fallback_order);
+	set_state_info(nid, idx, buf, idle_state, remain, max_bw, fallback_order);
 }
 
 static inline int init_state_file(void)
@@ -241,6 +271,7 @@ static inline int init_state_file(void)
 	}
 
 	idle_state_f_num = (int)(sizeof(idle_state_f) / sizeof(idle_state_f[0]));
+	remain_f_num = (int)(sizeof(remain_f) / sizeof(remain_f[0]));
 	max_bw_f_num = (int)(sizeof(max_bw_f) / sizeof(max_bw_f[0]));
 	fallback_order_f_num = (int)(sizeof(fallback_order_f) /
 			sizeof(fallback_order_f[0]));
@@ -344,10 +375,18 @@ static void set_wil_weights()
 			continue;
 		if (!is_node_state_idle(nid))
 			continue;
-		if (g_max_bw[nid][MAX_RDWR_BW] < EPS)
-			continue;
+		if (wil_init) {
+			if (g_max_bw[nid][MAX_RDWR_BW] < EPS)
+				continue;
+		} else {
+			if (g_remain[nid][REMAIN_BW] < EPS)
+				continue;
+		}
 		is_calcuated[nid] = true;
-		sum += g_max_bw[nid][MAX_RDWR_BW];
+		if (wil_init)
+			sum += g_max_bw[nid][MAX_RDWR_BW];
+		else
+			sum += g_remain[nid][REMAIN_BW];
 	}
 
 	if (sum < EPS) {
@@ -364,8 +403,15 @@ static void set_wil_weights()
 		for (int nid = 0; nid < total_nodes; nid++) {
 			if (!is_calcuated[nid])
 				continue;
-			weights[nid] = (unsigned char)round(g_max_bw[nid][MAX_RDWR_BW]
-					* (100.0f / sum));
+			if (wil_init) {
+				weights[nid] = (unsigned char)round(g_max_bw[nid][MAX_RDWR_BW]
+						* (100.0f / sum));
+			} else {
+				weights[nid] = (unsigned char)round(g_remain[nid][REMAIN_BW]
+						* (100.0f / sum));
+			}
+			if (weights[nid] == 0)
+				weights[nid] = 1;
 			numa_bitmask_setbit(wil_nodes, nid);
 		}
 	}
@@ -386,6 +432,9 @@ static int do_weighted_interleaving()
 		fprintf(stderr, "Failed to set_mempolicy: %s\n", strerror(errno));
 		return -1;
 	}
+
+	if (wil_init)
+		wil_init = false;
 
 	return 0;
 }
@@ -412,6 +461,7 @@ static void *monitor_func(void *args)
 	char managed_files[MAX_STATE_FILES][MAX_PATH_LEN];
 
 	bool idle_state[idle_state_f_num];
+	float remain[remain_f_num];
 	float max_bw[max_bw_f_num];
 	int **fallback_order = NULL;
 
@@ -430,7 +480,7 @@ static void *monitor_func(void *args)
 
 	for (i = 0; i < total_managed_files; i++)
 		read_state_file(target_nid, i, managed_files,
-				idle_state, max_bw, fallback_order);
+				idle_state, remain, max_bw, fallback_order);
 
 	pthread_mutex_lock(&monitor_mutex);
 	pthread_cond_signal(&monitor_cond);
@@ -468,7 +518,7 @@ static void *monitor_func(void *args)
 						continue;
 
 					read_state_file(target_nid, i, managed_files,
-							idle_state, max_bw, fallback_order);
+							idle_state, remain, max_bw, fallback_order);
 				}
 			}
 		}
@@ -551,6 +601,13 @@ int init_monitor_thread(void)
 			sizeof(bool));
 	if (!g_idle_state) {
 		fprintf(stderr, "Failed to alloc idle_state buffer\n");
+		goto fail;
+	}
+
+	g_remain = (float **)alloc_arr_2d(total_nodes, remain_f_num,
+			sizeof(float));
+	if (!g_remain) {
+		fprintf(stderr, "Failed to alloc max_bw buffer\n");
 		goto fail;
 	}
 

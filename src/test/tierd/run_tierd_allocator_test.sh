@@ -41,6 +41,7 @@ function check_binaries() {
 function prepare_test() {
 	check_binaries
 	check_tierd_running
+	tierd_mock_end
 }
 
 function tierd_mock_start() {

@@ -119,18 +119,6 @@ struct cxl_get_event_payload {
 #define CXL_CMD_IDENTIFY_QOS_TELEMETRY_CAPABILITIES_TEMPORARY_THROUGHPUT_REDUCTION_MASK \
 	BIT(1)
 
-/* CXL 3.0. 8.2.9.8.3.3 Set Alert Configuration */
-struct cxl_cmd_set_alert_config {
-	u8 valid_alert_actions;
-	u8 enable_alert_actions;
-	u8 life_used_prog_warn_threshold;
-	u8 rsvd;
-	le16 dev_over_temperature_prog_warn_threshold;
-	le16 dev_under_temperature_prog_warn_threshold;
-	le16 corrected_volatile_mem_err_prog_warn_threshold;
-	le16 corrected_pmem_err_prog_warn_threshold;
-} __attribute__((packed));
-
 /* CXL 3.0 8.2.9.3.1 Get FW Info */
 #define CXL_CMD_FW_INFO_FW_REV_LENGTH 0x10
 

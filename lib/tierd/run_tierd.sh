@@ -4,7 +4,7 @@ readonly BASEDIR=$(readlink -f $(dirname $0))/../../
 source "$BASEDIR/script/common.sh"
 
 TIERDDIR=$BASEDIR/lib/tierd/
-TIERD_DD=$BASEDIR/lib/linux-6.6-smdk/drivers/dax/kmem.ko
+TIERD_DD=$BASEDIR/lib/linux-6.9-smdk/drivers/dax/kmem.ko
 TIERD_CONF=$TIERDDIR/tierd.conf
 TIERD_DEV=/dev/tierd
 TIERD=$TIERDDIR/tierd

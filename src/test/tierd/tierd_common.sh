@@ -6,7 +6,7 @@ source "$BASEDIR/script/common.sh"
 ### PATH
 
 TIERDDIR=$BASEDIR/lib/tierd/
-TIERD_DD=$BASEDIR/lib/linux-6.6-smdk/drivers/dax/kmem.ko
+TIERD_DD=$BASEDIR/lib/linux-6.9-smdk/drivers/dax/kmem.ko
 TIERD_CONFPATH=$TIERDDIR/tierd.conf
 TIERD_DEVPATH=/dev/tierd
 TIERD=$TIERDDIR/tierd

@@ -265,8 +265,26 @@ global:
 	cxl_memdev_cancel_fw_update;
 } LIBCXL_5;
 
-/* smdk lib */
 LIBCXL_7 {
+global:
+	cxl_cmd_alert_config_set_life_used_prog_warn_threshold;
+	cxl_cmd_alert_config_set_dev_over_temperature_prog_warn_threshold;
+	cxl_cmd_alert_config_set_dev_under_temperature_prog_warn_threshold;
+	cxl_cmd_alert_config_set_corrected_volatile_mem_err_prog_warn_threshold;
+	cxl_cmd_alert_config_set_corrected_pmem_err_prog_warn_threshold;
+	cxl_cmd_alert_config_set_valid_alert_actions;
+	cxl_cmd_alert_config_set_enable_alert_actions;
+	cxl_cmd_new_set_alert_config;
+	cxl_memdev_wait_sanitize;
+	cxl_root_decoder_get_qos_class;
+	cxl_memdev_get_pmem_qos_class;
+	cxl_memdev_get_ram_qos_class;
+	cxl_region_qos_class_mismatch;
+	cxl_port_decoders_committed;
+} LIBCXL_6;
+
+/* smdk lib */
+LIBCXL_8 {
 global:
 	cxl_memdev_inject_poison;
 	cxl_memdev_clear_poison;
@@ -285,7 +303,6 @@ global:
 	cxl_cmd_identify_scans_for_poison;
 	cxl_cmd_identify_egress_port_congestion;
 	cxl_cmd_identify_temporary_throughput_reduction;
-	cxl_cmd_new_set_alert_config;
 	cxl_memdev_get_payload_max;
 	cxl_cmd_new_get_firmware_info;
 	cxl_cmd_firmware_info_get_slots_supported;
@@ -317,4 +334,4 @@ global:
 	cxl_cmd_new_get_sld_qos_control;
 	cxl_cmd_new_set_sld_qos_control;
 	cxl_cmd_new_get_sld_qos_status;
-} LIBCXL_6;
+} LIBCXL_7;

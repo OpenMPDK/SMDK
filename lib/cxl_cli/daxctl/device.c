@@ -55,12 +55,6 @@ static unsigned long flags;
 static struct mapping *maps = NULL;
 static long long nmaps = -1;
 
-enum memory_zone {
-	MEM_ZONE_MOVABLE,
-	MEM_ZONE_NORMAL,
-};
-static enum memory_zone mem_zone = MEM_ZONE_MOVABLE;
-
 enum device_action {
 	ACTION_RECONFIG,
 	ACTION_ONLINE,
@@ -469,8 +463,6 @@ static const char *parse_device_options(int argc, const char **argv,
 				align = __parse_size64(param.align, &units);
 		} else if (strcmp(param.mode, "system-ram") == 0) {
 			reconfig_mode = DAXCTL_DEV_MODE_RAM;
-			if (param.no_movable)
-				mem_zone = MEM_ZONE_NORMAL;
 		} else if (strcmp(param.mode, "devdax") == 0) {
 			reconfig_mode = DAXCTL_DEV_MODE_DEVDAX;
 			if (param.no_online) {
@@ -494,9 +486,6 @@ static const char *parse_device_options(int argc, const char **argv,
 			align = __parse_size64(param.align, &units);
 		/* fall through */
 	case ACTION_ONLINE:
-		if (param.no_movable)
-			mem_zone = MEM_ZONE_NORMAL;
-		/* fall through */
 	case ACTION_DESTROY:
 	case ACTION_OFFLINE:
 	case ACTION_DISABLE:
@@ -686,6 +675,13 @@ static int dev_destroy(struct daxctl_dev *dev)
 		return rc;
 
 	rc = daxctl_region_destroy_dev(daxctl_dev_get_region(dev), dev);
+	/*
+	 * The kernel treats daxX.0 specially. It can't be deleted to ensure
+	 * there is always a /sys/bus/dax/ present. If this happens, an
+	 * EBUSY is returned. Expect it and don't treat it as an error.
+	 */
+	if (daxctl_dev_get_id(dev) == 0 && rc == -EBUSY)
+		return 0;
 	if (rc < 0)
 		return rc;
 
@@ -1016,7 +1012,7 @@ static int do_xaction_device(const char *device, enum device_action action,
 	struct json_object *jdevs = NULL;
 	struct daxctl_region *region;
 	struct daxctl_dev *dev;
-	int rc = -ENXIO;
+	int rc = -ENXIO, saved_rc = 0;
 
 	*processed = 0;
 
@@ -1063,6 +1059,8 @@ static int do_xaction_device(const char *device, enum device_action action,
 				rc = -EINVAL;
 				break;
 			}
+			if (rc)
+				saved_rc = rc;
 		}
 	}
 
@@ -1074,7 +1072,7 @@ static int do_xaction_device(const char *device, enum device_action action,
 	if (jdevs)
 		util_display_json_array(stdout, jdevs, flags);
 
-	return rc;
+	return saved_rc;
 }
 
 int cmd_create_device(int argc, const char **argv, struct daxctl_ctx *ctx)

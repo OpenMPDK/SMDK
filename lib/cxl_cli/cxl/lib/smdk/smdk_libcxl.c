@@ -1460,46 +1460,6 @@ cxl_cmd_identify_temporary_throughput_reduction(struct cxl_cmd *cmd)
 }
 
 CXL_EXPORT struct cxl_cmd *
-cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev,
-			     enum cxl_setalert_event event, int enable,
-			     int threshold)
-{
-	struct cxl_cmd_set_alert_config *setalert;
-	struct cxl_cmd *cmd;
-
-	cmd = cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_SET_ALERT_CONFIG);
-	if (!cmd)
-		return NULL;
-
-	setalert = cmd->input_payload;
-
-	setalert->valid_alert_actions = 1 << event;
-	if (enable) {
-		setalert->enable_alert_actions = 1 << event;
-		if (event == CXL_SETALERT_LIFE)
-			setalert->life_used_prog_warn_threshold = (u8)threshold;
-		else if (event == CXL_SETALERT_OVER_TEMP)
-			setalert->dev_over_temperature_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else if (event == CXL_SETALERT_UNDER_TEMP)
-			setalert->dev_under_temperature_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else if (event == CXL_SETALERT_VOLATILE_ERROR)
-			setalert->corrected_volatile_mem_err_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else if (event == CXL_SETALERT_PMEM_ERROR)
-			setalert->corrected_pmem_err_prog_warn_threshold =
-				cpu_to_le16(threshold);
-		else {
-			cxl_cmd_unref(cmd);
-			return NULL;
-		}
-	}
-
-	return cmd;
-}
-
-CXL_EXPORT struct cxl_cmd *
 cxl_cmd_new_get_firmware_info(struct cxl_memdev *memdev)
 {
 	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_GET_FW_INFO);

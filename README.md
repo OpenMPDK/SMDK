@@ -1,9 +1,9 @@
-## Announcing the Release of Scalable Memory Development Kit (SMDK) v2.0
+## Announcing the Release of Scalable Memory Development Kit (SMDK) v2.1
 
-We are pleased to announce the release of SMDK v2.0 to leverage and help CXL ecosystem and industry.
+We are pleased to announce the release of SMDK v2.1 to leverage and help CXL ecosystem and industry.
 SMDK consists of the following components: plugin, library, cli tool, kernel, testcases, and a guide providing an example workload test.
 
-We previously published pre-release articles introducing SMDK to the industry, as well as demonstrated SMDK functionality at 2023 Flash Memory Summit, 2023 OCP APAC, 2022 SuperComputing, 2022 HPE Discover, 2021 OCP Global Summit, and so on.
+We previously published pre-release articles introducing SMDK to the industry, as well as demonstrated SMDK functionality at 2024 Dell Tech World, 2024 Red Hat Summit, 2024 MemCon, 2023 Flash Memory Summit, 2023 OCP APAC, 2022 SuperComputing, 2022 HPE Discover, 2021 OCP Global Summit, and so on.
 Currently, SMDK has been successfully integrated and tested with many industry partners on a variety of purposes and application workloads, utilizing Samsung’s CXL Memory Expander:
 
 https://news.samsung.com/global/samsung-introduces-industrys-first-open-source-software-solution-for-cxl-memory-platform

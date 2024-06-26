@@ -38,9 +38,40 @@ static struct parameters {
 	const char *type;
 	const char *size;
 	const char *decoder_filter;
-} param;
+	const char *life_used_threshold;
+	const char *dev_over_temperature_threshold;
+	const char *dev_under_temperature_threshold;
+	const char *corrected_volatile_mem_err_threshold;
+	const char *corrected_pmem_err_threshold;
+	const char *life_used_alert;
+	const char *dev_over_temperature_alert;
+	const char *dev_under_temperature_alert;
+	const char *corrected_volatile_mem_err_alert;
+	const char *corrected_pmem_err_alert;
+	int timeout;
+} param = {
+	.timeout = -1,
+};
 
 static struct log_ctx ml;
+
+struct alert_context {
+	int valid_alert_actions;
+	int enable_alert_actions;
+	int life_used_threshold;
+	int dev_over_temperature_threshold;
+	int dev_under_temperature_threshold;
+	int corrected_volatile_mem_err_threshold;
+	int corrected_pmem_err_threshold;
+};
+
+enum cxl_setalert_event {
+	CXL_SETALERT_LIFE_USED,
+	CXL_SETALERT_OVER_TEMP,
+	CXL_SETALERT_UNDER_TEMP,
+	CXL_SETALERT_VOLATILE_MEM_ERROR,
+	CXL_SETALERT_PMEM_ERROR,
+};
 
 enum cxl_setpart_type {
 	CXL_SETPART_PMEM,
@@ -99,6 +130,40 @@ OPT_BOOLEAN('c', "cancel", &param.cancel,                            \
 OPT_BOOLEAN('w', "wait", &param.wait,                                \
 	    "wait for firmware update to complete before returning")
 
+#define SET_ALERT_OPTIONS()                                                   \
+OPT_STRING('L', "life-used-threshold", &param.life_used_threshold,            \
+	   "threshold", "threshold value for life used warning alert"),       \
+OPT_STRING('\0', "life-used-alert", &param.life_used_alert,                   \
+	   "'on' or 'off'", "enable or disable life used warning alert"),     \
+OPT_STRING('O', "over-temperature-threshold",                                 \
+	   &param.dev_over_temperature_threshold, "threshold",                \
+	   "threshold value for device over temperature warning alert"),      \
+OPT_STRING('\0', "over-temperature-alert",                                    \
+	   &param.dev_over_temperature_alert, "'on' or 'off'",                \
+	   "enable or disable device over temperature warning alert"),        \
+OPT_STRING('U', "under-temperature-threshold",                                \
+	   &param.dev_under_temperature_threshold, "threshold",               \
+	   "threshold value for device under temperature warning alert"),     \
+OPT_STRING('\0', "under-temperature-alert",                                   \
+	   &param.dev_under_temperature_alert, "'on' or 'off'",               \
+	   "enable or disable device under temperature warning alert"),       \
+OPT_STRING('V', "volatile-mem-err-threshold",                                 \
+	   &param.corrected_volatile_mem_err_threshold, "threshold",          \
+	   "threshold value for corrected volatile mem error warning alert"), \
+OPT_STRING('\0', "volatile-mem-err-alert",                                    \
+	   &param.corrected_volatile_mem_err_alert, "'on' or 'off'",          \
+	   "enable or disable corrected volatile mem error warning alert"),   \
+OPT_STRING('P', "pmem-err-threshold",                                         \
+	   &param.corrected_pmem_err_threshold, "threshold",                  \
+	   "threshold value for corrected pmem error warning alert"),         \
+OPT_STRING('\0', "pmem-err-alert",                                            \
+	   &param.corrected_pmem_err_alert, "'on' or 'off'",                  \
+	   "enable or disable corrected pmem error warning alert")
+
+#define WAIT_SANITIZE_OPTIONS()                \
+OPT_INTEGER('t', "timeout", &param.timeout,    \
+	    "time in milliseconds to wait for overwrite completion (default: infinite)")
+
 static const struct option read_options[] = {
 	BASE_OPTIONS(),
 	LABEL_OPTIONS(),
@@ -152,6 +217,18 @@ static const struct option free_dpa_options[] = {
 static const struct option update_fw_options[] = {
 	BASE_OPTIONS(),
 	FW_OPTIONS(),
+	OPT_END(),
+};
+
+static const struct option set_alert_options[] = {
+	BASE_OPTIONS(),
+	SET_ALERT_OPTIONS(),
+	OPT_END(),
+};
+
+static const struct option wait_sanitize_options[] = {
+	BASE_OPTIONS(),
+	WAIT_SANITIZE_OPTIONS(),
 	OPT_END(),
 };
 
@@ -373,14 +450,28 @@ static int action_free_dpa(struct cxl_memdev *memdev,
 
 static int action_disable(struct cxl_memdev *memdev, struct action_context *actx)
 {
+	struct cxl_endpoint *ep;
+	struct cxl_port *port;
+
 	if (!cxl_memdev_is_enabled(memdev))
 		return 0;
 
-	if (!param.force) {
-		/* TODO: actually detect rather than assume active */
+	ep = cxl_memdev_get_endpoint(memdev);
+	if (!ep)
+		return -ENODEV;
+
+	port = cxl_endpoint_get_port(ep);
+	if (!port)
+		return -ENODEV;
+
+	if (cxl_port_decoders_committed(port)) {
 		log_err(&ml, "%s is part of an active region\n",
 			cxl_memdev_get_devname(memdev));
-		return -EBUSY;
+		if (!param.force)
+			return -EBUSY;
+
+		log_err(&ml, "Forcing %s disable with an active region!\n",
+			cxl_memdev_get_devname(memdev));
 	}
 
 	return cxl_memdev_disable_invalidate(memdev);
@@ -396,10 +487,13 @@ static int action_zero(struct cxl_memdev *memdev, struct action_context *actx)
 	size_t size;
 	int rc;
 
-	if (param.len)
+	if (param.len) {
 		size = param.len;
-	else
+	} else {
 		size = cxl_memdev_get_label_size(memdev);
+		if (size == SIZE_MAX)
+			return -EINVAL;
+	}
 
 	if (cxl_memdev_nvdimm_bridge_active(memdev)) {
 		log_err(&ml,
@@ -431,6 +525,9 @@ static int action_write(struct cxl_memdev *memdev, struct action_context *actx)
 
 	if (!size) {
 		size_t label_size = cxl_memdev_get_label_size(memdev);
+
+		if (label_size == SIZE_MAX)
+			return -EINVAL;
 
 		fseek(actx->f_in, 0L, SEEK_END);
 		size = ftell(actx->f_in);
@@ -470,11 +567,13 @@ static int action_read(struct cxl_memdev *memdev, struct action_context *actx)
 	char *buf;
 	int rc;
 
-	if (param.len)
+	if (param.len) {
 		size = param.len;
-	else
+	} else {
 		size = cxl_memdev_get_label_size(memdev);
-
+		if (size == SIZE_MAX)
+			return -EINVAL;
+	}
 	buf = calloc(1, size);
 	if (!buf)
 		return -ENOMEM;
@@ -673,6 +772,12 @@ out_err:
 	return rc;
 }
 
+static int action_wait_sanitize(struct cxl_memdev *memdev,
+				struct action_context *actx)
+{
+	return cxl_memdev_wait_sanitize(memdev, param.timeout);
+}
+
 static int action_update_fw(struct cxl_memdev *memdev,
 			    struct action_context *actx)
 {
@@ -697,6 +802,148 @@ static int action_update_fw(struct cxl_memdev *memdev,
 	}
 
 	flags = UTIL_JSON_FIRMWARE;
+	if (actx->f_out == stdout && isatty(1))
+		flags |= UTIL_JSON_HUMAN;
+	jmemdev = util_cxl_memdev_to_json(memdev, flags);
+	if (actx->jdevs && jmemdev)
+		json_object_array_add(actx->jdevs, jmemdev);
+
+	return rc;
+}
+
+static int validate_alert_threshold(enum cxl_setalert_event event,
+				    int threshold)
+{
+	if (event == CXL_SETALERT_LIFE_USED) {
+		if (threshold < 0 || threshold > 100) {
+			log_err(&ml, "Invalid life used threshold: %d\n",
+				threshold);
+			return -EINVAL;
+		}
+	} else if (event == CXL_SETALERT_OVER_TEMP ||
+		   event == CXL_SETALERT_UNDER_TEMP) {
+		if (threshold < SHRT_MIN || threshold > SHRT_MAX) {
+			log_err(&ml,
+				"Invalid device temperature threshold: %d\n",
+				threshold);
+			return -EINVAL;
+		}
+	} else {
+		if (threshold < 0 || threshold > USHRT_MAX) {
+			log_err(&ml,
+				"Invalid corrected mem error threshold: %d\n",
+				threshold);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+#define alert_param_set_threshold(arg, alert_event)                           \
+{                                                                             \
+	if (!param.arg##_alert) {                                             \
+		if (param.arg##_threshold) {                                  \
+			log_err(&ml, "Action not specified\n");               \
+			return -EINVAL;                                       \
+		}                                                             \
+	} else if (strcmp(param.arg##_alert, "on") == 0) {                    \
+		if (param.arg##_threshold) {                                  \
+			char *endptr;                                         \
+			alertctx.arg##_threshold =                            \
+				strtol(param.arg##_threshold, &endptr, 10);   \
+			if (endptr[0] != '\0') {                              \
+				log_err(&ml, "Invalid threshold: %s\n",       \
+					param.arg##_threshold);               \
+				return -EINVAL;                               \
+			}                                                     \
+			rc = validate_alert_threshold(                        \
+				alert_event, alertctx.arg##_threshold);       \
+			if (rc != 0)                                          \
+				return rc;                                    \
+			alertctx.valid_alert_actions |= 1 << alert_event;     \
+			alertctx.enable_alert_actions |= 1 << alert_event;    \
+		} else {                                                      \
+			log_err(&ml, "Threshold not specified\n");            \
+			return -EINVAL;                                       \
+		}                                                             \
+	} else if (strcmp(param.arg##_alert, "off") == 0) {                   \
+		if (!param.arg##_threshold) {                                 \
+			alertctx.valid_alert_actions |= 1 << alert_event;     \
+			alertctx.enable_alert_actions &= ~(1 << alert_event); \
+		} else {                                                      \
+			log_err(&ml, "Disable not require threshold\n");      \
+			return -EINVAL;                                       \
+		}                                                             \
+	} else {                                                              \
+		log_err(&ml, "Invalid action: %s\n", param.arg##_alert);      \
+		return -EINVAL;                                               \
+	}                                                                     \
+}
+
+#define setup_threshold_field(arg)                                            \
+{                                                                             \
+	if (param.arg##_threshold)                                            \
+		cxl_cmd_alert_config_set_##arg##_prog_warn_threshold(         \
+			cmd, alertctx.arg##_threshold);                       \
+}
+
+static int action_set_alert_config(struct cxl_memdev *memdev,
+				   struct action_context *actx)
+{
+	const char *devname = cxl_memdev_get_devname(memdev);
+	struct cxl_cmd *cmd;
+	struct alert_context alertctx = { 0 };
+	struct json_object *jmemdev;
+	unsigned long flags;
+	int rc = 0;
+
+	alert_param_set_threshold(life_used, CXL_SETALERT_LIFE_USED)
+	alert_param_set_threshold(dev_over_temperature, CXL_SETALERT_OVER_TEMP)
+	alert_param_set_threshold(dev_under_temperature,
+				  CXL_SETALERT_UNDER_TEMP)
+	alert_param_set_threshold(corrected_volatile_mem_err,
+				  CXL_SETALERT_VOLATILE_MEM_ERROR)
+	alert_param_set_threshold(corrected_pmem_err, CXL_SETALERT_PMEM_ERROR)
+	if (alertctx.valid_alert_actions == 0) {
+		log_err(&ml, "No action specified\n");
+		return -EINVAL;
+	}
+
+	cmd = cxl_cmd_new_set_alert_config(memdev);
+	if (!cmd) {
+		rc = -ENXIO;
+		goto out_err;
+	}
+
+	setup_threshold_field(life_used)
+	setup_threshold_field(dev_over_temperature)
+	setup_threshold_field(dev_under_temperature)
+	setup_threshold_field(corrected_volatile_mem_err)
+	setup_threshold_field(corrected_pmem_err)
+	cxl_cmd_alert_config_set_valid_alert_actions(
+		cmd, alertctx.valid_alert_actions);
+	cxl_cmd_alert_config_set_enable_alert_actions(
+		cmd, alertctx.enable_alert_actions);
+
+	rc = cxl_cmd_submit(cmd);
+	if (rc < 0) {
+		log_err(&ml, "cmd submission failed: %s\n", strerror(-rc));
+		goto out_cmd;
+	}
+
+	rc = cxl_cmd_get_mbox_status(cmd);
+	if (rc != 0) {
+		log_err(&ml, "%s: mbox status: %d\n", __func__, rc);
+		rc = -ENXIO;
+	}
+
+out_cmd:
+	cxl_cmd_unref(cmd);
+out_err:
+	if (rc)
+		log_err(&ml, "%s error: %s\n", devname, strerror(-rc));
+
+	flags = UTIL_JSON_ALERT_CONFIG;
 	if (actx->f_out == stdout && isatty(1))
 		flags |= UTIL_JSON_HUMAN;
 	jmemdev = util_cxl_memdev_to_json(memdev, flags);
@@ -749,7 +996,8 @@ static int memdev_action(int argc, const char **argv, struct cxl_ctx *ctx,
 	}
 
 	if (action == action_setpartition || action == action_reserve_dpa ||
-	    action == action_free_dpa || action == action_update_fw)
+	    action == action_free_dpa || action == action_update_fw ||
+	    action == action_set_alert_config)
 		actx.jdevs = json_object_new_array();
 
 	if (err == argc) {
@@ -965,6 +1213,30 @@ int cmd_update_fw(int argc, const char **argv, struct cxl_ctx *ctx)
 
 	log_info(&ml, "firmware update %s on %d mem device%s\n", op_string,
 		 count >= 0 ? count : 0, count > 1 ? "s" : "");
+
+	return count >= 0 ? 0 : EXIT_FAILURE;
+}
+
+int cmd_set_alert_config(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int count = memdev_action(
+		argc, argv, ctx, action_set_alert_config, set_alert_options,
+		"cxl set-alert-config <mem0> [<mem1>..<memN>] [<options>]");
+	log_info(&ml, "set alert configuration for %d mem%s\n",
+		 count >= 0 ? count : 0, count > 1 ? "s" : "");
+
+	return count >= 0 ? 0 : EXIT_FAILURE;
+}
+
+int cmd_wait_sanitize(int argc, const char **argv, struct cxl_ctx *ctx)
+{
+	int count = memdev_action(
+		argc, argv, ctx, action_wait_sanitize, wait_sanitize_options,
+		"cxl wait-sanitize <mem0> [<mem1>..<memn>] [<options>]");
+
+	log_info(&ml, "wait sanitize %s on %d mem device%s\n",
+		 count >= 0 ? "completed" : "failed", count >= 0 ? count : 0,
+		 count > 1 ? "s" : "");
 
 	return count >= 0 ? 0 : EXIT_FAILURE;
 }

@@ -47,6 +47,8 @@ struct cxl_memdev {
 	struct list_node list;
 	unsigned long long pmem_size;
 	unsigned long long ram_size;
+	int ram_qos_class;
+	int pmem_qos_class;
 	int payload_max;
 	size_t lsa_size;
 	struct kmod_module *module;
@@ -87,6 +89,7 @@ struct cxl_port {
 	int dports_init;
 	int nr_dports;
 	int depth;
+	int decoders_committed;
 	struct cxl_ctx *ctx;
 	struct cxl_bus *bus;
 	enum cxl_port_type type;
@@ -144,6 +147,7 @@ struct cxl_decoder {
 	struct list_head targets;
 	struct list_head regions;
 	struct list_head stale_regions;
+	int qos_class;
 };
 
 enum cxl_decode_state {
@@ -308,6 +312,18 @@ struct cxl_cmd_get_alert_config {
 	BIT(3)
 #define CXL_CMD_ALERT_CONFIG_PROG_ALERTS_CORRECTED_PMEM_ERR_PROG_WARN_THRESHOLD_MASK \
 	BIT(4)
+
+/* CXL 3.0 8.2.9.8.3.3 Set Alert Configuration */
+struct cxl_cmd_set_alert_config {
+	u8 valid_alert_actions;
+	u8 enable_alert_actions;
+	u8 life_used_prog_warn_threshold;
+	u8 rsvd;
+	le16 dev_over_temperature_prog_warn_threshold;
+	le16 dev_under_temperature_prog_warn_threshold;
+	le16 corrected_volatile_mem_err_prog_warn_threshold;
+	le16 corrected_pmem_err_prog_warn_threshold;
+} __attribute__((packed));
 
 struct cxl_cmd_get_partition {
 	le64 active_volatile;

@@ -14,6 +14,7 @@
 #include <util/parse-options.h>
 #include <ccan/minmax/minmax.h>
 #include <ccan/short_types/short_types.h>
+#include <daxctl/libdaxctl.h>
 
 #include "filter.h"
 #include "json.h"
@@ -35,6 +36,7 @@ static struct region_params {
 	bool force;
 	bool human;
 	bool debug;
+	bool enforce_qos;
 #ifdef ENABLE_SMDK_PLUGIN
 	bool soft_interleaving;
 	const char *group_preset;
@@ -60,6 +62,7 @@ struct parsed_params {
 	const char **argv;
 	struct cxl_decoder *root_decoder;
 	enum cxl_decoder_mode mode;
+	bool enforce_qos;
 #ifdef ENABLE_SMDK_PLUGIN
 	bool soft_interleaving;
 	const char *group_preset;
@@ -97,7 +100,8 @@ OPT_STRING('U', "uuid", &param.uuid, \
 	   "region uuid", "uuid for the new region (default: autogenerate)"), \
 OPT_BOOLEAN('m', "memdevs", &param.memdevs, \
 	    "non-option arguments are memdevs"), \
-OPT_BOOLEAN('u', "human", &param.human, "use human friendly number formats")
+OPT_BOOLEAN('u', "human", &param.human, "use human friendly number formats"), \
+OPT_BOOLEAN('Q', "enforce-qos", &param.enforce_qos, "enforce qos_class match")
 
 #ifdef ENABLE_SMDK_PLUGIN
 #define CREATE_GROUP_OPTIONS() \
@@ -133,6 +137,8 @@ static const struct option enable_options[] = {
 
 static const struct option disable_options[] = {
 	BASE_OPTIONS(),
+	OPT_BOOLEAN('f', "force", &param.force,
+		    "attempt to offline memory before disabling the region"),
 	OPT_END(),
 };
 
@@ -466,6 +472,8 @@ static int parse_create_options(struct cxl_ctx *ctx, int count,
 		}
 	}
 
+	p->enforce_qos = param.enforce_qos;
+
 	return 0;
 
 err:
@@ -533,10 +541,52 @@ static void collect_minsize(struct cxl_ctx *ctx, struct parsed_params *p)
 	}
 }
 
+static int create_region_validate_qos_class(struct parsed_params *p)
+{
+	int root_qos_class;
+	int qos_class;
+	int i;
+
+	if (!p->enforce_qos)
+		return 0;
+
+	root_qos_class = cxl_root_decoder_get_qos_class(p->root_decoder);
+	if (root_qos_class == CXL_QOS_CLASS_NONE)
+		return 0;
+
+	for (i = 0; i < p->ways; i++) {
+		struct json_object *jobj =
+			json_object_array_get_idx(p->memdevs, i);
+		struct cxl_memdev *memdev = json_object_get_userdata(jobj);
+
+		if (p->mode == CXL_DECODER_MODE_RAM)
+			qos_class = cxl_memdev_get_ram_qos_class(memdev);
+		else
+			qos_class = cxl_memdev_get_pmem_qos_class(memdev);
+
+		/* No qos_class entries. Possibly no kernel support */
+		if (qos_class == CXL_QOS_CLASS_NONE)
+			break;
+
+		if (qos_class != root_qos_class) {
+			if (p->enforce_qos) {
+				log_err(&rl, "%s qos_class mismatch %s\n",
+					cxl_decoder_get_devname(p->root_decoder),
+					cxl_memdev_get_devname(memdev));
+
+				return -ENXIO;
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int validate_decoder(struct cxl_decoder *decoder,
 			    struct parsed_params *p)
 {
 	const char *devname = cxl_decoder_get_devname(decoder);
+	int rc;
 
 	switch(p->mode) {
 	case CXL_DECODER_MODE_RAM:
@@ -555,6 +605,10 @@ static int validate_decoder(struct cxl_decoder *decoder,
 		log_err(&rl, "unknown type: %s\n", param.type);
 		return -EINVAL;
 	}
+
+	rc = create_region_validate_qos_class(p);
+	if (rc)
+		return rc;
 
 	/* TODO check if the interleave config is possible under this decoder */
 
@@ -838,6 +892,58 @@ out:
 	return rc;
 }
 
+static int disable_region(struct cxl_region *region)
+{
+	const char *devname = cxl_region_get_devname(region);
+	struct daxctl_region *dax_region;
+	struct daxctl_memory *mem;
+	struct daxctl_dev *dev;
+	int failed = 0, rc;
+
+	dax_region = cxl_region_get_daxctl_region(region);
+	if (!dax_region)
+		goto out;
+
+	daxctl_dev_foreach(dax_region, dev) {
+		if (!daxctl_dev_is_system_ram_capable(dev))
+			continue;
+
+		mem = daxctl_dev_get_memory(dev);
+		if (!mem)
+			return -ENXIO;
+
+		/*
+		 * If memory is still online and user wants to force it, attempt
+		 * to offline it.
+		 */
+		if (daxctl_memory_is_online(mem)) {
+			rc = daxctl_memory_offline(mem);
+			if (rc < 0) {
+				log_err(&rl, "%s: unable to offline %s: %s\n",
+					devname,
+					daxctl_dev_get_devname(dev),
+					strerror(abs(rc)));
+				if (!param.force)
+					return rc;
+
+				failed++;
+			}
+		}
+	}
+
+	if (failed) {
+		log_err(&rl, "%s: Forcing region disable without successful offline.\n",
+			devname);
+		log_err(&rl, "%s: Physical address space has now been permanently leaked.\n",
+			devname);
+		log_err(&rl, "%s: Leaked address cannot be recovered until a reboot.\n",
+			devname);
+	}
+
+out:
+	return cxl_region_disable(region);
+}
+
 static int destroy_region(struct cxl_region *region)
 {
 	const char *devname = cxl_region_get_devname(region);
@@ -847,7 +953,7 @@ static int destroy_region(struct cxl_region *region)
 	/* First, unbind/disable the region if needed */
 	if (cxl_region_is_enabled(region)) {
 		if (param.force) {
-			rc = cxl_region_disable(region);
+			rc = disable_region(region);
 			if (rc) {
 				log_err(&rl, "%s: error disabling region: %s\n",
 					devname, strerror(-rc));
@@ -908,7 +1014,7 @@ static int do_region_xable(struct cxl_region *region, enum region_actions action
 	case ACTION_ENABLE:
 		return cxl_region_enable(region);
 	case ACTION_DISABLE:
-		return cxl_region_disable(region);
+		return disable_region(region);
 	case ACTION_DESTROY:
 		return destroy_region(region);
 	default:

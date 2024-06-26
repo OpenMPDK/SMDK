@@ -164,116 +164,114 @@ public:
 	}
 };
 
-extern "C" {
-	double delay = 1.0f; // in second.
-	uint64 SPR_CHA_CXL_Event_Count = 0;
-	shared_ptr<CHAEventCollector> chaEventCollector;
-	std::vector<ServerUncoreCounterState> BeforeState;
-	std::vector<ServerUncoreCounterState> AfterState;
-	uint64 BeforeTime;
-	uint64 AfterTime;
-	PCM *m;
+double delay = 1.0f; // in second.
+uint64 SPR_CHA_CXL_Event_Count = 0;
+shared_ptr<CHAEventCollector> chaEventCollector;
+std::vector<ServerUncoreCounterState> BeforeState;
+std::vector<ServerUncoreCounterState> AfterState;
+uint64 BeforeTime;
+uint64 AfterTime;
+PCM *m;
 
-	// PCM Instance Initialization
-	int pcm_monitor_init(int interval_in_us)
-	{
-		m = PCM::getInstance();
+// PCM Instance Initialization
+int pcm_monitor_init(int interval_in_us)
+{
+	m = PCM::getInstance();
 
-		ServerUncoreMemoryMetrics metrics =
-			m->PMMTrafficMetricsAvailable() ? Pmem : PartialWrites;
+	ServerUncoreMemoryMetrics metrics =
+		m->PMMTrafficMetricsAvailable() ? Pmem : PartialWrites;
 
-		// For high accuracy in Sandy Bridge.
-		m->disableJKTWorkaround();
+	// For high accuracy in Sandy Bridge.
+	m->disableJKTWorkaround();
 
-		PCM::ErrorCode status;
-		/*
-		 * The second and third parameter only for Ivytown and Skylake
-		 * to additional tracking on Memory Channel 0.
-		 * The second and third parameter don't affect other CPUs.
-		 */
-		status = m->programServerUncoreMemoryMetrics(metrics, -1, -1);
-		if (status != PCM::Success)
-			return status == PCM::PMUBusy ? -EBUSY : -EPERM;
+	PCM::ErrorCode status;
+	/*
+	 * The second and third parameter only for Ivytown and Skylake
+	 * to additional tracking on Memory Channel 0.
+	 * The second and third parameter don't affect other CPUs.
+	 */
+	status = m->programServerUncoreMemoryMetrics(metrics, -1, -1);
+	if (status != PCM::Success)
+		return status == PCM::PMUBusy ? -EBUSY : -EPERM;
 
-		max_imc_channels = (pcm::uint32)m->getMCChannelsPerSocket();
+	max_imc_channels = (pcm::uint32)m->getMCChannelsPerSocket();
 
-		BeforeState.resize(m->getNumSockets());
-		AfterState.resize(m->getNumSockets());
-		BeforeTime = 0;
-		AfterTime = 0;
+	BeforeState.resize(m->getNumSockets());
+	AfterState.resize(m->getNumSockets());
+	BeforeTime = 0;
+	AfterTime = 0;
 
-		m->setBlocked(false);
+	m->setBlocked(false);
 
-		// 1 second is the minimum value of interval for CXL Read BW Accuracy.
-		if (interval_in_us > 1000000)
-			delay = (float)(interval_in_us / 1000000.0f);
+	// 1 second is the minimum value of interval for CXL Read BW Accuracy.
+	if (interval_in_us > 1000000)
+		delay = (float)(interval_in_us / 1000000.0f);
 
-		bool SPR_CXL = (PCM::SPR == m->getCPUModel()) && (getNumCXLPorts(m) > 0);
-		if (SPR_CXL) {
-			chaEventCollector = std::make_shared<CHAEventCollector>(delay, m);
-			assert(chaEventCollector.get());
-			chaEventCollector->programFirstGroup();
-		}
-
-		return 0;
+	bool SPR_CXL = (PCM::SPR == m->getCPUModel()) && (getNumCXLPorts(m) > 0);
+	if (SPR_CXL) {
+		chaEventCollector = std::make_shared<CHAEventCollector>(delay, m);
+		assert(chaEventCollector.get());
+		chaEventCollector->programFirstGroup();
 	}
 
-	void pcm_monitor_start()
-	{
-		readState(BeforeState);
-		BeforeTime = m->getTickCount();
-		SPR_CHA_CXL_Event_Count = 0;
-	}
+	return 0;
+}
 
-	void pcm_monitor_stop()
-	{
-		if (PCM::isInitialized())
-			PCM::getInstance()->cleanup();
-	}
+void pcm_monitor_start()
+{
+	readState(BeforeState);
+	BeforeTime = m->getTickCount();
+	SPR_CHA_CXL_Event_Count = 0;
+}
 
-	void pcm_monitor_report_start()
-	{
-		if (chaEventCollector.get())
-			chaEventCollector->multiplexEvents(BeforeState);
-		else
-			simpleCalibratedSleep(delay, m);
+void pcm_monitor_stop()
+{
+	if (PCM::isInitialized())
+		PCM::getInstance()->cleanup();
+}
 
-		AfterTime = m->getTickCount();
+void pcm_monitor_report_start()
+{
+	if (chaEventCollector.get())
+		chaEventCollector->multiplexEvents(BeforeState);
+	else
+		simpleCalibratedSleep(delay, m);
+
+	AfterTime = m->getTickCount();
+	readState(AfterState);
+
+	if (chaEventCollector.get()) {
+		SPR_CHA_CXL_Event_Count = chaEventCollector->getTotalCount(AfterState);
+		chaEventCollector->reset();
+		chaEventCollector->programFirstGroup();
 		readState(AfterState);
-
-		if (chaEventCollector.get()) {
-			SPR_CHA_CXL_Event_Count = chaEventCollector->getTotalCount(AfterState);
-			chaEventCollector->reset();
-			chaEventCollector->programFirstGroup();
-			readState(AfterState);
-		}
 	}
+}
 
-	int pcm_monitor_get_BW(int socket_id, int port_id, float *read, float *write)
-	{
-		if (socket_id < 0 || (uint32)socket_id >= m->getNumSockets())
-			return -EINVAL;
+int pcm_monitor_get_BW(int socket_id, int port_id, float *read, float *write)
+{
+	if (socket_id < 0 || (uint32)socket_id >= m->getNumSockets())
+		return -EINVAL;
 
-		/*
-		 * DDR DRAM Case : port_id must be -1.
-		 * CXL DRAM Case : port_id should be smaller than Socket's CXL Ports Num.
-		 */
-		if (port_id != -1 && port_id >= (int)m->getNumCXLPorts(socket_id))
-			return -EINVAL;
+	/*
+	 * DDR DRAM Case : port_id must be -1.
+	 * CXL DRAM Case : port_id should be smaller than Socket's CXL Ports Num.
+	 */
+	if (port_id != -1 && port_id >= (int)m->getNumCXLPorts(socket_id))
+		return -EINVAL;
 
-		pcm_monitor_calculate_bandwidth(
-				BeforeState, AfterState, AfterTime - BeforeTime,
-				(uint32)socket_id, port_id, read, write,
-				SPR_CHA_CXL_Event_Count);
+	pcm_monitor_calculate_bandwidth(
+			BeforeState, AfterState, AfterTime - BeforeTime,
+			(uint32)socket_id, port_id, read, write,
+			SPR_CHA_CXL_Event_Count);
 
-		return 0;
-	}
+	return 0;
+}
 
-	void pcm_monitor_report_finish()
-	{
-		swap(BeforeTime, AfterTime);
-		swap(BeforeState, AfterState);
-	}
+void pcm_monitor_report_finish()
+{
+	swap(BeforeTime, AfterTime);
+	swap(BeforeState, AfterState);
 }
 
 constexpr float CXLBWWrScalingFactor = 0.5;

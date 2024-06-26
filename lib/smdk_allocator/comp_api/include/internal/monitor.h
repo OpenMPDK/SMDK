@@ -3,7 +3,7 @@
 
 #define EPS (1e-10)
 
-#define SET_MEMPOLICY2(a, b) syscall(454, a, b)
+#define SET_MEMPOLICY2(a, b) syscall(462, a, b)
 
 struct mempolicy_args {
 	unsigned short mode;
@@ -30,11 +30,6 @@ struct mempolicy_args {
 		struct {
 			unsigned long next_node; /* get only */
 		} interleave;
-		/* Partial interleave */
-		struct {
-			unsigned long weight;  /* get and set */
-			unsigned long next_node; /* get only */
-		} pil;
 		/* Weighted interleave */
 		struct {
 			unsigned long next_node; /* get only */

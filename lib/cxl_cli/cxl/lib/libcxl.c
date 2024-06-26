@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LGPL-2.1
 // Copyright (C) 2020-2021, Intel Corporation. All rights reserved.
+#include <poll.h>
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
@@ -411,6 +412,35 @@ CXL_EXPORT int cxl_region_is_enabled(struct cxl_region *region)
 	}
 
 	return is_enabled(path);
+}
+
+CXL_EXPORT bool cxl_region_qos_class_mismatch(struct cxl_region *region)
+{
+	struct cxl_decoder *root_decoder = cxl_region_get_decoder(region);
+	struct cxl_memdev_mapping *mapping;
+
+	cxl_mapping_foreach(region, mapping) {
+		struct cxl_decoder *decoder;
+		struct cxl_memdev *memdev;
+
+		decoder = cxl_mapping_get_decoder(mapping);
+		if (!decoder)
+			continue;
+
+		memdev = cxl_decoder_get_memdev(decoder);
+		if (!memdev)
+			continue;
+
+		if (region->mode == CXL_DECODER_MODE_RAM) {
+			if (root_decoder->qos_class != memdev->ram_qos_class)
+				return true;
+		} else if (region->mode == CXL_DECODER_MODE_PMEM) {
+			if (root_decoder->qos_class != memdev->pmem_qos_class)
+				return true;
+		}
+	}
+
+	return false;
 }
 
 CXL_EXPORT int cxl_region_disable(struct cxl_region *region)
@@ -1250,28 +1280,42 @@ static void *add_cxl_memdev(void *parent, int id, const char *cxlmem_base)
 	memdev->minor = minor(st.st_rdev);
 
 	sprintf(path, "%s/pmem/size", cxlmem_base);
-	if (sysfs_read_attr(ctx, path, buf) < 0)
-		goto err_read;
-	memdev->pmem_size = strtoull(buf, NULL, 0);
+	if (sysfs_read_attr(ctx, path, buf) == 0)
+		memdev->pmem_size = strtoull(buf, NULL, 0);
 
 	sprintf(path, "%s/ram/size", cxlmem_base);
+	if (sysfs_read_attr(ctx, path, buf) == 0)
+		memdev->ram_size = strtoull(buf, NULL, 0);
+
+	sprintf(path, "%s/pmem/qos_class", cxlmem_base);
 	if (sysfs_read_attr(ctx, path, buf) < 0)
-		goto err_read;
-	memdev->ram_size = strtoull(buf, NULL, 0);
+		memdev->pmem_qos_class = CXL_QOS_CLASS_NONE;
+	else
+		memdev->pmem_qos_class = atoi(buf);
+
+	sprintf(path, "%s/ram/qos_class", cxlmem_base);
+	if (sysfs_read_attr(ctx, path, buf) < 0)
+		memdev->ram_qos_class = CXL_QOS_CLASS_NONE;
+	else
+		memdev->ram_qos_class = atoi(buf);
 
 	sprintf(path, "%s/payload_max", cxlmem_base);
-	if (sysfs_read_attr(ctx, path, buf) < 0)
-		goto err_read;
-	memdev->payload_max = strtoull(buf, NULL, 0);
-	if (memdev->payload_max < 0)
-		goto err_read;
+	if (sysfs_read_attr(ctx, path, buf) == 0) {
+		memdev->payload_max = strtoull(buf, NULL, 0);
+		if (memdev->payload_max < 0)
+			goto err_read;
+	} else {
+		memdev->payload_max = -1;
+	}
 
 	sprintf(path, "%s/label_storage_size", cxlmem_base);
-	if (sysfs_read_attr(ctx, path, buf) < 0)
-		goto err_read;
-	memdev->lsa_size = strtoull(buf, NULL, 0);
-	if (memdev->lsa_size == ULLONG_MAX)
-		goto err_read;
+	if (sysfs_read_attr(ctx, path, buf) == 0) {
+		memdev->lsa_size = strtoull(buf, NULL, 0);
+		if (memdev->lsa_size == ULLONG_MAX)
+			goto err_read;
+	} else {
+		memdev->lsa_size = SIZE_MAX;
+	}
 
 	sprintf(path, "%s/serial", cxlmem_base);
 	if (sysfs_read_attr(ctx, path, buf) < 0)
@@ -1298,12 +1342,11 @@ static void *add_cxl_memdev(void *parent, int id, const char *cxlmem_base)
 	host[0] = '\0';
 
 	sprintf(path, "%s/firmware_version", cxlmem_base);
-	if (sysfs_read_attr(ctx, path, buf) < 0)
-		goto err_read;
-
-	memdev->firmware_version = strdup(buf);
-	if (!memdev->firmware_version)
-		goto err_read;
+	if (sysfs_read_attr(ctx, path, buf) == 0) {
+		memdev->firmware_version = strdup(buf);
+		if (!memdev->firmware_version)
+			goto err_read;
+	}
 
 	memdev->dev_buf = calloc(1, strlen(cxlmem_base) + 50);
 	if (!memdev->dev_buf)
@@ -1371,6 +1414,68 @@ CXL_EXPORT int cxl_memdev_get_id(struct cxl_memdev *memdev)
 	return memdev->id;
 }
 
+CXL_EXPORT int cxl_memdev_wait_sanitize(struct cxl_memdev *memdev,
+					int timeout_ms)
+{
+	struct cxl_ctx *ctx = cxl_memdev_get_ctx(memdev);
+	const char *devname = cxl_memdev_get_devname(memdev);
+	char *path = memdev->dev_buf;
+	int len = memdev->buf_len;
+	struct pollfd fds = { 0 };
+	int fd = 0, rc;
+	char buf[9];
+
+	if (snprintf(path, len, "%s/security/state", memdev->dev_path) >= len) {
+		err(ctx, "%s: buffer too small!\n", devname);
+		return -ERANGE;
+	}
+
+	fd = open(path, O_RDONLY|O_CLOEXEC);
+	if (fd < 0) {
+		/* device does not support security operations */
+		if (errno == ENOENT)
+			return 0;
+		rc = -errno;
+		err(ctx, "%s: %s\n", path, strerror(errno));
+		return rc;
+	}
+	memset(&fds, 0, sizeof(fds));
+	fds.fd = fd;
+
+	rc = pread(fd, buf, sizeof(buf), 0);
+	if (rc < 0) {
+		rc = -EOPNOTSUPP;
+		goto out;
+	}
+
+	/* skipping if not currently sanitizing */
+	if (strncmp(buf, "sanitize", 8) != 0) {
+		rc = 0;
+		goto out;
+	}
+
+	rc = poll(&fds, 1, timeout_ms);
+	if (rc == 0) {
+		dbg(ctx, "%s: sanitize timeout\n", devname);
+		rc = -ETIMEDOUT;
+	} else if (rc < 0) {
+		err(ctx, "%s: sanitize poll error: %s\n", devname, strerror(errno));
+		rc = -errno;
+	} else {
+		dbg(ctx, "%s: sanitize wake\n", devname);
+
+		rc = pread(fd, buf, sizeof(buf), 0);
+		if (rc < 0 || strncmp(buf, "sanitize", 8) == 0) {
+			err(ctx, "%s: sanitize wake error\n", devname);
+			rc = -ENXIO;
+		} else
+			rc = 0;
+	}
+out:
+	close(fd);
+	return rc;
+}
+
 CXL_EXPORT unsigned long long cxl_memdev_get_serial(struct cxl_memdev *memdev)
 {
 	return memdev->serial;
@@ -1418,6 +1523,16 @@ CXL_EXPORT unsigned long long cxl_memdev_get_pmem_size(struct cxl_memdev *memdev
 CXL_EXPORT unsigned long long cxl_memdev_get_ram_size(struct cxl_memdev *memdev)
 {
 	return memdev->ram_size;
+}
+
+CXL_EXPORT int cxl_memdev_get_pmem_qos_class(struct cxl_memdev *memdev)
+{
+	return memdev->pmem_qos_class;
+}
+
+CXL_EXPORT int cxl_memdev_get_ram_qos_class(struct cxl_memdev *memdev)
+{
+	return memdev->ram_qos_class;
 }
 
 CXL_EXPORT const char *cxl_memdev_get_firmware_verison(struct cxl_memdev *memdev)
@@ -1833,6 +1948,10 @@ static int cxl_port_init(struct cxl_port *port, struct cxl_port *parent_port,
 	if (sysfs_read_attr(ctx, path, buf) == 0)
 		port->module = util_modalias_to_module(ctx, buf);
 
+	sprintf(path, "%s/decoders_committed", cxlport_base);
+	if (sysfs_read_attr(ctx, path, buf) == 0)
+		port->decoders_committed = strtoul(buf, NULL, 0);
+
 	free(path);
 	return 0;
 err:
@@ -2002,6 +2121,9 @@ cxl_decoder_calc_max_available_extent(struct cxl_decoder *decoder)
 		return ULLONG_MAX;
 	}
 
+	if (decoder->start == ULLONG_MAX)
+		return ULLONG_MAX;
+
 	/*
 	 * Preload prev_end with an imaginary region that ends just before
 	 * the decoder's start, so that the extent calculation for the
@@ -2115,6 +2237,12 @@ static void *add_cxl_decoder(void *parent, int id, const char *cxldecoder_base)
 		decoder->interleave_ways = UINT_MAX;
 	else
 		decoder->interleave_ways = strtoul(buf, NULL, 0);
+
+	sprintf(path, "%s/qos_class", cxldecoder_base);
+	if (sysfs_read_attr(ctx, path, buf) < 0)
+		decoder->qos_class = CXL_QOS_CLASS_NONE;
+	else
+		decoder->qos_class = atoi(buf);
 
 	switch (port->type) {
 	case CXL_PORT_ENDPOINT:
@@ -2308,6 +2436,14 @@ CXL_EXPORT unsigned long long cxl_decoder_get_resource(struct cxl_decoder *decod
 CXL_EXPORT unsigned long long cxl_decoder_get_size(struct cxl_decoder *decoder)
 {
 	return decoder->size;
+}
+
+CXL_EXPORT int cxl_root_decoder_get_qos_class(struct cxl_decoder *decoder)
+{
+	if (!cxl_port_is_root(decoder->port))
+		return -EINVAL;
+
+	return decoder->qos_class;
 }
 
 CXL_EXPORT unsigned long long
@@ -3069,6 +3205,11 @@ cxl_port_get_dport_by_memdev(struct cxl_port *port, struct cxl_memdev *memdev)
 		if (cxl_dport_maps_memdev(dport, memdev))
 			return dport;
 	return NULL;
+}
+
+CXL_EXPORT int cxl_port_decoders_committed(struct cxl_port *port)
+{
+	return port->decoders_committed;
 }
 
 static void *add_cxl_bus(void *parent, int id, const char *cxlbus_base)
@@ -4430,6 +4571,9 @@ static int lsa_op(struct cxl_memdev *memdev, int op, void *buf,
 	if (length == 0)
 		return 0;
 
+	if (memdev->payload_max < 0)
+		return -EINVAL;
+
 	label_iter_max = memdev->payload_max - sizeof(struct cxl_cmd_set_lsa);
 	while (remaining) {
 		cur_len = min((size_t)label_iter_max, remaining);
@@ -4464,4 +4608,25 @@ CXL_EXPORT int cxl_memdev_read_label(struct cxl_memdev *memdev, void *buf,
 		size_t length, size_t offset)
 {
 	return lsa_op(memdev, LSA_OP_GET, buf, length, offset);
+}
+
+#define cxl_alert_config_set_field(field)                                     \
+CXL_EXPORT int cxl_cmd_alert_config_set_##field(struct cxl_cmd *cmd, int val) \
+{                                                                             \
+	struct cxl_cmd_set_alert_config *setalert = cmd->input_payload;       \
+	setalert->field = val;                                                \
+	return 0;                                                             \
+}
+
+cxl_alert_config_set_field(life_used_prog_warn_threshold)
+cxl_alert_config_set_field(dev_over_temperature_prog_warn_threshold)
+cxl_alert_config_set_field(dev_under_temperature_prog_warn_threshold)
+cxl_alert_config_set_field(corrected_volatile_mem_err_prog_warn_threshold)
+cxl_alert_config_set_field(corrected_pmem_err_prog_warn_threshold)
+cxl_alert_config_set_field(valid_alert_actions)
+cxl_alert_config_set_field(enable_alert_actions)
+
+CXL_EXPORT struct cxl_cmd *cxl_cmd_new_set_alert_config(struct cxl_memdev *memdev)
+{
+	return cxl_cmd_new_generic(memdev, CXL_MEM_COMMAND_ID_SET_ALERT_CONFIG);
 }

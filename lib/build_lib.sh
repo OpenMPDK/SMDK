@@ -18,8 +18,8 @@ STREAM=stream
 PCM=pcm
 UPROF=AMDuProf_Linux_x64_4.0.341
 NUMACTL=numactl-2.0.16
-CXL_KERNEL=linux-6.6-smdk
-CXL_KERNEL_CONFIG=config-linux-6.6-smdk
+CXL_KERNEL=linux-6.9-smdk
+CXL_KERNEL_CONFIG=config-linux-6.9-smdk
 QEMU=qemu-8.1.50
 MLC=mlc
 VOLTDB=$BASEDIR/src/app/voltdb
@@ -28,7 +28,7 @@ TIERD=tierd
 LIBPNM=PNMLibrary-pnm-v3.0.0
 
 SMDK_BIN=$BASEDIR/lib/SMDK_bin
-SMDK_VERSION=v2.0
+SMDK_VERSION=v2.1
 
 function build_voltdb() {
 	app=$VOLTDB
