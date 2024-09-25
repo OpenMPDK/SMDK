@@ -1,0 +1,42 @@
+{{- if .Values.plugin.jobs.patchConsoles.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "openshift-console-plugin.patcherName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshift-console-plugin.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        {{- include "openshift-console-plugin.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ template "openshift-console-plugin.patcherServiceAccountName" . }}
+      {{- if  and (.Values.plugin.securityContext.enabled) (.Values.plugin.jobs.patchConsoles.podSecurityContext.enabled) }}
+      securityContext: {{ tpl (toYaml (omit .Values.plugin.jobs.patchConsoles.podSecurityContext "enabled")) $ | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 400
+      dnsPolicy: ClusterFirst
+      containers:
+        - name: {{ template "openshift-console-plugin.patcherName" . }}
+          image: {{ required "Patcher image must be specified!" .Values.plugin.jobs.patchConsoles.image }}
+          {{- if and (.Values.plugin.securityContext.enabled) (.Values.plugin.containerSecurityContext) }}
+          securityContext: {{ tpl (toYaml (omit .Values.plugin.jobs.patchConsoles.containerSecurityContext "enabled")) $ | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.plugin.jobs.patchConsoles.resources | nindent 12 }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+                existingPlugins=$(oc get consoles.operator.openshift.io cluster -o json | jq -c '.spec.plugins // []')
+                mergedPlugins=$(jq --argjson existingPlugins "${existingPlugins}" --argjson consolePlugin '["{{ template "openshift-console-plugin.name" . }}"]' -c  -n '$existingPlugins + $consolePlugin | unique')
+                patchedPlugins=$(jq --argjson mergedPlugins $mergedPlugins -n -c  '{ "spec": { "plugins": $mergedPlugins } }')
+                oc patch consoles.operator.openshift.io cluster --patch $patchedPlugins  --type=merge
+{{- end }}

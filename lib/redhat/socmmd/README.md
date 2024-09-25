@@ -58,21 +58,6 @@ For instructions on how to use it, please refer to the document [__here__](./doc
 
 <br>
 
-## Build and Deploy
-To use the Operator in an OLM environment, you must not only build the Operator image but also create a bundle and follow the distribution process provided by the Red Hat Operator community. The steps are as follows.   
-<br>
-
-1. Operator Build and Push.
-2. Fork Git Repository. (Redhat operator community git)
-3. Pull Request.
-4. Check Bundle Image Source.
-5. Merage.
-6. Automatically reflected in the Red Hat OperatorHub Community catalog.   
-<br>
-
-For detailed information, please refer to the [__Operator Hub Registration__](./document/Build_Deploy_Guide.md) document.   
-<br>
-
 
 ## E2E Test
 The End-to-End Test of the Samsung Operator for CMM-D included various use case scenarios involving the Samsung CMM-D equipment:   

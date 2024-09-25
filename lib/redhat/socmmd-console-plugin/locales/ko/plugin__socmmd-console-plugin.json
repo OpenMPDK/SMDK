@@ -1,0 +1,8 @@
+{
+  "Set Label": "라벨 편집",
+  "Set Labels for CMMD Nodes": "CMMD 노드 라벨 설정",
+  "No labels found. To use this Operator you have to set the labels.": "설정된 라벨이 없습니다. 이 Operator를 사용하기 위해 라벨을 지정해야 합니다.",
+  "Setting the labels will trigger server reboot.": "라벨을 설정하면 서버가 재부팅 됩니다.",
+  "None":"None",
+  "Back": "뒤로"
+}

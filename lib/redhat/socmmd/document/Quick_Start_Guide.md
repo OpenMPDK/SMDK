@@ -215,7 +215,7 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: stress
-        image: quay.io/alicek106/stress:latest
+        image: <stress image>
         args: ["tail", "-f", "/dev/null"]
         resources:						<6>
           requests:
@@ -310,7 +310,7 @@ spec:
             node-role.kubernetes.io/cmmd: ""
           containers:
           - name: stress01
-            image: quay.io/alicek106/stress:latest
+            image: <stress image>
             args: ["tail", "-f", "/dev/null"]
             resources:					
               requests:

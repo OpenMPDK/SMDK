@@ -1,0 +1,17 @@
+{
+    "env": {
+      "cypress/globals": true,
+      "node": true
+    },
+    "extends": ["../.eslintrc.yml", "plugin:cypress/recommended"],
+    "plugins": ["cypress"],
+    "rules": {
+      "no-console": "off",
+      "no-namespace": "off",
+      "no-redeclare": "off",
+      "promise/catch-or-return": "off",
+      "promise/no-nesting": "off",
+      "@typescript-eslint/no-var-requires":"off",
+      "@typescript-eslint/no-namespace":"off"
+    }
+  }

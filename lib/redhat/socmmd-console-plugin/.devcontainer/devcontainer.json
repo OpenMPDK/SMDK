@@ -1,0 +1,31 @@
+{
+  "name": "Console + Plugin",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "plugin",
+  "workspaceFolder": "/workspace",
+
+  "initializeCommand": ".devcontainer/init.sh",
+  "postCreateCommand": "yarn && eval 'oc login $OC_URL -u $OC_USER -p $OC_PASS --insecure-skip-tls-verify'",
+  "forwardPorts": [9000, 9001],
+  "portsAttributes": {
+    "9000": {
+      "label": "Console"
+    },
+    "9001": {
+      "label": "Plugin static files",
+      "onAutoForward": "silent"
+    }
+  },
+  "features": {},
+  "customizations": {
+    "vscode": {
+      "settings": {},
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.vscode-typescript-next",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}

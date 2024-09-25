@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "openshift-console-plugin.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshift-console-plugin.labels" . | nindent 4 }}
+    app.openshift.io/runtime-namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.plugin.replicas }}
+  selector:
+    matchLabels:
+      {{- include "openshift-console-plugin.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+            {{- include "openshift-console-plugin.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ template "openshift-console-plugin.name" . }}
+          image: {{ required "Plugin image must be specified!" .Values.plugin.image }}
+          ports:
+            - containerPort: {{ .Values.plugin.port }}
+              protocol: TCP
+          imagePullPolicy: {{ .Values.plugin.imagePullPolicy }}
+          {{- if and (.Values.plugin.securityContext.enabled) (.Values.plugin.containerSecurityContext) }}
+          securityContext: {{ tpl (toYaml (omit .Values.plugin.containerSecurityContext "enabled")) $ | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.plugin.resources | nindent 12 }}
+          volumeMounts:
+            - name: {{ template "openshift-console-plugin.certificateSecret" . }}
+              readOnly: true
+              mountPath: /var/cert
+            - name: nginx-conf
+              readOnly: true
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: {{ template "openshift-console-plugin.certificateSecret" . }}
+          secret:
+            secretName: {{ template "openshift-console-plugin.certificateSecret" . }}
+            defaultMode: 420
+        - name: nginx-conf
+          configMap:
+            name: {{ template "openshift-console-plugin.name" . }}
+            defaultMode: 420
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      {{- if and (.Values.plugin.securityContext.enabled) (.Values.plugin.podSecurityContext) }}
+      securityContext: {{ tpl (toYaml (omit .Values.plugin.podSecurityContext "enabled")) $ | nindent 8 }}
+      {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%

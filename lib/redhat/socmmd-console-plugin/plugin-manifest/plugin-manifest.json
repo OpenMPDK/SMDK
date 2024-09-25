@@ -1,0 +1,35 @@
+{
+  "name": "socmmd-console-plugin",
+  "version": "0.0.1",
+  "dependencies": {
+    "@console/pluginAPI": "*"
+  },
+  "extensions": [
+    {
+      "type": "console.resource/create",
+      "properties": {
+        "model": {
+          "group": "cmmd.samsung.com",
+          "version": "v1",
+          "kind": "Label"
+        },
+        "component": {
+          "$codeRef": "List"
+        }
+      }
+    },
+    {
+      "type": "console.page/resource/list",
+      "properties": {
+        "model": {
+          "group": "cmmd.samsung.com",
+          "version": "v1",
+          "kind": "Label"
+        },
+        "component": {
+          "$codeRef": "List"
+        }
+      }
+    }
+  ]
+}

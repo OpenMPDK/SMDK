@@ -1,0 +1,20 @@
+FROM quay.io/openshift/origin-console:latest
+COPY --from=openshift/origin-cli:latest /usr/bin/oc /usr/local/bin/oc
+
+ENV OC_URL=$OC_URL
+ENV OC_PASS=$OC_PASS
+ENV OC_USER=$OC_USER
+ENV OC_PLUGIN_NAME=$OC_PLUGIN_NAME
+
+USER root
+CMD eval "oc login $OC_URL -u $OC_USER -p $OC_PASS --insecure-skip-tls-verify" && \
+    /opt/bridge/bin/bridge -public-dir=/opt/bridge/static \
+    -i18n-namespaces plugin__$OC_PLUGIN_NAME \
+    -plugins $OC_PLUGIN_NAME=http://localhost:9001 \
+    -k8s-mode-off-cluster-thanos=$(oc -n openshift-config-managed get configmap monitoring-shared-config -o jsonpath='{.data.thanosPublicURL}') \
+    -k8s-mode-off-cluster-endpoint=$(oc whoami --show-server) \
+    -k8s-mode-off-cluster-skip-verify-tls=true \
+    -k8s-auth-bearer-token=$(oc whoami --show-token) \
+    -k8s-auth="bearer-token" \
+    -user-auth="disabled" \
+    -k8s-mode="off-cluster"

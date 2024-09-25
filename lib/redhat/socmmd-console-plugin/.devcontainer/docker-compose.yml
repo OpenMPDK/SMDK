@@ -1,0 +1,34 @@
+version: '3.8'
+# create dev.env with the following values:
+# OC_URL
+# OC_USER
+# OC_PASS
+# OC_PLUGIN_NAME
+services:
+  console:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.console
+    env_file: dev.env
+    restart: unless-stopped
+    healthcheck:
+      test: oc whoami
+      interval: 1m30s
+      timeout: 10s
+      retries: 5
+
+  plugin:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile.plugin
+    env_file: dev.env
+    depends_on:
+      - console
+    network_mode: service:console
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+    # Cache local workspace and copy shell history.
+    volumes:
+      - ..:/workspace:cached
+      - ~/.bash_history:/root/.bash_history
+      - ~/.zsh_history:/root/.zsh_history

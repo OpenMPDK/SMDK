@@ -1,0 +1,18 @@
+.oper-label-height > .pf-c-form__group-control{
+  height: 80vh !important;
+  /* border: 1px solid red; */
+}
+
+/* .oper-label-height .co-virtualized-table {
+  height: 160%;
+  border: 1px solid navy;
+} */
+
+.operator-label-chip.pf-c-chip {
+  margin: 4px;
+  padding: 6px;
+  border-radius: 25px !important;
+  border: 1px solid #d2d2d2;
+  background-color: #f5f5f5;
+  --pf-c-chip--before--BorderColor: none;
+}
