@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socmmd-console-plugin
+  namespace: default
+  labels:
+    app: socmmd-console-plugin
+    app.kubernetes.io/component: socmmd-console-plugin
+    app.kubernetes.io/instance: socmmd-console-plugin
+    app.kubernetes.io/part-of: socmmd-console-plugin
+    app.openshift.io/runtime-namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: socmmd-console-plugin
+  template:
+    metadata:
+      labels:
+        app: socmmd-console-plugin
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+          operator: Exists
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - arm64
+                - ppc64le
+                - s390x
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      containers:
+        - name: socmmd-console-plugin
+          image: quay.io/samsung_sag/socmmd-console-plugin@sha256:4aaba19478d907233417b741116aa4100760c1d5d79cf8677198ec63dbdb54d2
+          ports:
+            - containerPort: 9443
+              protocol: TCP
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: plugin-serving-cert
+              readOnly: true
+              mountPath: /var/serving-cert
+            - name: nginx-conf
+              readOnly: true
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: plugin-serving-cert
+          secret:
+            secretName: plugin-serving-cert
+            defaultMode: 420
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+            defaultMode: 420
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: default
+  labels:
+    app: socmmd-console-plugin
+    app.kubernetes.io/part-of: socmmd-console-plugin
+data:
+  nginx.conf: |
+    error_log /dev/stdout info;
+    events {}
+    http {
+      access_log         /dev/stdout;
+      include            /etc/nginx/mime.types;
+      default_type       application/octet-stream;
+      keepalive_timeout  65;
+      server {
+        listen              9443 ssl;
+        ssl_certificate     /var/serving-cert/tls.crt;
+        ssl_certificate_key /var/serving-cert/tls.key;
+        root                /usr/share/nginx/html;
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: plugin-serving-cert
+  name: socmmd-console-plugin
+  namespace: default
+  labels:
+    app: socmmd-console-plugin
+    app.kubernetes.io/component: socmmd-console-plugin
+    app.kubernetes.io/instance: socmmd-console-plugin
+    app.kubernetes.io/part-of: socmmd-console-plugin
+spec:
+  ports:
+    - name: 9443-tcp
+      protocol: TCP
+      port: 9443
+      targetPort: 9443
+  type: ClusterIP
+  selector:
+    app: socmmd-console-plugin
+  sessionAffinity: None
+---
+apiVersion: console.openshift.io/v1
+kind: ConsolePlugin
+metadata:
+  name: socmmd-console-plugin
+spec:
+  displayName: 'OpenShift Console Customization Plugin'
+  backend:
+    type: Service
+    service:
+      name: socmmd-console-plugin
+      namespace: default
+      port: 9443
+      basePath: '/'
+---
+apiVersion: operator.openshift.io/v1
+kind: Console
+metadata:
+  name: socmmd-console-plugin
+spec:
+  managementState: Managed
+  plugins:
+  - socmmd-console-plugin

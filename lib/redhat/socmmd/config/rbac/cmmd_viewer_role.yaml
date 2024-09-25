@@ -1,0 +1,27 @@
+# permissions for end users to view cmmds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: cmmd-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: socmmd
+    app.kubernetes.io/part-of: socmmd
+    app.kubernetes.io/managed-by: kustomize
+  name: cmmd-viewer-role
+rules:
+- apiGroups:
+  - cmmd.samsung.com
+  resources:
+  - cmmds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cmmd.samsung.com
+  resources:
+  - cmmds/status
+  verbs:
+  - get

@@ -1,0 +1,35 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: cmmd
+  name: 99-daxdev-reconfigure
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      files:
+      - path: /etc/udev/rules.d/90-daxctl-device.rules
+        filesystem: root
+        mode: 420
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,QUNUSU9OPT0iYWRkIiwgU1VCU1lTVEVNPT0iZGF4IiwgVEFHKz0ic3lzdGVtZCIsIFwKICBQUk9HUkFNPSIvdXNyL2Jpbi9zeXN0ZW1kLWVzY2FwZSAtcCAtLXRlbXBsYXRlPWRheGRldi1yZWNvbmZpZ3VyZUAuc2VydmljZSAkZW52e0RFVk5BTUV9IiwgXAogIEVOVntTWVNURU1EX1dBTlRTfT0iJWMiCg==
+      - path: /usr/local/bin/daxdev-reconfigure
+        mode: 493
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,IyEvYmluL2Jhc2gKCmlmIFsgIiRMRF9MSUJSQVJZX1BBVEgiICE9ICIiIF0KdGhlbgoJTERfTElCUkFSWV9QQVRIPS91c3IvbG9jYWwvYmluOiR7TERfTElCUkFSWV9QQVRIfQoJZXhwb3J0IExEX0xJQlJBUllfUEFUSAplbHNlCglMRF9MSUJSQVJZX1BBVEg9L3Vzci9sb2NhbC9iaW4KCWV4cG9ydCBMRF9MSUJSQVJZX1BBVEgKZmkKCiNlY2hvICJbYC9iaW4vZGF0ZSAiKyVZJW0lZF8lSCVNJVMiYF0iID4+IC90bXAvam91cm5hbGxvZwpub2h1cCAvdXNyL2xvY2FsL2Jpbi9qb3VybmFsLXdhdGNoIDI+JjEgJgoKZWNobyAiW2AvYmluL2RhdGUgIislWSVtJWRfJUglTSVTImBdIiA+PiAvdG1wL2RheGRldi1yZWNvbmZpZ3VyZS1sb2dzCm5vaHVwIC91c3IvbG9jYWwvYmluL2RheGN0bCBsaXN0ID4+IC90bXAvZGF4ZGV2LXJlY29uZmlndXJlLWxvZ3MgMj4mMQplY2hvICJbYC9iaW4vZGF0ZSAiKyVZJW0lZF8lSCVNJVMiYF0iID4+IC90bXAvZGF4ZGV2LXJlY29uZmlndXJlLWxvZ3MKbm9odXAgL3Vzci9sb2NhbC9iaW4vZGF4Y3RsIHJlY29uZmlndXJlLWRldmljZSAtLW1vZGU9c3lzdGVtLXJhbSBhbGwgPj4gL3RtcC9kYXhkZXYtcmVjb25maWd1cmUtbG9ncyAyPiYxCgpub2h1cCAvdXNyL2xvY2FsL2Jpbi9kYXhjdGwgbGlzdCA+IC92YXIvbG9jYWwvZGF4Y3RsLWluZm8K
+    systemd:
+      units:
+        - contents: |
+            [Unit]
+            Description=Automatic daxctl device reconfiguration
+            Documentation=man:daxctl-reconfigure-device(1)
+            [Service]
+            Type=forking
+            GuessMainPID=false
+            ExecStart=/bin/sh -c "exec /usr/local/bin/daxdev-reconfigure %i"
+          enabled: true
+          name: "daxdev-reconfigure@.service"

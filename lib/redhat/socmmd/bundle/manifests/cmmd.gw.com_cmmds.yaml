@@ -1,0 +1,112 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.1
+  creationTimestamp: null
+  name: cmmds.cmmd.samsung.com
+spec:
+  group: cmmd.samsung.com
+  names:
+    kind: CMMD
+    listKind: CMMDList
+    plural: cmmds
+    singular: cmmd
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: CMMD is the Schema for the cmmds API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CMMDSpec defines the desired state of CMMD
+            properties:
+              allocate:
+                description: Specify resource allocation manually
+                properties:
+                  cpu:
+                    type: string
+                  memory:
+                    type: string
+                  nodeName:
+                    type: string
+                type: object
+              allocateMode:
+                description: Specify resource allocation mode
+                enum:
+                - auto
+                - manual
+                type: string
+              enable:
+                description: Whether use of CMMD
+                type: boolean
+              payload:
+                description: Specify user resource manifest. e.g.) Pod, Deployment,
+                  Replicaset
+                type: object
+                x-kubernetes-embedded-resource: true
+                x-kubernetes-preserve-unknown-fields: true
+            required:
+            - allocateMode
+            - enable
+            - payload
+            type: object
+          status:
+            description: CMMDStatus defines the observed state of CMMD
+            properties:
+              allocateMode:
+                description: AllocateMode
+                type: string
+              amountMemory:
+                description: AmountMemory
+                format: int64
+                type: integer
+              amountMemoryStr:
+                description: AmountMemoryStr
+                type: string
+              cpu:
+                description: CPU
+                type: string
+              enable:
+                description: Enable
+                type: boolean
+              kind:
+                description: Kind
+                type: string
+              memory:
+                description: Memory
+                type: string
+              name:
+                description: Name
+                type: string
+              namespace:
+                description: Namespace
+                type: string
+              nodeName:
+                description: NodeName
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: null
+  storedVersions: null

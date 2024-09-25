@@ -1,0 +1,34 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: cmmd
+  name: 99-cmmdc-util
+spec:
+  config:
+    ignition:
+      version: 3.4.0
+    storage:
+      files:
+      - path: /usr/local/bin/cmmdc-util
+        mode: 493
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,IyEvYmluL2Jhc2gKCmlmIFsgIiRMRF9MSUJSQVJZX1BBVEgiICE9ICIiIF0KdGhlbgoJTERfTElCUkFSWV9QQVRIPS91c3IvbG9jYWwvYmluOiR7TERfTElCUkFSWV9QQVRIfQoJZXhwb3J0IExEX0xJQlJBUllfUEFUSAplbHNlCglMRF9MSUJSQVJZX1BBVEg9L3Vzci9sb2NhbC9iaW4KCWV4cG9ydCBMRF9MSUJSQVJZX1BBVEgKZmkKCm5vaHVwIC91c3IvbG9jYWwvYmluL2pvdXJuYWwtd2F0Y2ggMj4mMSAmCm5vaHVwIC91c3IvbG9jYWwvYmluL2RheGN0bCBsaXN0ID4gL3Zhci9sb2NhbC9kYXhjdGwtaW5mbwo=
+      - path: /usr/local/bin/journal-watch
+        mode: 493
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,IyEgL2Jpbi9iYXNoCnRvdWNoIC90bXAvam91cm5hbGxvZwpjaG1vZCBhK3cgL3RtcC9qb3VybmFsbG9nCmVjaG8gIltgL2Jpbi9kYXRlICIrJVklbSVkXyVIJU0lUyJgXSIgPiAvdG1wL2pvdXJuYWxsb2cKZm9yICgoIDsgOyApKQpkbyAKICAgL3Vzci9iaW4vam91cm5hbGN0bCAtLXNpbmNlPSI2MHMgYWdvIiAtLW5vLXBhZ2VyIHwgZ3JlcCAtRSAtaSAnY3hsfGNtbWR8bW9udGFnZXx3YXJuaW5nJyA+IC90bXAvam91cm5hbGxvZwogICBzbGVlcCA2MApkb25l
+    systemd:
+      units:
+        - contents: |
+            [Unit]
+            Description=Automatic cmmdc utilization
+            Documentation=man:cmmdc-util(1)
+            [Service]
+            Type=forking
+            GuessMainPID=false
+            ExecStart=/bin/sh -c "exec /usr/local/bin/cmmdc-util %i"
+          enabled: true
+          name: "cmmdc-util@.service"

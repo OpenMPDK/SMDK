@@ -1,0 +1,7 @@
+apiVersion: cmmd.samsung.com/v1
+kind: Label
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: cmmd
+  name: cmmd-node-label
+  namespace: socmmd

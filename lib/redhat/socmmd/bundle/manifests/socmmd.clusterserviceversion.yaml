@@ -1,0 +1,503 @@
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "cmmd.samsung.com/v1",
+          "kind": "CMMD",
+          "metadata": {
+            "name": "my-app",
+            "namespace": "my-namespace"
+          },
+          "spec": {
+            "allocateMode": "auto",
+            "enable": true,
+            "payload": {
+              "apiVersion": "apps/v1",
+              "kind": "Deployment",
+              "metadata": {
+                "name": "my-app"
+              },
+              "spec": {
+                "replicas": 1,
+                "selector": {
+                  "matchLabels": {
+                    "name": "my-app"
+                  }
+                },
+                "template": {
+                  "metadata": {
+                    "labels": {
+                      "name": "my-app"
+                    }
+                  },
+                  "spec": {
+                    "containers": [
+                      {
+                        "image": "quay.io/my-account/my-app:latest",
+                        "name": "my-app-01"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "cmmd.samsung.com/v1",
+          "kind": "Label",
+          "metadata": {
+            "labels": {
+              "machineconfiguration.openshift.io/role": "cmmd"
+            },
+            "name": "cmmd-node-label",
+            "namespace": "socmmd"
+          }
+        }
+      ]
+    capabilities: Seamless Upgrades
+    categories: Integration & Delivery
+    console.openshift.io/plugins: '["socmmd-console-plugin"]'
+    containerImage: quay.io/rasen708/ncn-operator:v0.5.13
+    createdAt: "2024-08-01T05:45:38Z"
+    description: Provides the ncn extend
+    operatorframework.io/initialization-resource: |-
+      {
+        "apiVersion": "cmmd.samsung.com/v1",
+        "kind": "Label",
+        "metadata": {
+          "name": "cmmd-node-label",
+          "namespace": "socmmd",
+          "labels": {}
+        },
+        "spec": {}
+      }
+    operatorframework.io/suggested-namespace: socmmd-system
+    operators.operatorframework.io/builder: operator-sdk-v1.31.0-ocp
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    repository: https://github.com/geunwookim/ncn-operator
+    support: geunwookim
+  name: ncn-operator.v0.5.13
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: CMMD is the Schema for the cmmds API
+      displayName: CMMD
+      kind: CMMD
+      name: cmmds.cmmd.samsung.com
+      version: v1
+    - description: Label is the Schema for the labels API
+      displayName: Node Label
+      kind: Label
+      name: labels.cmmd.samsung.com
+      version: v1
+  description: This operator is for ncn extend
+  displayName: ncn-operator
+  icon:
+  - base64data: PHN2ZyBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGZpbGwtcnVsZT0iZXZlbm9kZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLW1pdGVybGltaXQ9IjEuNDE0MjEiIHZpZXdCb3g9IjAgMCA1NjAgNDAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxnIGZpbGw9IiMwMDMyYTAiIGZpbGwtcnVsZT0ibm9uemVybyIgdHJhbnNmb3JtPSJtYXRyaXgoMS42Nzc4NSAwIDAgMS42Nzc4NSAyOC4zMjIxIDE2MC4xMjYpIj48cGF0aCBkPSJtMjAuNzggMzIuOTNjLjQxIDEuMDMuMjggMi4zNS4wOCAzLjE1LS4zNSAxLjQyLTEuMzEgMi44Ny00LjE1IDIuODctMi42NiAwLTQuMjgtMS41NC00LjI4LTMuODZ2LTQuMTNoLTExLjQzdjMuMjhjMCA5LjUgNy40NyAxMi4zNyAxNS40OCAxMi4zNyA3LjcgMCAxNC4wNC0yLjYyIDE1LjA1LTkuNzMuNTItMy42OC4xNC02LjA5LS4wNC02Ljk4LTEuOC04LjkyLTE3Ljk2LTExLjU4LTE5LjE3LTE2LjU3LS4xNjgtLjczNi0uMTgyLTEuNDk5LS4wNC0yLjI0LjMtMS4zNyAxLjIzLTIuODYgMy44OS0yLjg2IDIuNSAwIDMuOTUgMS41NCAzLjk1IDMuODZ2Mi42NGgxMC42M3YtM2MwLTkuMjgtOC4zMy0xMC43My0xNC4zNS0xMC43My03LjU4IDAtMTMuNzcgMi41MS0xNC45IDkuNDYtLjMgMS45LS4zNSAzLjYuMSA1Ljc0IDEuODUgOC43IDE2Ljk4IDExLjIyIDE5LjE4IDE2LjczIi8+PHBhdGggZD0ibTQ2LjYgMi4zNi03LjkgNDIuNTloMTEuNTFsNS44My0zOC42NWguMjRsNS42NyAzOC42NWgxMS40NWwtNy44NS00Mi42em02NC4zNSAwLTUuMjUgMzIuNTZoLS4yNWwtNS4yNC0zMi41NmgtMTcuMzdsLS45NCA0Mi41OWgxMC42NmwuMjYtMzguMjloLjI0bDcuMTEgMzguMjloMTAuODFsNy4xMi0zOC4yOGguMjNsLjI3IDM4LjI4aDEwLjY1bC0uOTQtNDIuNnoiLz48cGF0aCBkPSJtMjAuNzggMzIuOTNjLjQxIDEuMDMuMjggMi4zNS4wOCAzLjE1LS4zNSAxLjQyLTEuMzEgMi44Ny00LjE1IDIuODctMi42NiAwLTQuMjgtMS41NC00LjI4LTMuODZ2LTQuMTNoLTExLjQzdjMuMjhjMCA5LjUgNy40NyAxMi4zNyAxNS40OCAxMi4zNyA3LjcgMCAxNC4wNC0yLjYyIDE1LjA1LTkuNzMuNTItMy42OC4xNC02LjA5LS4wNC02Ljk4LTEuOC04LjkyLTE3Ljk2LTExLjU4LTE5LjE3LTE2LjU3LS4xNjgtLjczNi0uMTgyLTEuNDk5LS4wNC0yLjI0LjMtMS4zNyAxLjIzLTIuODYgMy44OS0yLjg2IDIuNSAwIDMuOTUgMS41NCAzLjk1IDMuODZ2Mi42NGgxMC42M3YtM2MwLTkuMjgtOC4zMy0xMC43My0xNC4zNS0xMC43My03LjU4IDAtMTMuNzcgMi41MS0xNC45IDkuNDYtLjMgMS45LS4zNSAzLjYuMSA1Ljc0IDEuODUgOC43IDE2Ljk4IDExLjIyIDE5LjE4IDE2LjczIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMzguNDcgLS4wOCkiLz48cGF0aCBkPSJtMTk1IDM4LjU3YzIuOTYgMCAzLjg3LTIuMDQgNC4wOC0zLjA4LjA5LS40Ni4xLTEuMDguMS0xLjYzdi0zMS41aDEwLjc4djMwLjUzYy4wMDIuOTM0LS4wMzEgMS44NjgtLjEgMi44LS43NSA3Ljk1LTcuMDMgMTAuNTMtMTQuODYgMTAuNTMtNy44NCAwLTE0LjEyLTIuNTgtMTQuODctMTAuNTMtLjAzLS40Mi0uMTEtMi4wMi0uMS0yLjh2LTMwLjU0aDEwLjc4djMxLjVjLS4wMS41Ni4wMSAxLjE4LjEgMS42NC4yIDEuMDQgMS4xMiAzLjA4IDQuMDkgMy4wOG01Mi4wOC0zNi4yMS41OCAzMy40M2gtLjIzbC05LjgtMzMuNDNoLTE1Ljh2NDIuMTRoMTAuNDdsLS41OC0zNC41OWguMjNsMTAuNTEgMzQuNTloMTUuMTd2LTQyLjE0em0zNi43NSAzNS43N2MzLjA4IDAgNC4xNi0xLjk1IDQuMzUtMy4xLjA5LS40Ny4xLTEuMDcuMS0xLjZ2LTYuMmgtNC4zN3YtNi4yaDE1LjA5djExLjQyYzAgLjgtLjAyIDEuMzgtLjE1IDIuOC0uNyA3Ljc2LTcuNDMgMTAuNTMtMTQuOTggMTAuNTNzLTE0LjI3LTIuNzctMTQuOTgtMTAuNTNjLS4xMi0xLjQyLS4xNS0yLS4xNS0yLjh2LTE3LjkyYzAtLjc2LjEtMi4xLjE4LTIuOC45NS03Ljk3IDcuNC0xMC41MyAxNC45NS0xMC41M3MxNC4xNyAyLjU0IDE0Ljk1IDEwLjUyYy4xNCAxLjM2LjEgMi44LjEgMi44djEuNDNoLTEwLjc0di0yLjM5czAtMS0uMTMtMS42MmMtLjItLjk0LTEtMy4xLTQuMjYtMy4xLTMuMSAwLTQuMDEgMi4wNS00LjI0IDMuMS0uMTMuNTYtLjE4IDEuMzItLjE4IDIuMDF2MTkuNDdjMCAuNTQuMDIgMS4xNC4xIDEuNjIuMiAxLjE0IDEuMjggMy4wOSA0LjM2IDMuMDkiLz48L2c+PC9zdmc+
+    mediatype: image/svg+xml
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - endpoints
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - nodes
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - serviceaccounts
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          - events.k8s.io
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - replicasets
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - console.openshift.io
+          resources:
+          - consoleplugins
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - cmmd.samsung.com
+          resources:
+          - cmmds
+          - labels
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - cmmd.samsung.com
+          resources:
+          - cmmds/finalizers
+          - labels/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - cmmd.samsung.com
+          resources:
+          - cmmds/status
+          - labels/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - machineconfiguration.openshift.io
+          resources:
+          - machineconfigs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - operator.openshift.io
+          resources:
+          - consoles
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - operators.coreos.com
+          resources:
+          - clusterserviceversions
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterrolebindings
+          verbs:
+          - '*'
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - clusterroles
+          verbs:
+          - '*'
+        - apiGroups:
+          - security.openshift.io
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - use
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: socmmd-controller-manager
+      deployments:
+      - label:
+          app.kubernetes.io/component: manager
+          app.kubernetes.io/created-by: socmmd
+          app.kubernetes.io/instance: controller-manager
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: deployment
+          app.kubernetes.io/part-of: socmmd
+          control-plane: controller-manager
+        name: socmmd-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+              labels:
+                control-plane: controller-manager
+            spec:
+              tolerations:
+                - key: node-role.kubernetes.io/master
+                  effect: NoSchedule
+                  operator: Exists
+              affinity:
+                nodeAffinity:
+                  requiredDuringSchedulingIgnoredDuringExecution:
+                    nodeSelectorTerms:
+                    - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: Exists
+                      - key: kubernetes.io/arch
+                        operator: In
+                        values:
+                        - amd64
+                        - arm64
+                        - ppc64le
+                        - s390x
+                      - key: kubernetes.io/os
+                        operator: In
+                        values:
+                        - linux
+              containers:
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --logtostderr=true
+                - --v=0
+                image: registry.redhat.io/openshift4/ose-kube-rbac-proxy:v4.14
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 5m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+              - args:
+                - --health-probe-bind-address=:8081
+                - --metrics-bind-address=127.0.0.1:8080
+                - --leader-elect
+                command:
+                - /manager
+                env:
+                - name: OPER_PROPS
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['operatorframework.io/properties']
+                - name: OPER_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.annotations['olm.operatorNamespace']
+                image: quay.io/rasen708/ncn-operator:v0.5.13
+                imagePullPolicy: Always
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: "1"
+                    memory: 256Mi
+                  requests:
+                    cpu: "1"
+                    memory: 256Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                startupProbe:
+                  failureThreshold: 30
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  periodSeconds: 10
+                volumeMounts:
+                - name: host-os-release
+                  mountPath: /host/etc/os-release
+                  readOnly: true
+              volumes:
+              - name: host-os-release
+                hostPath:
+                  path: /usr/lib/os-release
+                  type: File
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: socmmd-controller-manager
+              terminationGracePeriodSeconds: 90
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: socmmd-controller-manager
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - ncn
+  - memory
+  - extend
+  links:
+  - name: NCN Operator
+    url: https://ncn-operator.domain
+  maintainers:
+  - email: geunwookim@gmail.com
+    name: geunwookim
+  maturity: alpha
+  provider:
+    name: geunwookim
+  replaces: ncn-operator.v0.5.12
+  version: 0.5.13

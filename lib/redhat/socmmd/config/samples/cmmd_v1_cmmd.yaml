@@ -1,0 +1,26 @@
+apiVersion: cmmd.samsung.com/v1
+kind: CMMD
+metadata:
+  name: my-app
+  namespace: my-namespace
+spec:
+  enable: true
+  allocateMode: auto
+  payload:
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: my-app
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          name: my-app
+      template:
+        metadata:
+          labels:
+            name: my-app
+        spec:
+          containers:
+          - image: quay.io/my-account/my-app:latest
+            name: my-app-01

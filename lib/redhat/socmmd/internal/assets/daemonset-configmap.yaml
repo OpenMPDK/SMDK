@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: default
+  name: cmmdc-config
+data:
+  config.yaml: |
+    apiVersion: operators.coreos.com/v1
+    kind: Operator
+    name: ncn-operator
+    metrics:
+      use: true
+      output: json
+      bindAddress: :37654
+      secured: false
+      certificate: secret/server.crt
+      key: secret/server.key
+    journalConfig:
+      sinceSeconds: 60
+      path: /tmp/journallog
+      collector: /tmp/journalwatch
+    machineConfig:
+      name: 99-cmmdc-hook
