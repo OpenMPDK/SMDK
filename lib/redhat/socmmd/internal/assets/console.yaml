@@ -43,7 +43,7 @@ spec:
                 - linux
       containers:
         - name: socmmd-console-plugin
-          image: quay.io/samsung_sag/socmmd-console-plugin@sha256:4aaba19478d907233417b741116aa4100760c1d5d79cf8677198ec63dbdb54d2
+          image: quay.io/samsung_sag/socmmd-console-plugin@sha256:fa7c196988c6afebaaee2e9645bec471fa63231951a35d228bd47c8cb05c7e00
           ports:
             - containerPort: 9443
               protocol: TCP

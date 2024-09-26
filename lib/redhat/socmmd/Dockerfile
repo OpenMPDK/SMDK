@@ -17,7 +17,7 @@ COPY internal/ internal/
 COPY mc-gen.sh mc-gen.sh
 
 # Append daxctl into MC
-RUN ./mc-gen.sh
+RUN sh ./mc-gen.sh
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
