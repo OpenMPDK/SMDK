@@ -1,7 +1,4 @@
 # Samsung Operator for CMM-D (SOCMMD)
-![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/wunicorns/gostress) 
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes)
-![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/wunicorns/gostress?sort=semver)   
 
 Samsung Operator for CMM-D provides a way to integrate and utilize CXL Memory Module Device manufactured by Samsung in PasS environment.
 This is implemented by utilizing [__technology that utilizes Linux NUMA in CMM-D hierarchy__](https://semiconductor.samsung.com/news-events/tech-blog/utilizing-linux-numa-in-cmm-d-memory-tiering/) and CoreOs and Openshift Operator technology provided by RedHat.
@@ -52,7 +49,7 @@ For information on the environment in which the Samsung Operator for CMM-D was t
 <br>   
 
 ## Quick Start Guide
-Hardware and software requirements for installing, configuring, and utilizing the Samsung Operator for CMM-D can be found in the document [__here__](./document/Quick_StartGuid.md).   
+Hardware and software requirements for installing, configuring, and utilizing the Samsung Operator for CMM-D can be found in the document [__here__](./document/Quick_Start_Guide.md).   
 For instructions on how to use it, please refer to the document [__here__](./document/Quick_Start_Guide.md)  
 
 

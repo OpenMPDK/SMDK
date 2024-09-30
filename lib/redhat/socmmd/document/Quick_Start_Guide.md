@@ -59,14 +59,14 @@ This is an explanation of how to use the Samsung Operator for CMM-D.
 	   ![image 3 - Web Console Operator Search2](./images/webconsole_operator_search.png)   
 	   <br>
 
-	3) Select the Operator and Specify Installation Options   
+	2) Select the Operator and Specify Installation Options   
 	
 	   The image below shows the installation screen that appears when you click on the operator found in step 1). After selecting the necessary installation options, click the 'Install' button to proceed.   
 
 	   ![image 4 - Web Console Operator ](./images/webconsole_operator_install_2.png)   
 	   <br>
 
-	4) Operator Installation   
+	3) Operator Installation   
 	
 	   The image below shows the installation screen that appears when you click the 'Install' button in the previous image.   <br>
 
@@ -76,7 +76,42 @@ This is an explanation of how to use the Samsung Operator for CMM-D.
 	   The image below shows the screen displayed upon completion of the operator installation.   
 
 	   ![image 6 - Web Console Operator Install 2](./images/operator_install_success.png)   
-	   <br><br>   
+	   <br>
+
+	4) As a mandatory step after installing the operator, set the Node Label.<br>
+After entering the Node Label used on the worker node equipped with CMM-D, the Machine Config is automatically applied to the target worker nodes. <br>
+On worker nodes where the Machine Config is not applied, the use of CMM-D for Pods deployed via the operator is not guaranteed. <br>
+
+	   Click the Console plugin item, then select Enable from the pop-up menu and save.   
+	   ![image 1 - Web Console Operator Setting](./images/installed_plugin_enable.png)   
+	   <br>
+
+	   When Enable is set, a refresh alert will pop up after a while. Click Refresh web console.   
+	   ![image 2 - Web Console Operator Setting](./images/installed_plugin_enable_alert.png)   
+	   <br>
+
+	   When the screen is refreshed, you can see a UI similar to the image below.  
+	   ![image 3 - Web Console Operator Setting](./images/installed_plugin_refresh_after.png)   
+	   <br>
+
+	   Clicking the SetLabel button will bring up the Label input pop-up. Enter the Node Label of the worker node equipped with CMM-D. (One or more)   
+	   ![image 4 - Web Console Operator Setting](./images/installed_plugin_set_label.png)   
+	   <br>
+
+	   The Machin Config is applied sequentially to the target worker nodes and reboot occurs. All target worker nodes must complete reboot for the operator to operate properly.   
+	   ![image 5 - Web Console Operator Setting](./images/installed_plugin_set_label_after.png)   
+	   <br>
+     
+    5) This is an additional step.<br>
+    The operator deploys a Daemonset named "cmmdc" to collect information from each worker node. If the Daemonset is not deployed properly, the operator is not guaranteed to operate properly. <br>
+    If Taints are set on the worker node, you can apply Toleration through the following process. <br>
+    Create a ConfigMap named "cmmd-config" in the same namespace as the operator and add the Toleration to be applied to the CMMD_ND_TOLERATIONS item. <br>
+    <br>
+
+	   The image below shows an example.   
+	   ![image 1 - Web Console Operator Setting](./images/installed_toleration.png)   
+	   <br>
+
 
 3. Samsung Operator for CMM-D Usage Examples   
 The following explains the Custom Resource Definition (CRD) required for using Samsung Operator for CMM-D, how to submit a Custom Resource (CR) based on the CRD, and how to check and delete Pods created through the CR, illustrated with two examples.
@@ -215,7 +250,7 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: stress
-        image: <stress image>
+        image: quay.io/alicek106/stress:latest
         args: ["tail", "-f", "/dev/null"]
         resources:						<6>
           requests:
@@ -310,7 +345,7 @@ spec:
             node-role.kubernetes.io/cmmd: ""
           containers:
           - name: stress01
-            image: <stress image>
+            image: quay.io/alicek106/stress:latest
             args: ["tail", "-f", "/dev/null"]
             resources:					
               requests:
