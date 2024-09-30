@@ -40,9 +40,9 @@ The operator supports the following features:
 The Samsung Operator for CMM-D has been tested and verified on OpenShift and Kubernetes.   
 Supported versions include:   
 
-|Kubernetes version|Openshift version| RHEL version|
-|-------------------|-------------------|-------------------|
-|v1.27.10+c79e5e2|4.14.16|9.2
+|Kubernetes version|Openshift version| 
+|-------------------|-------------------| 
+|v1.27.10+c79e5e2|4.14.16| 
  
 For information on the environment in which the Samsung Operator for CMM-D was tested and verified, please refer to the document [__here__](./document/CXL_requiements.md)
 
