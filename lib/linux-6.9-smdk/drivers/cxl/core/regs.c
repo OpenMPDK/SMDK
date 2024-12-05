@@ -7,6 +7,7 @@
 #include <cxlmem.h>
 #include <cxlpci.h>
 #include <pmu.h>
+#include <hmu.h>
 
 #include "core.h"
 
@@ -400,6 +401,34 @@ int cxl_map_pmu_regs(struct cxl_register_map *map, struct cxl_pmu_regs *regs)
 	return 0;
 }
 EXPORT_SYMBOL_NS_GPL(cxl_map_pmu_regs, CXL);
+
+int cxl_map_hmu_regs(struct cxl_register_map *map, struct cxl_hmu_regs *regs)
+{
+	struct device *dev = map->host;
+	resource_size_t phys_addr, hmu_reg_size;
+
+	phys_addr = map->resource;
+	regs->hmu = devm_cxl_iomap_block(dev, phys_addr, CXL_HMU_COMMON_CAP_SIZE);
+	if (!regs->hmu)
+		return -ENOMEM;
+
+	hmu_reg_size = cxl_hmu_get_reg_size(regs);
+	if (hmu_reg_size == CXL_RESOURCE_NONE) {
+		devm_iounmap(dev, regs->hmu);
+		return -ENOMEM;
+	}
+
+	devm_iounmap(dev, regs->hmu);
+	devm_release_mem_region(dev, phys_addr, CXL_HMU_COMMON_CAP_SIZE);
+
+	dev_dbg(dev, "HMU base: 0x%llx, size: 0x%llx\n", phys_addr, hmu_reg_size);
+	regs->hmu = devm_cxl_iomap_block(dev, phys_addr, hmu_reg_size);
+	if (!regs->hmu)
+		return -ENOMEM;
+
+	return 0;
+}
+EXPORT_SYMBOL_NS_GPL(cxl_map_hmu_regs, CXL);
 
 static int cxl_map_regblock(struct cxl_register_map *map)
 {

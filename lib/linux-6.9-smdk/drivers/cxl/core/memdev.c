@@ -323,6 +323,20 @@ static struct cxl_region *cxl_dpa_to_region(struct cxl_memdev *cxlmd, u64 dpa)
 	return ctx.cxlr;
 }
 
+u64 cxl_memdev_dpa_to_hpa(struct cxl_memdev *cxlmd, u64 dpa)
+{
+	struct cxl_dev_state *cxlds = cxlmd->cxlds;
+	struct cxl_region *cxlr = cxl_dpa_to_region(cxlmd, dpa);
+
+	if (!cxlr) {
+		dev_dbg(cxlds->dev, "no region\n");
+		return ULLONG_MAX;
+	}
+
+	return cxl_trace_hpa(cxl_dpa_to_region(cxlmd, dpa), cxlmd, dpa);
+}
+EXPORT_SYMBOL_NS_GPL(cxl_memdev_dpa_to_hpa, CXL);
+
 static int cxl_validate_poison_dpa(struct cxl_memdev *cxlmd, u64 dpa)
 {
 	struct cxl_dev_state *cxlds = cxlmd->cxlds;

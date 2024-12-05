@@ -7,6 +7,7 @@ system_ss.add(when: 'CONFIG_CXL',
                    'cxl-cdat.c',
                    'cxl-events.c',
                    'cxl-cpmu.c',
+                   'cxl-chmu.c',
                    'switch-mailbox-cci.c',
                ),
                if_false: files(

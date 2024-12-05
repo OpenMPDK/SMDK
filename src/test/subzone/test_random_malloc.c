@@ -18,15 +18,15 @@ int main(void)
 	srand(time(NULL));
 
 	while (1) {
-#ifdef USE_MALLOC
 		size = rand() % MAX_UNIT;
+#ifdef USE_MALLOC
 		addr = malloc(size);
 		assert(addr);
-		memset(addr, 0x0, size);
 #else
-		addr = mmap(NULL, size, PROT_READ|PROT_WRITE, flag, -1, 0);
+		addr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 		assert(addr != MAP_FAILED);
 #endif
+		memset(addr, 0x0, size);
 		// free(addr) or munmap(addr, size)
 		total_size += size;
 		if (total_size >= MAX_SIZE)

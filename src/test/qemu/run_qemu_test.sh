@@ -41,7 +41,7 @@ function check_region_created() {
 	fi
 }
 
-REGION_SIZE=$((1*1024*1024*1024))
+REGION_SIZE=$((16*1024*1024*1024))
 function test_cxl_create_region() {
 	log_normal "Run testcase - cxl create-region"
 	$CXLCLI create-region -d decoder0.0 -s $REGION_SIZE -t ram

@@ -17,6 +17,7 @@
 #include "cxlsls.h"
 #include "cxl.h"
 #include "pmu.h"
+#include "hmu.h"
 
 /**
  * DOC: cxl pci
@@ -795,7 +796,7 @@ static int cxl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct cxl_dev_state *cxlds;
 	struct cxl_register_map map;
 	struct cxl_memdev *cxlmd;
-	int i, rc, pmu_count;
+	int i, rc, pmu_count, hmu_count;
 	bool irq_avail;
 
 	/*
@@ -911,6 +912,29 @@ static int cxl_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		rc = devm_cxl_pmu_add(cxlds->dev, &pmu_regs, cxlmd->id, i, CXL_PMU_MEMDEV);
 		if (rc) {
 			dev_dbg(&pdev->dev, "Could not add PMU instance\n");
+			break;
+		}
+	}
+
+	hmu_count = cxl_count_regblock(pdev, CXL_REGLOC_RBI_HMU);
+	for (i = 0; i < hmu_count; i++) {
+		struct cxl_hmu_regs hmu_regs;
+
+		rc = cxl_find_regblock_instance(pdev, CXL_REGLOC_RBI_HMU, &map, i);
+		if (rc) {
+			dev_dbg(&pdev->dev, "Could not find HMU regblock\n");
+			break;
+		}
+
+		rc = cxl_map_hmu_regs(&map, &hmu_regs);
+		if (rc) {
+			dev_dbg(&pdev->dev, "Could not map HMU regs\n");
+			break;
+		}
+
+		rc = devm_cxl_hmu_add(cxlds->dev, &hmu_regs, cxlmd->id, i, CXL_HMU_MEMDEV);
+		if (rc) {
+			dev_dbg(&pdev->dev, "Could not add HMU instance\n");
 			break;
 		}
 	}

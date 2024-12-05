@@ -17,6 +17,7 @@
 #include "cxl_pci.h"
 #include "cxl_component.h"
 #include "cxl_cpmu.h"
+#include "cxl_chmu.h"
 #include "cxl_device.h"
 
 #define CXL_CACHE_LINE_SIZE 64
@@ -24,6 +25,9 @@
 #define CXL_DEVICE_REG_BAR_IDX 2
 
 #define CXL_CPMU_SIZE          0x8f8
+
+#define CXL_CHMU_SIZE          (0x10 + CXL_NUM_CHMU_INSTANCES * \
+                                       CXL_HMU_INSTANCE_LEN)
 
 #define CXL_WINDOW_MAX 10
 

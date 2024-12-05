@@ -7,6 +7,7 @@
 extern const struct device_type cxl_nvdimm_bridge_type;
 extern const struct device_type cxl_nvdimm_type;
 extern const struct device_type cxl_pmu_type;
+extern const struct device_type cxl_hmu_type;
 
 extern struct attribute_group cxl_base_attribute_group;
 
@@ -97,5 +98,7 @@ long cxl_pci_get_latency(struct pci_dev *pdev);
 int cxl_update_hmat_access_coordinates(int nid, struct cxl_region *cxlr,
 				       enum access_coordinate_class access);
 bool cxl_need_node_perf_attrs_update(int nid);
+
+resource_size_t cxl_hmu_get_reg_size(struct cxl_hmu_regs *regs);
 
 #endif /* __CXL_CORE_H__ */

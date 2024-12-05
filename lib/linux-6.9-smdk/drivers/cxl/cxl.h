@@ -224,6 +224,10 @@ struct cxl_regs {
 		void __iomem *pmu;
 	);
 
+	struct_group_tagged(cxl_hmu_regs, hmu_regs,
+		void __iomem *hmu;
+	);
+
 	/*
 	 * RCH downstream port specific RAS register
 	 * @aer: CXL 3.0 8.2.1.1 RCH Downstream Port RCRB
@@ -289,6 +293,7 @@ int cxl_map_component_regs(const struct cxl_register_map *map,
 int cxl_map_device_regs(const struct cxl_register_map *map,
 			struct cxl_device_regs *regs);
 int cxl_map_pmu_regs(struct cxl_register_map *map, struct cxl_pmu_regs *regs);
+int cxl_map_hmu_regs(struct cxl_register_map *map, struct cxl_hmu_regs *regs);
 
 enum cxl_regloc_type;
 int cxl_count_regblock(struct pci_dev *pdev, enum cxl_regloc_type type);
@@ -838,8 +843,9 @@ void cxl_driver_unregister(struct cxl_driver *cxl_drv);
 #define CXL_DEVICE_PMEM_REGION		7
 #define CXL_DEVICE_DAX_REGION		8
 #define CXL_DEVICE_PMU			9
-#define CXL_DEVICE_IMDB			10
-#define CXL_DEVICE_PNM_SLS		11
+#define CXL_DEVICE_HMU			10
+#define CXL_DEVICE_IMDB			11
+#define CXL_DEVICE_PNM_SLS		12
 
 #define MODULE_ALIAS_CXL(type) MODULE_ALIAS("cxl:t" __stringify(type) "*")
 #define CXL_MODALIAS_FMT "cxl:t%d"
