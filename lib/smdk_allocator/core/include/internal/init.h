@@ -30,7 +30,6 @@
 #define MAX_MEMPOOL_LIMIT_MB    (1024 * 1024)    /* temporal limit, 1TB */
 #define NR_ARENA_MAX 128
 #define ARENA_AUTOSCALE_FACTOR 0
-#define ARENA_SCALE_FACTOR 2
 
 /* utility constants */
 #ifndef GB
@@ -96,8 +95,6 @@ extern smdk_config opt_smdk;
 typedef struct arena_pool{
     unsigned arena_id[NR_ARENA_MAX];    /* normal/exmem arena id */
     int nr_arena;                        /* the number of normal/exmem arena in arena pool */
-    int arena_index;                    /* arena index, used only when use_auto_arena_scaling=false to traverse avaiable arena index(round-robin)*/
-    pthread_rwlock_t rwlock_arena_index;
     mem_type_t type_mem;
     struct bitmask *nodemask;
 }arena_pool;

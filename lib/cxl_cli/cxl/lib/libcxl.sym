@@ -283,8 +283,14 @@ global:
 	cxl_port_decoders_committed;
 } LIBCXL_6;
 
-/* smdk lib */
 LIBCXL_8 {
+global:
+    cxl_memdev_trigger_poison_list;
+    cxl_region_trigger_poison_list;
+} LIBCXL_7;
+
+/* smdk lib */
+LIBCXL_9 {
 global:
 	cxl_memdev_inject_poison;
 	cxl_memdev_clear_poison;
@@ -334,4 +340,4 @@ global:
 	cxl_cmd_new_get_sld_qos_control;
 	cxl_cmd_new_set_sld_qos_control;
 	cxl_cmd_new_get_sld_qos_status;
-} LIBCXL_7;
+} LIBCXL_8;

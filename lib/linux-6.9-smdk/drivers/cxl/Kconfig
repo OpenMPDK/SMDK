@@ -100,6 +100,19 @@ config CXL_MEM
 
 	  If unsure say 'm'.
 
+config CXL_HMU
+	tristate "CXL Hotness Monitoring Unit"
+	depends on CXL_BUS
+	help
+	  Support hotness monitoring as defined in CXL rev 3.1
+	  ECN 'CXL Hotness Monitoring Unit' v0.9. CXL components may have
+	  one or more CXL Hotness Monitoring Units (CHMUs).
+
+	  Say 'y/m' to enable a driver that will attach to performance
+	  monitoring units.
+
+	  If unsure say 'm'.
+
 config CXL_PORT
 	default CXL_BUS
 	tristate

@@ -531,6 +531,11 @@ static void build_dvsecs(CXLType3Dev *ct3d)
             RBI_CXL_CPMU_REG | CXL_DEVICE_REG_BAR_IDX;
         regloc_dvsec->reg_base[2 + i].hi = 0;
     }
+    for (i = 0; i < CXL_NUM_CHMU_INSTANCES; i++) {
+        regloc_dvsec->reg_base[2 + CXL_NUM_CPMU_INSTANCES + i].lo =
+		    CXL_CHMU_OFFSET(i) | RBI_CXL_CHMU_REG | CXL_DEVICE_REG_BAR_IDX;
+        regloc_dvsec->reg_base[2 + CXL_NUM_CPMU_INSTANCES + i].hi = 0;
+    }
     cxl_component_create_dvsec(cxl_cstate, CXL2_TYPE3_DEVICE,
                                REG_LOC_DVSEC_LENGTH, REG_LOC_DVSEC,
                                REG_LOC_DVSEC_REVID, (uint8_t *)regloc_dvsec);
@@ -997,6 +1002,7 @@ void ct3_realize(PCIDevice *pci_dev, Error **errp)
                                    &ct3d->cci);
     cxl_cpmu_register_block_init(OBJECT(pci_dev), &ct3d->cxl_dstate, 0, 6);
     cxl_cpmu_register_block_init(OBJECT(pci_dev), &ct3d->cxl_dstate, 1, 7);
+    cxl_chmu_register_block_init(OBJECT(pci_dev), &ct3d->cxl_dstate, 0, 8);
     pci_register_bar(pci_dev, CXL_DEVICE_REG_BAR_IDX,
                      PCI_BASE_ADDRESS_SPACE_MEMORY |
                          PCI_BASE_ADDRESS_MEM_TYPE_64,

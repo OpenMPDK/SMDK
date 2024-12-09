@@ -1,12 +1,29 @@
 # Changelog
 
+## v2.2: CHMU Support / Userspace CLI Tool
+
+**1. CXL Hotness Monitoring Unit Support (CXL 3.2.8.2.8)**
+- The CXL Hotness Monitoring Unit (CHMU) is an interface that allows software running on CXL hosts to identify the ‘hot’ memory ranges (i.e., memory ranges with higher access frequency relative to other memory ranges) in CXL memory devices in terms of memory access counts.
+- Added a CXL device driver to support CHMU and an emulation function based on QEMU.
+
+**2. CXL-CLI**
+- Baseline v79 → v80
+
+**3. Bug Fix**
+- Fix for memory leak issue occuring when setting the 'use_auto_arena_scaling' allocator option to 'false'.
+- When 'use_auto_arena_scaling option' is set to false, the number of arenas is 1 per pool.
+- When 'true', the arena is generated in proportion to the number of CPUs as before.
+- Reference: https://github.com/OpenMPDK/SMDK/issues/31
+
+<br>
+
 ## v2.1: Intelligent Tiering Engine / Userspace CLI Tool
 
 **1. Intelligent Tiering Engine**
 - BW-Aware tiering: Weighted page allocation
 > The weight ratio has been changed to be adjusted in more finely. <br>
-> ~v2.0: Set weight to zero for saturated node, and max bandwidth of node for others. <br>
-> v2.1~: Set weight to as much as available bandwidth based on max bandwidth.
+> ~ v2.0: Set weight to zero for saturated node, and max bandwidth of node for others. <br>
+> v2.1 ~: Set weight to as much as available bandwidth based on max bandwidth.
 
 **2. Kernel**
 - Baseline v6.4 -> v6.9

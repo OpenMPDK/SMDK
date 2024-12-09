@@ -75,32 +75,20 @@ SMDK_INLINE unsigned get_auto_scale_target_arena(int pool_id){
 }
 
 SMDK_INLINE unsigned get_normal_target_arena(int pool_id){
-    arena_pool* pool = &g_arena_pool[pool_id];
-    int aid;
-
-    pthread_rwlock_wrlock(&pool->rwlock_arena_index);
-    aid = pool->arena_index++;
-    pthread_rwlock_unlock(&pool->rwlock_arena_index);
-
-    return pool->arena_id[aid%pool->nr_arena];
+    return g_arena_pool[pool_id].arena_id[0];
 }
 
 static int scale_arena_pool(){
     int nrcpu = sysconf(_SC_NPROCESSORS_ONLN);
     assert(nrcpu >0);
 
-    int narenas = 0;
+    int narenas = 1;
     if(opt_smdk.use_auto_arena_scaling){
         /* for SMP systems, create 2 normal/exmem arena per cpu by default */
         narenas = nrcpu << ARENA_AUTOSCALE_FACTOR;
-        smdk_info.nr_arena_normal = MIN(narenas, NR_ARENA_MAX);
-        smdk_info.nr_arena_exmem = MIN(narenas, NR_ARENA_MAX);
     }
-    else{
-        narenas = nrcpu << ARENA_SCALE_FACTOR;
-        smdk_info.nr_arena_normal = MIN(narenas, NR_ARENA_MAX);
-        smdk_info.nr_arena_exmem = MIN(narenas, NR_ARENA_MAX);
-    }
+    smdk_info.nr_arena_normal = MIN(narenas, NR_ARENA_MAX);
+    smdk_info.nr_arena_exmem = MIN(narenas, NR_ARENA_MAX);
     return narenas;
 }
 
@@ -148,10 +136,13 @@ static void _init_arena_pool(int pool_id, mem_type_t type_mem){
     assert(type_mem != mem_type_invalid);
 
     g_arena_pool[pool_id].type_mem = type_mem;
-    if (type_mem == mem_type_exmem) {
-        g_arena_pool[pool_id].nr_arena = smdk_info.nr_arena_exmem / smdk_info.nr_pool_exmem;
-    } else { /* type_mem == mem_type_normal */
-        g_arena_pool[pool_id].nr_arena = smdk_info.nr_arena_normal / smdk_info.nr_pool_normal;
+    g_arena_pool[pool_id].nr_arena = 1;
+    if (opt_smdk.use_auto_arena_scaling) {
+        if (type_mem == mem_type_exmem) {
+            g_arena_pool[pool_id].nr_arena = MAX(1, smdk_info.nr_arena_exmem / smdk_info.nr_pool_exmem);
+        } else { /* type_mem == mem_type_normal */
+            g_arena_pool[pool_id].nr_arena = MAX(1, smdk_info.nr_arena_normal / smdk_info.nr_pool_normal);
+        }
     }
 
     nodemask = get_nodemask_from_pool_id(pool_id);
@@ -167,8 +158,6 @@ static void _init_arena_pool(int pool_id, mem_type_t type_mem){
         assert(arena != NULL);
         arena_set_smdk_flag(arena, pool_id, nodemask);
     }
-    g_arena_pool[pool_id].arena_index = 0;
-    assert(!init_smdk_rwlock(&g_arena_pool[pool_id].rwlock_arena_index));
 }
 
 static void init_arena_pool(){
